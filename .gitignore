@@ -24,6 +24,7 @@ support_uploads/
 
 # WhatsApp: die gekoppelte Sitzung ist ein vollwertiger Kontozugang
 whatsapp-sitzung/
+.sitzung/
 .wwebjs_auth/
 .wwebjs_cache/
 

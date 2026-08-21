@@ -96,7 +96,7 @@ def _schon_bekannt(db, kennungen: list) -> set:
     # Nur die Ausfall-Tickets ansehen, und nur die neueren. Eine Meldung, die
     # laenger als vier Wochen liegt, gibt es beim Worker nicht mehr.
     for ticket in (db.query(SupportTicket)
-                   .filter(SupportTicket.subject.like(BETREFF_MARKE + "%"))
+                   .filter(SupportTicket.subject.ilike(BETREFF_MARKE + "%"))
                    .order_by(SupportTicket.id.desc()).limit(300).all()):
         for kennung in kennungen:
             if KENNUNG_MARKE + kennung + "]" in (ticket.message or ""):

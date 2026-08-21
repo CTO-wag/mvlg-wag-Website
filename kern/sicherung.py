@@ -10,7 +10,26 @@ import os
 import sqlite3
 from datetime import datetime
 
-from kern.einstellungen import BACKUP_DIR, BACKUP_KEEP, DATENBANK_DATEI
+from kern.einstellungen import (BACKUP_DIR, BACKUP_KEEP, DATABASE_URL,
+                                DATENBANK_DATEI)
+
+
+def _liegt_lokal() -> bool:
+    """Liegt die Datenbank als Datei neben der Anwendung?
+
+    Bei Supabase nicht. Dann gibt es keine Datei zum Kopieren, und die
+    Sicherung entsteht stattdessen als Auszug: alle Tabellen in eine
+    SQLite-Datei. Die laesst sich herunterladen, ansehen und zurueckspielen -
+    genau wie vorher.
+    """
+    return DATABASE_URL.startswith("sqlite")
+
+
+def _auszug(ziel: str) -> None:
+    """Den Inhalt der Datenbank in eine SQLite-Datei schreiben."""
+    from kern.datenumzug import kopiere
+    kopiere(DATABASE_URL, "sqlite:///" + ziel.replace("\\", "/"),
+            melden=lambda _: None)
 
 NAMENSMUSTER = "ag_plattform_%Y-%m-%d_%H-%M.db"
 # Kopien, die vor einer Aenderung an der Struktur entstehen. Der alte
@@ -21,23 +40,26 @@ VOR_MIGRATION = ("vor-v2-", "vor-migration-")
 
 def erstelle() -> str:
     """Legt eine Sicherung an und raeumt alte weg. Gibt den Dateinamen zurueck."""
-    if not os.path.exists(DATENBANK_DATEI):
+    if _liegt_lokal() and not os.path.exists(DATENBANK_DATEI):
         return ""
     os.makedirs(BACKUP_DIR, exist_ok=True)
     ziel = os.path.join(BACKUP_DIR, datetime.now().strftime(NAMENSMUSTER))
     if os.path.exists(ziel):
         # Innerhalb derselben Minute schon eine da - dann ist nichts zu tun.
         return ""
-    quelle = sqlite3.connect(DATENBANK_DATEI)
-    try:
-        kopie = sqlite3.connect(ziel)
+    if _liegt_lokal():
+        quelle = sqlite3.connect(DATENBANK_DATEI)
         try:
-            with kopie:
-                quelle.backup(kopie)
+            kopie = sqlite3.connect(ziel)
+            try:
+                with kopie:
+                    quelle.backup(kopie)
+            finally:
+                kopie.close()
         finally:
-            kopie.close()
-    finally:
-        quelle.close()
+            quelle.close()
+    else:
+        _auszug(ziel)
     alte_entfernen()
     return os.path.basename(ziel)
 
@@ -120,38 +142,49 @@ def einspielen(name: str) -> tuple:
     quelle = pfad_von(name)
     if not quelle:
         return False, "Diese Sicherung gibt es nicht."
-    if not os.path.exists(DATENBANK_DATEI):                  # pragma: no cover
+    if _liegt_lokal() and not os.path.exists(DATENBANK_DATEI):  # pragma: no cover
         return False, "Es gibt keine Datenbank, in die eingespielt werden könnte."
 
     vorher = os.path.join(
         BACKUP_DIR, datetime.now().strftime("vor-einspielen_%Y-%m-%d_%H-%M.db"))
     try:
-        quell_db = sqlite3.connect(DATENBANK_DATEI)
-        try:
-            kopie = sqlite3.connect(vorher)
+        if _liegt_lokal():
+            quell_db = sqlite3.connect(DATENBANK_DATEI)
             try:
-                with kopie:
-                    quell_db.backup(kopie)
+                kopie = sqlite3.connect(vorher)
+                try:
+                    with kopie:
+                        quell_db.backup(kopie)
+                finally:
+                    kopie.close()
             finally:
-                kopie.close()
-        finally:
-            quell_db.close()
+                quell_db.close()
+        else:
+            _auszug(vorher)
     except Exception as fehler:                              # pragma: no cover
         return False, f"Der jetzige Stand liess sich nicht sichern: {fehler}"
 
     try:
         from kern.datenbank import engine
         engine.dispose()
-        alt = sqlite3.connect(quelle)
-        try:
-            ziel = sqlite3.connect(DATENBANK_DATEI)
+        if _liegt_lokal():
+            alt = sqlite3.connect(quelle)
             try:
-                with ziel:
-                    alt.backup(ziel)
+                ziel = sqlite3.connect(DATENBANK_DATEI)
+                try:
+                    with ziel:
+                        alt.backup(ziel)
+                finally:
+                    ziel.close()
             finally:
-                ziel.close()
-        finally:
-            alt.close()
+                alt.close()
+        else:
+            # Zurueck in die entfernte Datenbank: Tabelle fuer Tabelle, nicht
+            # als Datei. Die Zaehler der Primaerschluessel zieht kopiere()
+            # danach selbst nach.
+            from kern.datenumzug import kopiere
+            kopiere("sqlite:///" + quelle.replace("\\", "/"), DATABASE_URL,
+                    melden=lambda _: None)
         engine.dispose()
     except Exception as fehler:
         return False, (f"Das Einspielen ist gescheitert: {fehler}. Der Stand "

@@ -50,8 +50,12 @@ for _ordner in (BACKUP_DIR, REDAKTION_UPLOAD_DIR, SUPPORT_UPLOAD_DIR):
     os.makedirs(_ordner, exist_ok=True)
 
 DATENBANK_DATEI = os.path.join(DATEN_DIR, "ag_plattform.db")
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL", "sqlite:///" + DATENBANK_DATEI.replace("\\", "/"))
+# .strip() or ... statt eines blossen get(): In der config.cmd steht ein Wert
+# oft als  set "DATABASE_URL="  da, um zu zeigen, dass es ihn gibt. get() gibt
+# dann eine leere Zeichenkette zurueck - der Schluessel existiert ja - und die
+# Anwendung braeche beim Start mit einer unverstaendlichen Meldung ab.
+DATABASE_URL = (os.environ.get("DATABASE_URL", "").strip()
+                or "sqlite:///" + DATENBANK_DATEI.replace("\\", "/"))
 
 
 def _text(name: str, standard: str = "") -> str:
@@ -372,10 +376,20 @@ ERLAUBTE_ANHANGTYPEN = dict(ERLAUBTE_BILDTYPEN, **{
 })
 
 
+def _datenbank_kurz() -> str:
+    """Woher die Daten kommen - ohne Passwort im Klartext."""
+    if DATABASE_URL.startswith("sqlite"):
+        return "SQLite-Datei im Datenordner"
+    ort = DATABASE_URL.split("@")[-1].split("/")[0] if "@" in DATABASE_URL else "?"
+    art = "Supabase" if "supabase" in DATABASE_URL else "Postgres"
+    return f"{art} ({ort})"
+
+
 def zusammenfassung() -> list:
     """Kurzer Startbericht - was aktiv ist und was nicht."""
     zeilen = [
         f"Umgebung     : {APP_ENV}",
+        f"Datenbank    : {_datenbank_kurz()}",
         f"Datenordner  : {DATEN_DIR}",
         f"Website      : {WEBSITE_URL}",
         f"Dashboard    : {DASHBOARD_URL}",

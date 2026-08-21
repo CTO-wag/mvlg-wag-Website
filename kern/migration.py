@@ -43,16 +43,34 @@ def _tabellen() -> set:
     return set(inspect(engine).get_table_names())
 
 
+# SQLite nimmt fast jeden Typnamen an, Postgres nicht. DATETIME etwa kennt
+# es nicht - der ALTER-Befehl bricht dann mit einem Syntaxfehler ab, mitten
+# im Hochfahren. Die Liste unten uebersetzt nur, was hier wirklich vorkommt.
+TYPEN_POSTGRES = {
+    "DATETIME": "TIMESTAMP",
+    "REAL": "DOUBLE PRECISION",
+}
+
+
+def _typ_fuer_datenbank(typ: str) -> str:
+    if engine.dialect.name != "postgresql":
+        return typ
+    grund = typ.split()[0].upper()
+    ersatz = TYPEN_POSTGRES.get(grund)
+    return typ.replace(typ.split()[0], ersatz, 1) if ersatz else typ
+
+
 def _spalte_anhaengen(tabelle: str, name: str, typ: str, standard=None) -> bool:
     """Haengt eine Spalte an, wenn sie fehlt. Gibt zurueck, ob etwas geschah.
 
-    SQLite kann Spalten nur anhaengen, nicht einfuegen - das genuegt hier.
-    Ein NOT NULL braucht zwingend einen Standardwert, sonst weigert sich
-    SQLite bei einer Tabelle, in der schon Zeilen stehen.
+    Nur anhaengen, nicht einfuegen - das genuegt hier. Ein NOT NULL braucht
+    zwingend einen Standardwert, sonst weigert sich die Datenbank bei einer
+    Tabelle, in der schon Zeilen stehen.
     """
     if name in _spalten(tabelle):
         return False
-    satz = f'ALTER TABLE "{tabelle}" ADD COLUMN "{name}" {typ}'
+    satz = (f'ALTER TABLE "{tabelle}" ADD COLUMN "{name}" '
+            f'{_typ_fuer_datenbank(typ)}')
     if standard is not None:
         satz += f" DEFAULT {standard}"
     with engine.begin() as verbindung:
@@ -89,12 +107,27 @@ def _sicherung_vor_migration() -> None:
     Kostet ein paar hundert Kilobyte und beantwortet die einzige Frage, die
     bei einem Umstieg wirklich zaehlt: Kommt man zurueck, wenn etwas schiefgeht?
     """
-    if not os.path.exists(DATENBANK_DATEI):
+    from kern.einstellungen import DATABASE_URL
+    lokal = DATABASE_URL.startswith("sqlite")
+    if lokal and not os.path.exists(DATENBANK_DATEI):
         return
     ziel = os.path.join(
         BACKUP_DIR,
         f"vor-migration-{datetime.now().strftime('%Y-%m-%d_%H-%M')}.db")
     if os.path.exists(ziel):
+        return
+    if not lokal:
+        # Keine Datei zum Kopieren - stattdessen ein Auszug aller Tabellen.
+        # Ohne das gaebe es bei Supabase gar keine Sicherheitskopie mehr, und
+        # zwar unbemerkt: die alte Fassung stieg hier einfach still aus.
+        try:
+            os.makedirs(BACKUP_DIR, exist_ok=True)
+            from kern.datenumzug import kopiere
+            kopiere(DATABASE_URL, "sqlite:///" + ziel.replace("\\", "/"),
+                    melden=lambda _: None)
+            print(f"[Migration] Sicherung angelegt: {os.path.basename(ziel)}")
+        except Exception as fehler:                          # pragma: no cover
+            print(f"[Migration] Sicherung fehlgeschlagen: {fehler}")
         return
     try:
         # Ueber die SQLite-eigene Sicherung, damit auch offene WAL-Inhalte
