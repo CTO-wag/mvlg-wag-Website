@@ -1,0 +1,126 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{% call m.kopf("Leadership", "Rechnet sich von selbst – bei jedem Ereignis und einmal nachts.") %}
+  <form hx-post="/dashboard/leistung/neu-rechnen" hx-target="#tab-inhalt">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn-zweit btn-klein">Jetzt nachrechnen</button>
+  </form>
+{% endcall %}
+
+{{ m.rueckmeldung(meldung) }}
+
+<div class="panel">
+  <h3 style="margin-top:0;">Wie der Wert zustande kommt</h3>
+  <p class="meta">
+    Fünf Teilwerte von 0 bis 100, gewichtet zusammengefasst. Erledigte Aufgaben
+    zählen <strong>dauerhaft</strong> – auch wenn die Aufgabe später gelöscht
+    wird. Aufräumen darf niemanden schlechter dastehen lassen. Ältere
+    Leistungen zählen weniger, damit ein Neuzugang aufholen kann.
+  </p>
+  <div class="reihe" style="margin-top:var(--r3);">
+    {% for name, gewicht in gewichte.items() %}
+    <span class="marke">{{ name|capitalize }} · {{ gewicht }} %</span>
+    {% endfor %}
+  </div>
+</div>
+
+{% if zeilen %}
+{{ m.suche("#leistung-liste", "Person oder Rolle suchen …", "Personen") }}
+{% endif %}
+
+<div class="panel" id="leistung-liste" style="padding:0;overflow:hidden;">
+  <div class="leistung-zeile leistung-kopf">
+    <span>#</span><span>Person</span>
+    <span>Zuverlässig</span><span>Aufgaben</span><span>Anwesend</span>
+    <span>Projekte</span><span>Initiative</span><span class="rechts">Gesamt</span>
+  </div>
+  {% for z in zeilen %}
+  <div class="leistung-zeile" data-suchbar>
+    <span class="leistung-platz {% if loop.index <= 3 %}oben{% endif %}">{{ loop.index }}</span>
+    <span class="leistung-person">
+      <strong>{{ z.person.vorname }} {{ z.person.nachname }}</strong>
+      <span class="meta">
+        {{ z.person.role|label }}
+        <span class="marke zustand-{{ 'erledigt' if z.score.leadership_potential == 'high' else ('in_bearbeitung' if z.score.leadership_potential == 'emerging' else 'idee') }}">
+          {{ z.score.leadership_potential|label }}</span>
+      </span>
+      {% if z.empfehlungen %}
+      <span class="meta">
+        {% for e in z.empfehlungen %}
+        <span class="marke zustand-geplant">{{ empfehlung_labels.get(e, e) }}</span>
+        {% endfor %}
+      </span>
+      {% endif %}
+    </span>
+    {% for wert, name in [(z.score.zuverlaessigkeit, "Zuverlässigkeit"),
+                          (z.score.task_completion_score, "Aufgaben"),
+                          (z.score.attendance_score, "Anwesenheit"),
+                          (z.score.project_activity_score, "Projekte"),
+                          (z.score.initiative, "Initiative")] %}
+    <span class="leistung-wert" title="{{ name }}: {{ wert }} von 100">
+      <b>{{ wert }}</b>
+      <span class="balken" style="height:4px;">
+        <span style="width:{{ wert if wert else 1.5 }}%;
+                     background:{% if wert >= 70 %}var(--gruen){% elif wert >= 40 %}var(--amber){% else %}var(--gedaempft){% endif %};"></span>
+      </span>
+    </span>
+    {% endfor %}
+    <span class="leistung-gesamt">{{ z.gesamt }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+{% if darf_planen %}
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Nachfolgeplanung</h2>
+      <p class="meta">Wer könnte welche Rolle übernehmen, wenn jemand geht?
+        Diese Notizen sind nur für den Vorstand sichtbar.</p></div>
+  </div>
+
+  {% if kandidaten %}
+  <div class="tabelle-rahmen">
+    <table>
+      <thead><tr><th>Position</th><th>Person</th><th>Platz</th>
+        <th>Zuversicht</th><th>Bereit ab</th><th>Notiz</th><th></th></tr></thead>
+      <tbody>
+        {% for k, person in kandidaten %}
+        <tr>
+          <td><strong>{{ k.position }}</strong></td>
+          <td>{{ person.vorname }} {{ person.nachname }}</td>
+          <td class="zahl">{{ k.ranking or "–" }}</td>
+          <td class="zahl">{{ k.confidence }} %</td>
+          <td>{{ k.readiness_date|berlin if k.readiness_date else "–" }}</td>
+          <td class="meta">{{ k.notes or "" }}</td>
+          <td class="rechts">
+            {{ m.loeschen("/dashboard/leistung/nachfolge/" ~ k.id ~ "/loeschen",
+                          "Eintrag entfernen?", csrf, "Entfernen", "btn-still btn-klein") }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <form hx-post="/dashboard/leistung/nachfolge" hx-target="#tab-inhalt"
+        class="formular" style="margin-top:var(--r4);">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Person{{ m.personen_auswahl("person", personen, none, "– wählen –") }}</label>
+    <label>Position
+      <input type="text" name="position" maxlength="80" list="positionen"
+             placeholder="z. B. CEO">
+      <datalist id="positionen">
+        <option value="CEO"><option value="COO"><option value="CTO">
+        <option value="CRO"><option value="CMO"><option value="Projektleitung">
+      </datalist>
+    </label>
+    <label>Platz <span class="meta">1 = erste Wahl</span>
+      <input type="number" name="platz" min="1" value="1"></label>
+    <label>Zuversicht (%)<input type="number" name="sicherheit" min="0" max="100" value="70"></label>
+    <label>Bereit ab<input type="date" name="ab"></label>
+    <label class="voll">Notiz<textarea name="notiz" maxlength="2000" rows="2"></textarea></label>
+    <div class="formular-fuss"><button type="submit">Eintragen</button></div>
+  </form>
+</div>
+{% endif %}

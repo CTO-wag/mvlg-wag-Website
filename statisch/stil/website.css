@@ -1,0 +1,391 @@
+/* ===========================================================================
+   Oeffentliche Seite - Startseite, Bewerbung, Quiz, Rechtstexte
+   ========================================================================= */
+
+/* Abstand zwischen den Abschnitten: enger als vorher (war --r8). Die Kapitel
+   sind jetzt am Amber-Strich vor der Zeile zu erkennen; dafuer braucht es
+   nicht mehr so viel Leerraum, und die Seite wird deutlich kuerzer. */
+.abschnitt{ margin-bottom:var(--r7); scroll-margin-top:6rem; }
+.abschnitt:last-child{ margin-bottom:var(--r6); }
+
+/* Kapitelmarke: ein kurzer Strich vor der kleinen Überschrift. Er sagt dem
+   Auge beim Scrollen "hier faengt etwas Neues an" - vorher unterschieden
+   sich die Abschnitte nur durch Abstand. */
+.abschnitt .hut::before{
+  content:""; display:inline-block; vertical-align:middle;
+  width:1.7rem; height:2px; margin-right:.55rem;
+  background:var(--amber); border-radius:2px;
+}
+/* Im Aufmacher nicht: dort ist die Zeile die Herkunftsangabe, kein Kapitel.
+   Steht bewusst danach und mit gleicher Staerke - die spaetere Regel gewinnt. */
+.aufmacher .hut::before{ display:none; }
+
+/* Ueberschriften der Abschnitte etwas groesser - der Unterschied zwischen
+   Kapitelname und Fliesstext war zu klein. */
+.abschnitt > h2, .abschnitt > div > h2{ margin-bottom:var(--r3); }
+
+/* --- Kopfbereich ---------------------------------------------------------
+   Der Aufmacher war genauso hoch wie jeder andere Abschnitt - die Seite las
+   sich als neun gleich grosse Bloecke hintereinander, ohne Anfang. Jetzt
+   traegt er sichtbar mehr Gewicht: Text links, Wappen rechts, darunter die
+   vier Angaben zum Ueberfliegen. */
+.aufmacher{
+  display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);
+  gap:var(--r6); align-items:center;
+  padding:var(--r7) 0 var(--r6);
+  margin-bottom:var(--r5);
+}
+.aufmacher h1{
+  max-width:20ch; font-size:clamp(2rem, 1.2rem + 3.2vw, 3.1rem);
+  background:linear-gradient(100deg, var(--navy) 35%, var(--amber) 82%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+html[data-theme="dark"] .aufmacher h1{
+  /* Im Hellen laeuft die Ueberschrift von Marineblau nach Bernstein - zwei
+     dunkle, satte Toene, dazwischen nichts Auffaelliges. Im Dunkeln sind
+     dieselben Variablen HELLBLAU und ORANGE, und ein Verlauf zwischen
+     hellblau und orange geht mitten durch Grau und Khaki. Die Ueberschrift
+     zerfiel dadurch in drei Farben und sah aus wie ein Darstellungsfehler.
+     Hier deshalb ein Verlauf innerhalb einer Familie: von fast weiss nach
+     hellblau. Kein Umweg ueber trübe Zwischentoene. */
+  background:linear-gradient(100deg, var(--text-stark) 20%, var(--navy) 92%);
+  -webkit-background-clip:text; background-clip:text;
+  /* Kein text-shadow: Bei durchsichtigem Text liegt er hinter den Buchstaben
+     und macht daraus einen Schmierfleck. */
+}
+.aufmacher-motto{
+  font-family:var(--schrift-mono); font-size:.86rem; letter-spacing:.02em;
+  color:var(--amber); margin:.1rem 0 var(--r4);
+}
+.aufmacher .fuehrung{
+  font-size:1.03rem; color:var(--gedaempft); max-width:52ch; line-height:1.8;
+}
+.aufmacher .knopfzeile{ margin-top:var(--r5); }
+
+/* Das Wappen mit einem warmen Schein dahinter - sonst schwebt es im Nichts. */
+.aufmacher-bild{ position:relative; display:flex; justify-content:center; }
+.aufmacher-bild::before{
+  content:""; position:absolute; inset:-12% -6%;
+  background:radial-gradient(circle at 50% 45%,
+             var(--amber-hauch) 0%, transparent 68%);
+  z-index:0;
+}
+.aufmacher-bild img{
+  position:relative; z-index:1;
+  width:100%; max-width:300px; height:auto;
+  filter:drop-shadow(0 18px 34px rgba(8,15,26,.28));
+}
+html[data-theme="dark"] .aufmacher-bild img{
+  /* Gross genug fuer eine sichtbare Kante plus einen Hauch Streulicht - das
+     hebt das Wappen von der Nacht ab, ohne dass es leuchtet. Siehe die
+     Erklaerung zu img.wappen in basis.css. */
+  filter:
+    drop-shadow(0 0 2px rgba(255,255,255,.9))
+    drop-shadow(0 0 2px rgba(255,255,255,.9))
+    drop-shadow(0 0 14px rgba(255,255,255,.18))
+    drop-shadow(0 18px 40px rgba(0,0,0,.55));
+}
+html[data-theme="dark"] .aufmacher-bild::before{
+  /* Der warme Schein wird auf dunklem Grund zu einem gelben Fleck hinter dem
+     weissen Saum. Kuehler und schwaecher passt er zur Nacht. */
+  background:radial-gradient(circle at 50% 45%,
+             rgba(150,180,225,.16) 0%, transparent 66%);
+}
+@media (max-width:860px){
+  .aufmacher{ grid-template-columns:1fr; padding-top:var(--r5); }
+  /* Auf dem Tablet zuerst der Satz, dann das Bild - und kleiner. */
+  .aufmacher-bild{ order:2; }
+  .aufmacher-bild img{ max-width:190px; }
+}
+@media (max-width:640px){
+  /* Auf dem Handy ganz weg: Das Wappen steht schon in der Kopfzeile, und
+     hier kostet es eine Viertel Bildschirmlaenge, bevor die vier Angaben
+     kommen. Schmuck darf nicht vor der Auskunft stehen. */
+  .aufmacher-bild{ display:none; }
+  .aufmacher{ padding-bottom:var(--r4); margin-bottom:var(--r4); }
+}
+
+/* --- Die vier Angaben unter dem Aufmacher -------------------------------- */
+/* 150px als Untergrenze: damit stehen auch auf einem 375er-Schirm noch zwei
+   nebeneinander statt vier untereinander - vier gestapelte Kaesten waeren auf
+   dem Handy eine halbe Bildschirmlaenge, bevor der Text ueberhaupt anfaengt. */
+.fakten{
+  list-style:none; margin:0 0 var(--r7); padding:0;
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(min(150px,100%),1fr));
+  gap:var(--r3);
+}
+.fakten li{
+  display:flex; flex-direction:column; gap:.15rem;
+  padding:var(--r4);
+  background:var(--flaeche); border:1px solid var(--linie);
+  border-top:3px solid var(--amber);
+  border-radius:var(--rund);
+}
+/* Vier kraeftige Balken nebeneinander sind auf hellem Grund eine Reihe, auf
+   dunklem eine Leuchtschrift. Duenner und gedaempft reicht: Die Karten
+   heben sich im Dunkeln ohnehin schon durch ihre Flaeche ab. */
+html[data-theme="dark"] .fakten li{
+  border-top-width:2px;
+  border-top-color:color-mix(in srgb, var(--amber) 85%, transparent);
+}
+@media (max-width:520px){
+  .fakten li{ padding:var(--r3); }
+  .fakten strong{ font-size:.95rem; }
+  .fakten span{ font-size:.8rem; }
+}
+.fakten strong{
+  font-family:var(--schrift-titel); font-size:1.02rem; color:var(--text-stark);
+}
+.fakten span{ font-size:.86rem; color:var(--gedaempft); line-height:1.5; }
+
+
+/* --- Was du mitnimmst ---------------------------------------------------- */
+.vorteile-kasten{
+  background:var(--amber-hauch); padding:var(--r6);
+  border-radius:var(--rund); border:1px solid color-mix(in srgb, var(--amber) 22%, transparent);
+}
+/* Bernstein mit 13 Prozent Deckkraft ueber hellem Papier ist ein warmer
+   Hauch. Ueber dunklem Marineblau ist es Braun - und daneben stehen gruene
+   Haken und blaue Schrift. Im Dunkeln deshalb eine ruhige, leicht erhoehte
+   Flaeche; die Farbe traegt allein die Ueberschrift. */
+html[data-theme="dark"] .vorteile-kasten{
+  background:var(--flaeche-2);
+  border-color:var(--linie);
+}
+.vorteile-kasten h3{ margin-top:0; color:var(--amber); }
+html[data-theme="dark"] .vorteile-kasten h3{ color:var(--amber-hell); }
+.vorteile-liste{ list-style:none; padding:0; margin:0; }
+.vorteile-liste li{
+  display:flex; gap:var(--r3); align-items:flex-start;
+  padding:var(--r2) 0; color:var(--text); font-size:.94rem;
+}
+.vorteile-liste li::before{
+  content:"✓"; color:var(--gruen); font-weight:700; flex-shrink:0;
+}
+
+/* --- Halbjahre ----------------------------------------------------------- */
+.halbjahr{ position:relative; padding-left:4.2rem; border-left:4px solid var(--navy); }
+.halbjahr.zwei{ border-left-color:var(--amber); }
+.halbjahr h3{ margin-top:0; }
+.halbjahr-nummer{
+  position:absolute; left:1.4rem; top:1.3rem;
+  font-family:var(--schrift-titel); font-size:2.1rem; font-weight:700;
+  line-height:1; color:var(--navy); opacity:.22;
+}
+.halbjahr.zwei .halbjahr-nummer{ color:var(--amber); opacity:.35; }
+.halbjahr-fazit{ margin:var(--r5) 0 0; color:var(--gedaempft); font-size:.94rem; }
+@media (max-width:720px){
+  .halbjahr{ padding-left:var(--r5); }
+  .halbjahr-nummer{ position:static; display:block; margin-bottom:.2rem; font-size:1.6rem; }
+}
+
+/* --- Unsere Arbeit (aus der Datenbank) ----------------------------------- */
+/* Die Karten stehen nicht mehr im Quelltext, sondern in der Tabelle
+   seiten_inhalte und lassen sich im Dashboard pflegen. Farbe und Zeichen
+   kommen je Karte mit - deshalb --karte als Variable am Element. */
+.arbeit-karte{
+  border-left:4px solid var(--karte, var(--navy));
+  padding-left:var(--r5); position:relative;
+  transition:transform var(--tempo) ease, box-shadow var(--tempo) ease;
+}
+.arbeit-karte:hover{ transform:translateY(-2px); box-shadow:var(--schatten-hoch); }
+.arbeit-karte h3{ margin-top:0; display:flex; align-items:center; gap:var(--r2); }
+.arbeit-zeichen{ font-size:1.15rem; line-height:1; }
+.arbeit-karte p{ margin:0; color:var(--gedaempft); }
+
+/* --- Stufen -------------------------------------------------------------- */
+.stufen{ list-style:none; counter-reset:stufe; margin:var(--r6) 0 0; padding:0 0 0 .2rem; position:relative; }
+.stufen::before{
+  content:""; position:absolute; left:1.05rem; top:.9rem; bottom:.9rem;
+  width:2px; background:var(--linie);
+}
+.stufen li{
+  counter-increment:stufe; position:relative;
+  padding:0 0 var(--r5) 3.2rem; display:flex; flex-direction:column; gap:.15rem;
+}
+.stufen li:last-child{ padding-bottom:0; }
+.stufen li::before{
+  content:counter(stufe); position:absolute; left:0; top:-.1rem;
+  width:2.2rem; height:2.2rem; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--flaeche); border:2px solid var(--navy); color:var(--navy);
+  font-family:var(--schrift-mono); font-size:.85rem; font-weight:600;
+}
+.stufen strong{ font-family:var(--schrift-titel); font-size:1.02rem; }
+.stufen span{ color:var(--gedaempft); }
+.stufen-fazit{ margin:var(--r5) 0 0; color:var(--gedaempft); font-size:.94rem; }
+
+/* --- Aufrufe ------------------------------------------------------------- */
+.aufruf{
+  background:linear-gradient(135deg, var(--amber-hauch) 0%, var(--navy-hauch) 100%);
+  padding:var(--r7) var(--r6); border-radius:var(--rund);
+  border:1px solid color-mix(in srgb, var(--amber) 16%, transparent);
+  text-align:center;
+}
+/* Warm nach kalt ueber Dunkelblau ergibt in der Mitte wieder Braun. */
+html[data-theme="dark"] .aufruf{
+  background:var(--flaeche-2);
+  border-color:var(--linie);
+}
+.aufruf > div{ max-width:600px; margin:0 auto; }
+.aufruf h2{ color:var(--amber); }
+.aufruf .btn{ margin-top:var(--r4); }
+
+.quiz-anriss{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:var(--r5); flex-wrap:wrap; border-left:4px solid var(--amber);
+}
+.quiz-anriss > div{ flex:1 1 300px; }
+.quiz-anriss h2{ margin-top:0; }
+
+/* --- Kontakt ------------------------------------------------------------- */
+.kontakt-formular{ display:flex; flex-direction:column; gap:var(--r4); }
+
+/* --- Quiz ---------------------------------------------------------------- */
+.quiz-fortschritt{ margin-bottom:var(--r5); }
+.quiz-fortschritt-kopf{
+  display:flex; justify-content:space-between; font-family:var(--schrift-mono);
+  font-size:.74rem; color:var(--gedaempft); margin-bottom:var(--r2);
+}
+.quiz-frage-text{ font-size:1.2rem; margin-bottom:var(--r4); }
+.quiz-optionen{ display:flex; flex-direction:column; gap:var(--r2); }
+.quiz-option{
+  display:flex; align-items:center; gap:var(--r3); width:100%;
+  text-align:left; justify-content:flex-start;
+  background:var(--flaeche-2); color:var(--text); border:1px solid var(--linie);
+  padding:var(--r3) var(--r4); font-weight:500; min-height:3rem;
+}
+.quiz-option:hover:not(:disabled){
+  background:var(--navy-hauch); color:var(--navy); border-color:var(--navy);
+}
+.quiz-marke{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:1.7rem; height:1.7rem; flex-shrink:0; border-radius:50%;
+  background:var(--flaeche); border:1px solid var(--linie);
+  font-family:var(--schrift-mono); font-size:.8rem;
+}
+.quiz-option.richtig{
+  background:color-mix(in srgb, var(--gruen) 14%, transparent);
+  border-color:var(--gruen); color:var(--gruen); opacity:1;
+}
+.quiz-option.falsch{
+  background:color-mix(in srgb, var(--rot) 14%, transparent);
+  border-color:var(--rot); color:var(--rot); opacity:1;
+}
+.quiz-option:disabled{ cursor:default; }
+html[data-theme="dark"] .quiz-option.richtig{
+  background:color-mix(in srgb, var(--gruen) 18%, var(--flaeche));
+}
+html[data-theme="dark"] .quiz-option.falsch{
+  background:color-mix(in srgb, var(--rot) 18%, var(--flaeche));
+}
+.quiz-rueckmeldung{ margin-top:var(--r4); }
+.quiz-fuss{ margin-top:var(--r4); display:flex; justify-content:flex-end; }
+.quiz-punktzahl{
+  font-family:var(--schrift-titel); font-size:2.6rem; line-height:1;
+  color:var(--navy); margin:var(--r2) 0;
+}
+.quiz-bilanz{ list-style:none; padding:0; margin:var(--r4) 0; }
+.quiz-bilanz li{
+  display:flex; gap:var(--r3); align-items:flex-start;
+  padding:var(--r3) 0; border-bottom:1px solid var(--linie); font-size:.9rem;
+}
+.quiz-bilanz li:last-child{ border-bottom:none; }
+.quiz-bilanz-zeichen{ font-weight:700; flex-shrink:0; }
+.quiz-bilanz li.gut .quiz-bilanz-zeichen{ color:var(--gruen); }
+.quiz-bilanz li.schlecht .quiz-bilanz-zeichen{ color:var(--rot); }
+.quiz-bilanz-loesung{ display:block; color:var(--gedaempft); font-size:.85rem; }
+.quiz-ergebnis-knoepfe{ display:flex; gap:var(--r3); flex-wrap:wrap; margin-top:var(--r5); }
+
+/* --- Rechtstexte --------------------------------------------------------- */
+.rechtstext h2{ margin-top:var(--r6); font-size:1.25rem; }
+.rechtstext h2:first-of-type{ margin-top:var(--r4); }
+.rechtstext h3{ margin-top:var(--r5); font-size:1.02rem; }
+.rechtstext p, .rechtstext li{ color:var(--text); font-size:.94rem; }
+.rechtstext ul{ padding-left:1.2rem; }
+.rechtstext li{ margin-bottom:var(--r1); }
+
+/* --- Anmeldung ----------------------------------------------------------- */
+.anmeldung-karte{ max-width:440px; margin:var(--r5) auto; border-top:4px solid var(--navy); }
+.anmeldung-karte img{ height:88px; width:auto; margin:0 auto var(--r4); display:block; --saum:1.5px; }
+.anmeldung-karte form{ text-align:left; }
+.anmeldung-fuss{
+  margin-top:var(--r5); padding-top:var(--r4); border-top:1px solid var(--linie);
+  display:flex; flex-direction:column; gap:var(--r2);
+  font-size:.85rem; text-align:center;
+}
+.code-feld{
+  font-family:var(--schrift-mono); font-size:1.5rem; letter-spacing:.5em;
+  text-align:center; padding-left:.5em;
+}
+
+/* --- Portfolio: was die AG schon gemacht hat ----------------------------- */
+/* Eine Zeitleiste, keine Kachelwand. Bei Erfolgen zählt die Reihenfolge, und
+   eine Liste liest sich schneller als vier gleich große Kästen. */
+.portfolio{ list-style:none; margin:var(--r6) 0 0; padding:0; position:relative; }
+.portfolio::before{
+  content:""; position:absolute; left:7.5rem; top:.8rem; bottom:.8rem;
+  width:2px; background:var(--linie);
+}
+.portfolio-karte{
+  display:grid; grid-template-columns:7.5rem 1fr; gap:var(--r5);
+  align-items:start; padding:0 0 var(--r5);
+  position:relative;
+}
+.portfolio-karte:last-child{ padding-bottom:0; }
+.portfolio-zeit{
+  font-family:var(--schrift-mono); font-size:.76rem; letter-spacing:.04em;
+  color:var(--gedaempft); text-align:right; padding-top:.35rem;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+/* Der Punkt auf der Linie. */
+.portfolio-karte::before{
+  content:""; position:absolute; left:calc(7.5rem - 4px); top:.75rem;
+  width:10px; height:10px; border-radius:50%;
+  background:var(--karte, var(--navy));
+  box-shadow:0 0 0 3px var(--bg);
+}
+.portfolio-inhalt{
+  min-width:0; padding-left:var(--r2);
+  border-left:3px solid var(--karte, var(--navy));
+  padding-left:var(--r4);
+}
+.portfolio-inhalt h3{ margin:0 0 var(--r2); font-size:1.08rem; }
+.portfolio-inhalt p{ margin:0 0 var(--r2); color:var(--gedaempft); font-size:.94rem; }
+.portfolio-inhalt p:last-child{ margin-bottom:0; }
+.portfolio-ergebnis{
+  display:inline-block; margin-top:var(--r1) !important;
+  padding:.25rem .7rem; border-radius:var(--rund-voll);
+  background:color-mix(in srgb, var(--karte, var(--navy)) 12%, transparent);
+  border:1px solid color-mix(in srgb, var(--karte, var(--navy)) 30%, transparent);
+  color:var(--text) !important; font-size:.86rem !important; font-weight:600;
+}
+html[data-theme="dark"] .portfolio-ergebnis{
+  background:color-mix(in srgb, var(--karte, var(--navy)) 20%, var(--flaeche));
+}
+@media (max-width:720px){
+  .portfolio::before{ left:3px; }
+  .portfolio-karte{ grid-template-columns:1fr; gap:var(--r1); padding-left:var(--r5); }
+  .portfolio-karte::before{ left:-1px; top:.4rem; }
+  .portfolio-zeit{ text-align:left; padding-top:0; }
+  .portfolio-inhalt{ border-left:none; padding-left:0; }
+}
+
+/* Die Notluke am zweiten Faktor - unauffaellig, aber auffindbar. */
+.anmeldung-hilfe{ margin:var(--r3) 0 0; text-align:left; }
+.anmeldung-hilfe summary{
+  cursor:pointer; font-size:.86rem; color:var(--gedaempft);
+  padding:.35rem 0; min-height:2rem; display:flex; align-items:center;
+}
+.anmeldung-hilfe summary:hover{ color:var(--text); }
+.anmeldung-hilfe .meta{ margin:.2rem 0 0; }
+
+/* Der Haken "Angemeldet bleiben" - links am Rand, wie die Beschriftungen
+   darueber, und mit genug Flaeche zum Treffen. */
+.angemeldet-bleiben{
+  display:flex; align-items:flex-start; gap:var(--r2);
+  margin:var(--r3) 0 var(--r4); text-align:left; cursor:pointer;
+  font-size:.92rem;
+}
+.angemeldet-bleiben input{ margin-top:.15rem; flex-shrink:0; }
+.angemeldet-bleiben .meta{ display:block; margin:.1rem 0 0; }

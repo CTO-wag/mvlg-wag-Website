@@ -1,0 +1,72 @@
+{% extends "oeffentlich/basis_web.html" %}
+{% block ticker %}{% endblock %}
+{% block inhalt %}
+<section class="panel anmeldung-karte zentriert">
+  <img class="wappen" src="{{ statisch('bilder/logo-klein.webp') }}" width="226" height="180"
+       alt="Wirtschafts- und Investment-AG">
+  <span class="hut">Interner Bereich</span>
+  <h1 style="font-size:1.7rem;">Anmelden</h1>
+
+  {% if fehler %}<div class="meldung meldung-fehler"><div>{{ fehler }}</div></div>{% endif %}
+  {% if hinweis %}<div class="meldung meldung-gut"><div>{{ hinweis }}</div></div>{% endif %}
+
+  {% if zweiter_faktor %}
+  {# Schritt zwei: Passwort stimmt, jetzt der Code aus der App. Das Passwort
+     wird nicht noch einmal mitgeschickt - die halbe Anmeldung liegt bis
+     dahin in der Sitzung. #}
+  <p class="meta">Gib den sechsstelligen Code aus deiner Authenticator-App ein.</p>
+  <form method="post" action="/login/zweiter-faktor">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {# Kein pattern="[0-9]*" und kein maxlength=6 mehr: Hier darf auch ein
+       Ersatzcode wie "3f9a-c072" stehen. Mit der alten Beschraenkung liess
+       der Browser ihn gar nicht erst abschicken - die Notluke waere
+       zugemauert gewesen. inputmode bleibt numerisch, weil der Normalfall
+       die sechs Ziffern sind; die Tastatur laesst sich umschalten. #}
+    <label>Code
+      <input type="text" name="code" class="code-feld" inputmode="numeric"
+             maxlength="12" autocomplete="one-time-code" spellcheck="false"
+             autocapitalize="off" required autofocus>
+    </label>
+    <button type="submit" class="btn-breit">Weiter</button>
+  </form>
+  <details class="anmeldung-hilfe">
+    <summary>Handy nicht zur Hand?</summary>
+    <p class="meta">Gib einen deiner Ersatzcodes ein – die acht Codes, die du
+      beim Einschalten des zweiten Faktors bekommen hast. Jeder gilt einmal.
+      Sind auch die weg, kann der Vorstand den zweiten Faktor für dich
+      zurücksetzen.</p>
+  </details>
+  <div class="anmeldung-fuss">
+    <a href="/login?abbrechen=1">Abbrechen und neu anmelden</a>
+  </div>
+
+  {% else %}
+  <form method="post" action="/login">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>E-Mail
+      <input type="email" name="email" value="{{ email or '' }}" required
+             autocomplete="username" autofocus maxlength="160">
+    </label>
+    <label>Passwort
+      <input type="password" name="passwort" required
+             autocomplete="current-password">
+    </label>
+    {# Standardmaessig angehakt: Der Normalfall ist das eigene Handy oder
+       der eigene Rechner. Wer am Schulrechner sitzt, nimmt den Haken raus -
+       dann ist nach acht Stunden ohne Aufruf Schluss. #}
+    <label class="haken angemeldet-bleiben">
+      <input type="checkbox" name="angemeldet_bleiben" value="1" checked>
+      <span>Angemeldet bleiben
+        <span class="meta">Auf einem fremden Rechner besser abwählen.</span>
+      </span>
+    </label>
+    <button type="submit" class="btn-breit">Anmelden</button>
+  </form>
+  <div class="anmeldung-fuss">
+    <a href="/passwort-vergessen">Passwort vergessen?</a>
+    <span class="meta">Noch kein Konto? Dann bewirb dich zuerst –
+      <a href="/bewerbung">hier entlang</a>.</span>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{% call m.kopf(tabelle.replace("_", " ").title(), "Rohdaten der Tabelle " ~ tabelle) %}
+  <button type="button" class="btn-zweit btn-klein"
+          hx-get="/dashboard/datenbank" hx-target="#tab-inhalt">Zurück zur Übersicht</button>
+{% endcall %}
+
+{{ m.rueckmeldung(meldung) }}
+
+{% if zeilen %}
+<div class="panel" style="padding:0;">
+  <div class="tabelle-rahmen">
+    <table class="db-roh">
+      <thead><tr>{% for s in spalten %}<th>{{ s }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for zeile in zeilen %}
+        <tr>{% for wert in zeile %}<td title="{{ wert }}">{{ wert }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="knopfzeile">
+  {% if seite > 0 %}
+  <button type="button" class="btn-zweit btn-klein"
+          hx-get="/dashboard/datenbank/tabelle/{{ tabelle }}?seite={{ seite - 1 }}"
+          hx-target="#tab-inhalt">&larr; Vorherige</button>
+  {% endif %}
+  <span class="meta">Seite {{ seite + 1 }}</span>
+  {% if mehr %}
+  <button type="button" class="btn-zweit btn-klein"
+          hx-get="/dashboard/datenbank/tabelle/{{ tabelle }}?seite={{ seite + 1 }}"
+          hx-target="#tab-inhalt">Nächste &rarr;</button>
+  {% endif %}
+</div>
+{% else %}
+<div class="panel">{{ m.leer("Diese Tabelle ist leer", "", "leer") }}</div>
+{% endif %}

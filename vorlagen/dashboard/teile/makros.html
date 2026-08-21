@@ -1,0 +1,178 @@
+{% import "dashboard/teile/symbole.html" as sym %}
+{#
+  Bausteine, die in mehreren Bereichen vorkommen.
+
+  Ein eigener Baustein statt Copy-Paste: In V1 gab es die Rückmeldung
+  ("Gespeichert") an achtzehn Stellen, in vier leicht verschiedenen Fassungen.
+  Ändert man hier etwas, ändert es sich überall.
+#}
+
+{# --- Kopfzeile eines Bereichs ---------------------------------------------
+   Immer gleich aufgebaut: Titel links, Werkzeuge rechts, Erklärung darunter.
+   Damit weiß man in jedem Bereich sofort, wo der "Neu"-Knopf steckt. #}
+{% macro kopf(titel, erklaerung="") %}
+<div class="bereich-kopf">
+  <div>
+    <h1>{{ titel }}</h1>
+    {% if erklaerung %}<p class="meta">{{ erklaerung }}</p>{% endif %}
+  </div>
+  <div class="bereich-werkzeuge">{{ caller() if caller else "" }}</div>
+</div>
+{% endmacro %}
+
+{# --- Rückmeldung ----------------------------------------------------------
+   Kann einen Weg mitliefern: nach dem Löschen führt ein Knopf direkt in den
+   Papierkorb. Wer versehentlich gelöscht hat, sucht sonst erst einmal, wo
+   das Zurückholen geht. #}
+{% macro rueckmeldung(m) %}
+{% if m %}
+{# data-rueckmeldung: Nur DIESE Meldung ist die Antwort auf das, was
+   gerade abgeschickt wurde. Andere Kaesten derselben Bauart stehen dauerhaft
+   im Bereich (etwa der Hinweis auf das Startpasswort) und duerfen nicht
+   herausgeholt werden. #}
+<div class="meldung meldung-{{ m.art }}" role="status" data-rueckmeldung><div>
+  {{ m.text }}
+  {% if m.bereich %}
+  <button type="button" class="btn-zweit btn-klein" style="margin-left:var(--r2);"
+          data-springe="{{ m.bereich }}">{{ m.knopf or "Ansehen" }}</button>
+  {% endif %}
+</div></div>
+{% endif %}
+{% endmacro %}
+
+{# --- Leerer Zustand -------------------------------------------------------
+   Sagt, was fehlt UND was man tun kann. Ein blankes "Keine Einträge" lässt
+   Leute ratlos zurück - besonders beim ersten Öffnen eines Bereichs. #}
+{% macro leer(titel, hinweis="", symbol="leer", knopf="") %}
+<div class="leer">
+  <span class="leer-zeichen" aria-hidden="true">{{ sym.zeichen(symbol, 34) }}</span>
+  <strong>{{ titel }}</strong>
+  {% if hinweis %}<span>{{ hinweis }}</span>{% endif %}
+  {# Ein leerer Bereich soll den Weg zeigen, nicht nur feststellen, dass
+     nichts da ist. Der Knopf klappt das Anlegen-Formular auf und setzt den
+     Schreibzeiger hinein - siehe data-anlegen in dashboard.js. #}
+  {% if knopf %}
+  <button type="button" class="btn-zweit btn-klein" data-anlegen
+          style="margin-top:var(--r3);">{{ knopf }}</button>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# --- Bewertung in Sternen --------------------------------------------------
+   Die Sterne tragen U+FE0E hinter sich. Das ist die Anweisung „als Schrift
+   zeichnen, nicht als Bildchen“ - ohne sie machen manche Systeme aus dem
+   Stern ein buntes Emoji, und genau das soll hier nicht stehen.
+   Die Zahl kommt zusätzlich als Text mit: Vorlesegeräte lesen sonst fünfmal
+   „Stern“ vor. #}
+{% macro sterne(wert, hoechstens=5) -%}
+<span class="sterne" title="{{ wert }} von {{ hoechstens }}"
+      aria-label="{{ wert }} von {{ hoechstens }}"
+>{{ "★︎" * wert }}{{ "☆︎" * (hoechstens - wert) }}</span>
+{%- endmacro %}
+
+{# --- Marken ---------------------------------------------------------------- #}
+{% macro zustand(wert) %}
+<span class="marke zustand-{{ wert }}">{{ wert|label }}</span>
+{% endmacro %}
+
+{% macro rang(wert) %}
+<span class="marke rang-{{ wert }}">{{ wert|label }}</span>
+{% endmacro %}
+
+{# --- Kennzahlenreihe ------------------------------------------------------- #}
+{% macro kennzahl(wert, name, art="") %}
+<div class="kennzahl {{ art }}">
+  <span class="kennzahl-wert">{{ wert }}</span>
+  <span class="kennzahl-name">{{ name }}</span>
+</div>
+{% endmacro %}
+
+{# --- Personenauswahl ------------------------------------------------------- #}
+{% macro personen_auswahl(name, personen, gewaehlt=None, leer_text="– niemand –") %}
+<select name="{{ name }}">
+  <option value="">{{ leer_text }}</option>
+  {% for p in personen %}
+  <option value="{{ p.id }}" {% if gewaehlt == p.id %}selected{% endif %}>
+    {{ p.vorname }} {{ p.nachname }}
+  </option>
+  {% endfor %}
+</select>
+{% endmacro %}
+
+{% macro abteilungs_auswahl(name, keys, gewaehlt=None, leer_text="– keine –") %}
+<select name="{{ name }}">
+  {% if leer_text %}<option value="">{{ leer_text }}</option>{% endif %}
+  {% for key in keys %}
+  <option value="{{ key }}" {% if gewaehlt == key %}selected{% endif %}>
+    {{ abteilung_label(key) }}
+  </option>
+  {% endfor %}
+</select>
+{% endmacro %}
+
+{# --- Löschknopf mit Rückfrage ---------------------------------------------
+   Ein einzelner Knopf, KEIN eigenes Formular.
+
+   Vorher stand hier ein <form>. Der Löschknopf sitzt aber fast überall unten
+   im Bearbeiten-Formular - und ein Formular im Formular ist nach HTML nicht
+   erlaubt: der Browser wirft das innere stillschweigend weg. Der Knopf gehörte
+   damit zum äusseren Formular und speicherte, statt zu löschen. Genau daran
+   scheiterte "Aufgabe löschen".
+
+   type="button" ist Pflicht: sonst schickt ein Klick das umgebende Formular
+   ab. Die Rückfrage übernimmt hx-confirm, weil htmx die Anfrage sofort am
+   Knopf auslöst und ein eigener Klick-Wächter zu spät käme. #}
+{% macro loeschen(ziel, frage, csrf, beschriftung="Löschen", klasse="btn-gefahr btn-klein") %}
+<button type="button" class="{{ klasse }}"
+        hx-post="{{ ziel }}" hx-target="#tab-inhalt"
+        hx-vals='{"csrf": "{{ csrf }}"}'
+        hx-confirm="{{ frage }}">{{ beschriftung }}</button>
+{% endmacro %}
+
+{# --- Zuständigkeit: Person ODER Abteilung ----------------------------------
+   Eine einzige Liste statt zwei nebeneinander. Zwei Auswahlfelder liessen
+   beides gleichzeitig zu; welches dann gewinnt, war nur im Quelltext
+   nachzulesen. Mit einer Liste ist "immer nur eines" keine Regel mehr,
+   sondern schlicht nicht anders möglich.
+   Der Wert trägt seine Art mit: "p:12" für die Person, "a:finanzen" für die
+   Abteilung. #}
+{% macro zustaendig_auswahl(name, personen, abteilungen, person_id=None,
+                            abteilung=None, leer_text="– bitte wählen –") %}
+<select name="{{ name }}">
+  <option value="">{{ leer_text }}</option>
+  {% if personen %}
+  <optgroup label="Einzelne Person">
+    {% for p in personen %}
+    <option value="p:{{ p.id }}" {% if person_id == p.id %}selected{% endif %}>
+      {{ p.vorname }} {{ p.nachname }}
+    </option>
+    {% endfor %}
+  </optgroup>
+  {% endif %}
+  {% if abteilungen %}
+  <optgroup label="Ganze Abteilung">
+    {% for key in abteilungen %}
+    <option value="a:{{ key }}" {% if abteilung == key %}selected{% endif %}>
+      {{ abteilung_label(key) }}
+    </option>
+    {% endfor %}
+  </optgroup>
+  {% endif %}
+</select>
+{% endmacro %}
+
+{# --- Suchleiste über einer Liste -------------------------------------------
+   Filtert im Browser, ohne Anfrage an den Server: bei 30 Aufgaben ist ein
+   Rundweg zum Server pro Tastenanschlag reine Verschwendung, und offline
+   funktioniert es auch. Die Suche greift auf jedes Element mit
+   [data-suchbar] innerhalb des Behälters; durchsucht wird sein Text.
+   `zahl` blendet die Trefferzahl ein. #}
+{% macro suche(ziel, platzhalter="Suchen …", zahl_text="Einträge") %}
+<div class="suchleiste" data-suche="{{ ziel }}" data-suche-wort="{{ zahl_text }}">
+  <span class="such-zeichen" aria-hidden="true">{{ sym.zeichen("suche", 18) }}</span>
+  <input type="search" placeholder="{{ platzhalter }}" aria-label="{{ platzhalter }}"
+         autocomplete="off" spellcheck="false">
+  <button type="button" class="such-leeren" aria-label="Suche leeren" hidden>&times;</button>
+  <span class="such-zahl meta" aria-live="polite"></span>
+</div>
+{% endmacro %}

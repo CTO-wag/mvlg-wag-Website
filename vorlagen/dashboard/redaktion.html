@@ -1,0 +1,135 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{% macro eintrag_karte(e) %}
+<details class="block">
+  <summary>
+    <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
+      <strong>{{ e.titel }}</strong>
+      <span class="marke">{{ e.kanal|label }}</span>
+      {{ m.zustand(e.status) }}
+      {% if e.datum %}<span class="meta">{{ e.datum|berlin }}</span>{% endif %}
+      {% if e.verantwortlich %}
+      <span class="meta">{{ e.verantwortlich.vorname }}</span>{% endif %}
+      {% if anhaenge.get(e.id) %}
+      <span class="meta">{{ anhaenge[e.id]|length }}</span>{% endif %}
+    </span>
+  </summary>
+  <div class="aufklapp-inhalt">
+    {% if e.notiz %}<p style="white-space:pre-wrap;">{{ e.notiz }}</p>{% endif %}
+
+    {% if anhaenge.get(e.id) %}
+    <h4>Dateien</h4>
+    <ul class="liste">
+      {% for anhang in anhaenge[e.id] %}
+      <li>
+        <span class="liste-links">
+          <a href="/dashboard/redaktion/datei/{{ anhang.id }}">{{ anhang.dateiname }}</a>
+          <span class="meta">{{ (anhang.groesse / 1024)|round|int }} KB ·
+            {{ anhang.created_at|relativ }}</span>
+        </span>
+        <span class="liste-rechts">
+          {{ m.loeschen("/dashboard/redaktion/datei/" ~ anhang.id ~ "/loeschen",
+                        "Datei „" ~ anhang.dateiname ~ "“ löschen?", csrf, "Entfernen",
+                        "btn-still btn-klein") }}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    <form hx-post="/dashboard/redaktion/{{ e.id }}/datei" hx-target="#tab-inhalt"
+          hx-encoding="multipart/form-data"
+          style="flex-direction:row;gap:var(--r2);margin-top:var(--r3);flex-wrap:wrap;">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="file" name="datei" required
+             accept="image/png,image/jpeg,image/webp,image/gif,application/pdf">
+      <button type="submit" class="btn-zweit btn-klein">Hochladen</button>
+    </form>
+
+    <details style="margin-top:var(--r4);">
+      <summary class="meta" style="cursor:pointer;">Bearbeiten oder löschen</summary>
+      <form hx-post="/dashboard/redaktion/{{ e.id }}/aendern" hx-target="#tab-inhalt"
+            class="formular" style="margin-top:var(--r3);">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="voll">Titel<input type="text" name="titel" value="{{ e.titel }}" maxlength="160"></label>
+        <label>Kanal
+          <select name="kanal">
+            {% for k in ["instagram", "aushang", "website", "newsletter", "sonstiges"] %}
+            <option value="{{ k }}" {% if e.kanal == k %}selected{% endif %}>{{ k|label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Datum <span class="meta">Ein Datum macht aus der Idee einen Plan.</span>
+          <input type="date" name="wann" value="{{ e.datum.isoformat() if e.datum else '' }}"></label>
+        <label>Stand
+          <select name="status">
+            {% for s in ["idee", "geplant", "in_arbeit", "veroeffentlicht"] %}
+            <option value="{{ s }}" {% if e.status == s %}selected{% endif %}>{{ s|label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Verantwortlich{{ m.personen_auswahl("verantwortlich", personen, e.verantwortlich_id, "– offen –") }}</label>
+        <label class="voll">Notiz<textarea name="notiz" maxlength="4000" rows="3">{{ e.notiz or "" }}</textarea></label>
+        <div class="formular-fuss">
+          <button type="submit">Speichern</button>
+          {{ m.loeschen("/dashboard/redaktion/" ~ e.id ~ "/loeschen",
+                        "„" ~ e.titel ~ "“ löschen?", csrf, "In den Papierkorb") }}
+        </div>
+      </form>
+    </details>
+  </div>
+</details>
+{% endmacro %}
+
+{{ m.kopf("Redaktionsplan", "Was wann wo rausgeht. Eine Idee ohne Datum bleibt in der Sammlung – ein Datum macht daraus einen Plan.") }}
+{{ m.rueckmeldung(meldung) }}
+
+{% if abteilungen_wahl %}
+<details class="block">
+  <summary>Neuer Eintrag</summary>
+  <div class="aufklapp-inhalt">
+    <form hx-post="/dashboard/redaktion" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Titel<input type="text" name="titel" maxlength="160" required
+                                      placeholder="Worum geht der Beitrag?"></label>
+      <label>Abteilung{{ m.abteilungs_auswahl("abteilung", abteilungen_wahl, none, "") }}</label>
+      <label>Kanal
+        <select name="kanal">
+          <option value="instagram">Instagram</option>
+          <option value="aushang">Aushang</option>
+          <option value="website">Website</option>
+          <option value="newsletter">Newsletter</option>
+          <option value="sonstiges" selected>Sonstiges</option>
+        </select>
+      </label>
+      <label>Datum <span class="meta">Leer lassen = erst mal nur eine Idee.</span>
+        <input type="date" name="wann"></label>
+      <label>Verantwortlich{{ m.personen_auswahl("verantwortlich", personen, none, "– offen –") }}</label>
+      <label class="voll">Notiz<textarea name="notiz" maxlength="4000" rows="2"></textarea></label>
+      <div class="formular-fuss"><button type="submit">Anlegen</button></div>
+    </form>
+  </div>
+</details>
+
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Geplant</h2><p class="meta">Beiträge mit Datum, nach Termin sortiert.</p></div>
+    <span class="marke">{{ geplant|length }}</span>
+  </div>
+  {% if geplant %}
+  <div class="stapel">{% for e in geplant %}{{ eintrag_karte(e) }}{% endfor %}</div>
+  {% else %}{{ m.leer("Nichts geplant", "Setz bei einer Idee ein Datum.", "kalender") }}{% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Ideensammlung</h2><p class="meta">Ohne Datum – nichts geht verloren.</p></div>
+    <span class="marke">{{ ideen|length }}</span>
+  </div>
+  {% if ideen %}
+  <div class="stapel">{% for e in ideen %}{{ eintrag_karte(e) }}{% endfor %}</div>
+  {% else %}{{ m.leer("Noch keine Ideen",
+                            "Alles darf hier rein – aussortiert wird später.",
+                            "idee", "Idee festhalten") }}{% endif %}
+</div>
+{% endif %}

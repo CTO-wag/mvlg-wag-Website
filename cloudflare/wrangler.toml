@@ -1,0 +1,66 @@
+# Einstellungen fuer das Auffangnetz (cloudflare/worker.js).
+#
+# Diese Datei beschreibt, WO der Worker laeuft. Was er tut, steht in worker.js.
+# Geheimnisse stehen absichtlich NICHT hier - sie kaemen sonst mit ins
+# Repository. Sie werden einzeln gesetzt, siehe ANLEITUNG.md.
+
+name = "wag-auffangnetz"
+main = "worker.js"
+
+# Datum der Worker-Laufzeit. Nicht ohne Grund aendern: Ein neueres Datum kann
+# das Verhalten aendern, und ein Auffangnetz soll sich genau dann nicht anders
+# verhalten, wenn man es braucht.
+compatibility_date = "2026-08-18"
+
+# ---------------------------------------------------------------------------
+#  Wo der Worker in den Weg gehen soll
+# ---------------------------------------------------------------------------
+#  Beide Adressen, weil der Ausfall beide trifft. Das Sternchen bedeutet
+#  "jeder Weg" - der Worker muss vor ALLEM stehen, nicht nur vor der
+#  Startseite: Wer mitten in der Arbeit ist, faellt auf einer Unterseite
+#  hinein, nicht auf "/".
+#
+#  ACHTUNG: "zone_name" muss die Domain sein, wie sie in deinem Cloudflare-
+#  Konto steht (ohne "www", ohne "https://").
+routes = [
+  { pattern = "mvlg-wag.de/*", zone_name = "mvlg-wag.de" },
+  { pattern = "app.mvlg-wag.de/*", zone_name = "mvlg-wag.de" },
+]
+
+# ---------------------------------------------------------------------------
+#  Der Zwischenspeicher fuer Meldungen
+# ---------------------------------------------------------------------------
+#  Ohne ihn laeuft alles andere weiter - dann zeigt die Fehlerseite nur keinen
+#  Meldeknopf mehr, statt einen anzubieten, der nichts tut.
+#  Die "id" bekommst du beim Anlegen (siehe ANLEITUNG.md, Schritt 3) und musst
+#  sie hier eintragen.
+[[kv_namespaces]]
+binding = "LAGER"
+id = "HIER_DIE_ID_EINTRAGEN"
+
+# ---------------------------------------------------------------------------
+#  Offene Werte (keine Geheimnisse)
+# ---------------------------------------------------------------------------
+[vars]
+# Welche Adresse die Uhr unten abfragt. Nur noetig, wenn du den Zeitplan
+# einschaltest.
+PRUEF_ADRESSE = "https://mvlg-wag.de/"
+# Ein eigener ntfy-Server, falls ihr je einen aufsetzt. Leer lassen = ntfy.sh.
+NTFY_BASIS = "https://ntfy.sh"
+
+# ---------------------------------------------------------------------------
+#  Regelmaessig nachsehen, auch wenn niemand die Seite oeffnet
+# ---------------------------------------------------------------------------
+#  Standardmaessig AUS. Ohne Zeitplan erfaehrt der CTO von einem Ausfall erst,
+#  wenn ihn jemand meldet - faellt die Plattform Freitagabend aus, also
+#  moeglicherweise gar nicht. Mit Zeitplan schaut Cloudflare alle fuenf Minuten
+#  nach und meldet den Wechsel: einmal beim Ausfall, einmal bei der Rueckkehr.
+#
+#  Bedenke dabei: Der Rechner in der Schule laeuft nicht rund um die Uhr. Wenn
+#  er abends planmaessig ausgeht, klingelt es abends planmaessig - und eine
+#  Meldung, die jeden Abend kommt, liest nach einer Woche niemand mehr. Schalte
+#  das nur ein, wenn der Rechner eigentlich immer laufen soll.
+#
+#  Zum Einschalten die naechsten zwei Zeilen entkommentieren:
+# [triggers]
+# crons = ["*/5 * * * *"]

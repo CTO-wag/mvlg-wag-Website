@@ -1,0 +1,50 @@
+# Zugangsdaten
+config.cmd
+config.cmd.vor-*
+!config.example.cmd
+ERSTE-ANMELDUNG.txt
+*.pem
+*.key
+*.p12
+*.pfx
+.cloudflared/
+
+# Datenbestand. Enthaelt personenbezogene Daten von Minderjaehrigen und darf
+# unter keinen Umstaenden ins Repository.
+daten/
+daten-*/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+redaktion_uploads/
+support_uploads/
+*.log
+
+# WhatsApp: die gekoppelte Sitzung ist ein vollwertiger Kontozugang
+whatsapp-sitzung/
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+
+# Werkzeuge, Betriebssystem
+.claude/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*.tmp

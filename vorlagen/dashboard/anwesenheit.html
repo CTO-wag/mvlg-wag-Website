@@ -1,0 +1,110 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("Anwesenheit", "Wer regelmäßig da ist – die Zahl, die beim Leadership-Wert am meisten aussagt.") }}
+{{ m.rueckmeldung(meldung) }}
+
+<details class="block">
+  <summary>Anwesenheit erfassen</summary>
+  <div class="aufklapp-inhalt">
+    <form hx-post="/dashboard/anwesenheit" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Datum<input type="date" name="wann" value="{{ heute().isoformat() }}"></label>
+      <label>Anlass
+        <input type="text" name="art" maxlength="80" value="Treffen"
+               list="anlaesse">
+        <datalist id="anlaesse">
+          <option value="Treffen"><option value="Workshop">
+          <option value="Wettbewerb"><option value="Projekttermin">
+          <option value="Exkursion">
+        </datalist>
+      </label>
+      <label>Zu welchem Treffen? <span class="meta">Optional.</span>
+        <select name="treffen_id">
+          <option value="">– kein bestimmtes –</option>
+          {% for t in treffen %}
+          <option value="{{ t.id }}">{{ t.date|berlin }} · {{ t.title }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="voll">Wer war da?
+        <span class="meta">Mehrfachauswahl – alle Angekreuzten werden auf einmal eingetragen.</span>
+      </label>
+      {# Anwesenheit wird alle zwei Wochen für dieselben zwanzig Leute erfasst.
+         Ohne "Alle" heisst das zwanzig Klicks für den Normalfall - und der
+         Normalfall ist: fast alle waren da. Also: alle ankreuzen und die
+         paar Fehlenden wieder abwählen. #}
+      <div class="empfaenger-kasten" style="grid-column:1 / -1;">
+        <div class="empfaenger-kopf">
+          <strong>{{ personen|length }} Mitglieder</strong>
+          <button type="button" class="btn-still btn-klein" data-empfaenger="alle">Alle</button>
+          <button type="button" class="btn-still btn-klein" data-empfaenger="keine">Keine</button>
+          <input type="search" class="empfaenger-suche" placeholder="Name filtern …"
+                 aria-label="Namen filtern">
+          <span class="meta" data-empfaenger-zahl></span>
+        </div>
+        <div class="empfaenger-liste">
+          {% for p in personen %}
+          <label class="haken" data-name="{{ p.vorname }} {{ p.nachname }}">
+            <input type="checkbox" name="personen" value="{{ p.id }}">
+            <span>{{ p.vorname }} {{ p.nachname }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <label class="voll">Notiz<textarea name="notiz" maxlength="2000" rows="2"></textarea></label>
+      <div class="formular-fuss"><button type="submit">Eintragen</button></div>
+    </form>
+  </div>
+</details>
+
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Quote je Person</h2>
+      <p class="meta">Bezogen auf {{ treffen_gesamt }} erfasste Treffen.</p></div>
+  </div>
+  {% if quoten %}
+  <div class="stapel">
+    {% for q in quoten %}
+    <div class="balken-zeile">
+      <span class="balken-name">{{ q.person.vorname }} {{ q.person.nachname }}</span>
+      <span class="balken {% if q.quote < 50 %}amber{% endif %}">
+        <span style="width:{{ q.quote if q.quote else 1.5 }}%"></span></span>
+      <b class="balken-zahl">{{ q.anzahl }}×</b>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  {{ m.leer("Noch nichts erfasst",
+            "Nach dem nächsten Treffen einmal ankreuzen, wer da war.",
+            "protokoll", "Anwesenheit erfassen") }}
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Letzte Einträge</h2></div></div>
+  {% if eintraege %}
+  <div class="tabelle-rahmen">
+    <table>
+      <thead><tr><th>Datum</th><th>Person</th><th>Anlass</th><th>Notiz</th><th></th></tr></thead>
+      <tbody>
+        {% for eintrag, person in eintraege %}
+        <tr>
+          <td>{{ eintrag.event_date|berlin }}</td>
+          <td>{{ person.vorname }} {{ person.nachname }}</td>
+          <td>{{ eintrag.event_type }}</td>
+          <td class="meta">{{ eintrag.notes or "" }}</td>
+          <td class="rechts">
+            {{ m.loeschen("/dashboard/anwesenheit/" ~ eintrag.id ~ "/loeschen",
+                          "Eintrag entfernen? Das war dann eine Fehleingabe – "
+                          "die Leistung wird zurückgenommen.", csrf, "Entfernen",
+                          "btn-still btn-klein") }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ m.leer("Noch keine Einträge", "", "protokoll") }}
+  {% endif %}
+</div>

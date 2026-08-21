@@ -1,0 +1,35 @@
+{% extends "basis.html" %}
+{% block ticker %}{% endblock %}
+{% block inhalt %}
+<section class="panel karten-seite zentriert" style="border-top:4px solid var(--rot);">
+  <img class="wappen" src="{{ statisch('bilder/logo-klein.webp') }}" width="226" height="180"
+       alt="" style="--saum:1.5px;height:80px;width:auto;margin:0 auto var(--r4);display:block;opacity:.85;">
+  <span class="hut">Fehler {{ status }}</span>
+  {% if status == 404 %}
+  <h1>Seite nicht gefunden</h1>
+  <p class="meta">Diese Seite gibt es nicht (mehr) oder sie wurde verschoben.</p>
+  {% elif status == 403 %}
+  <h1>Kein Zugriff</h1>
+  <p class="meta">Für diesen Bereich fehlt dir die Berechtigung. Falls das nicht
+    stimmt, wende dich an den Vorstand oder schreib eine Support-Anfrage.</p>
+  {% elif status == 429 %}
+  <h1>Kurz durchatmen</h1>
+  <p class="meta">{{ detail }}</p>
+  <p class="meta">Im Schulnetz teilen sich alle Geräte eine Adresse – es kann
+    also auch an jemand anderem liegen. Über das Handynetz klappt es meist sofort.</p>
+  {% elif status == 500 %}
+  <h1>Etwas ist schiefgelaufen</h1>
+  <p class="meta">Ein unerwarteter Fehler. Bitte versuch es erneut – bleibt es
+    dabei, melde dich beim Support.</p>
+  {% else %}
+  <h1>{{ detail or "Ein Fehler ist aufgetreten" }}</h1>
+  {% endif %}
+  <div class="knopfzeile" style="justify-content:center;margin-top:var(--r5);">
+    {% if user %}
+    <a class="btn" href="{{ DASHBOARD_URL }}/">Zum Dashboard</a>
+    {% else %}
+    <a class="btn" href="{{ WEBSITE_URL }}/">Zur Startseite</a>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

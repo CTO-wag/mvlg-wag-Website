@@ -1,0 +1,163 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("Sicherheit", "Wer kommt herein, von wo – und was sollte man nachziehen.") }}
+{{ m.rueckmeldung(meldung) }}
+
+<div class="kennzahlen">
+  {{ m.kennzahl(konten_gesamt, "aktive Konten") }}
+  {{ m.kennzahl(sitzungen|length, "offene Anmeldungen") }}
+  {{ m.kennzahl(fehlversuche, "Fehlversuche (14 Tage)",
+                "kennzahl-warnung" if fehlversuche > 20 else "") }}
+  {{ m.kennzahl(ohne_2fa|length, "ohne zweiten Faktor",
+                "kennzahl-warnung" if ohne_2fa else "kennzahl-gut") }}
+</div>
+
+{% if auffaellig %}
+<div class="panel" style="border-left:4px solid var(--rot);">
+  <div class="panel-kopf"><div><h2>Auffällige Adressen</h2>
+    <p class="meta">Fünf oder mehr Fehlversuche in den letzten 14 Tagen. Im
+      Schulnetz teilen sich alle Geräte eine Adresse – eine hohe Zahl allein
+      ist also noch kein Angriff.</p></div></div>
+  <div class="tabelle-rahmen">
+    <table>
+      <thead><tr><th>Adresse</th><th class="rechts">Fehlversuche</th></tr></thead>
+      <tbody>
+        {% for ip, anzahl in auffaellig %}
+        <tr><td><code>{{ ip or "unbekannt" }}</code></td>
+            <td class="zahl">{{ anzahl }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if gesperrt %}
+<div class="panel" style="border-left:4px solid var(--amber);">
+  <div class="panel-kopf"><div><h2>Gesperrte Konten</h2>
+    <p class="meta">Nach fünf Fehlversuchen sperrt sich ein Konto selbst für
+      15 Minuten. Hier lässt sich das vorzeitig aufheben.</p></div></div>
+  <ul class="liste">
+    {% for k in gesperrt %}
+    <li>
+      <span class="liste-links"><strong>{{ k.vorname }} {{ k.nachname }}</strong>
+        <span class="meta">gesperrt bis {{ k.locked_until|berlin("%H:%M") }}</span></span>
+      <span class="liste-rechts">
+        <form hx-post="/dashboard/sicherheit/konto/{{ k.id }}/entsperren" hx-target="#tab-inhalt">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="btn-zweit btn-klein">Entsperren</button>
+        </form>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="raster-2">
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Was nachzuziehen wäre</h2></div></div>
+    <ul class="liste">
+      <li>
+        <span class="liste-links"><strong>Ohne zweiten Faktor</strong>
+          <span class="meta">Vor allem Konten mit vielen Rechten sollten einen haben.</span></span>
+        <span class="liste-rechts">
+          <span class="marke {% if ohne_2fa %}zustand-offen{% else %}zustand-erledigt{% endif %}">
+            {{ ohne_2fa|length }}</span></span>
+      </li>
+      <li>
+        <span class="liste-links"><strong>Passwort älter als ein Jahr</strong>
+          <span class="meta">Zählt auch, wer sein Startpasswort noch nie
+            selbst geändert hat.</span></span>
+        <span class="liste-rechts">
+          <span class="marke {% if altes_passwort %}zustand-offen{% else %}zustand-erledigt{% endif %}">
+            {{ altes_passwort|length }}</span></span>
+      </li>
+    </ul>
+    {% if ohne_2fa %}
+    <details style="margin-top:var(--r3);">
+      <summary class="meta" style="cursor:pointer;">Welche Konten?</summary>
+      <div class="reihe" style="margin-top:var(--r2);">
+        {% for k in ohne_2fa %}
+        <span class="marke">{{ k.vorname }} {{ k.nachname }} · {{ k.role|label }}</span>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Betriebseinstellungen</h2>
+      <p class="meta">Aus config.cmd – hier nur zum Nachsehen.</p></div></div>
+    <ul class="liste">
+      {% for zeile in einstellungen %}
+      <li><span class="liste-links"><code style="font-size:.78rem;">{{ zeile }}</code></span></li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Offene Anmeldungen</h2>
+    <p class="meta">Alle Konten. Etwas Verdächtiges dabei? Beenden und die
+      Person bitten, ihr Passwort zu ändern.</p></div></div>
+  {% if sitzungen %}
+  <div class="tabelle-rahmen">
+    <table>
+      <thead><tr><th>Person</th><th>Gerät</th><th>Adresse</th>
+        <th>Zuletzt aktiv</th><th></th></tr></thead>
+      <tbody>
+        {% for s, person in sitzungen %}
+        <tr>
+          <td><strong>{{ person.vorname }} {{ person.nachname }}</strong></td>
+          <td>{{ geraet_name(s.user_agent) if geraet_name is defined else s.user_agent|truncate(40) }}</td>
+          <td class="meta"><code>{{ s.ip_address or "?" }}</code></td>
+          <td class="meta">{{ s.last_active|relativ }}</td>
+          <td class="rechts">
+            {{ m.loeschen("/dashboard/sicherheit/sitzung/" ~ s.id ~ "/beenden",
+                          "Diese Anmeldung beenden?", csrf, "Beenden",
+                          "btn-still btn-klein") }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}{{ m.leer("Keine offenen Anmeldungen", "", "schloss") }}{% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Anmeldeprotokoll</h2>
+    <p class="meta">Die letzten 60 Versuche. Wird nach 90 Tagen aufgeräumt.</p></div></div>
+  {% if versuche %}
+  <div class="tabelle-rahmen">
+    <table>
+      <thead><tr><th>Wann</th><th>Adresse (E-Mail)</th><th>Von</th>
+        <th>Ergebnis</th></tr></thead>
+      <tbody>
+        {% for v in versuche %}
+        <tr>
+          <td class="meta">{{ v.created_at|berlin("%d.%m. %H:%M") }}</td>
+          <td>{{ v.email }}</td>
+          <td class="meta"><code>{{ v.ip_address or "?" }}</code></td>
+          <td>{% if v.erfolg %}<span class="marke zustand-erledigt">angemeldet</span>
+              {% else %}<span class="marke zustand-abgelehnt">{{ v.grund or "abgelehnt" }}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}{{ m.leer("Noch keine Anmeldungen protokolliert", "", "schluessel") }}{% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Systemzustand</h2></div></div>
+  <div class="zustand-liste">
+    {% for p in zustand %}
+    <div class="zustand-punkt zustand-{{ p.art }}">
+      <span class="zustand-lampe" aria-hidden="true"></span>
+      <div><strong>{{ p.titel }}</strong><span>{{ p.text }}</span></div>
+    </div>
+    {% endfor %}
+  </div>
+</div>

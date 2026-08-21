@@ -1,0 +1,106 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("Wettbewerbe", "Planspiel Börse, Jugend Gründet und alles andere, wo wir antreten.") }}
+{{ m.rueckmeldung(meldung) }}
+
+<details class="block">
+  <summary>Neuer Wettbewerb</summary>
+  <div class="aufklapp-inhalt">
+    <form hx-post="/dashboard/wettbewerbe" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Titel<input type="text" name="titel" maxlength="200" required></label>
+      <label class="voll">Worum geht es?<textarea name="beschreibung" maxlength="4000"></textarea></label>
+      <label>Datum<input type="date" name="wann"></label>
+      <label>Ort<input type="text" name="ort" maxlength="200"></label>
+      <div class="formular-fuss"><button type="submit">Anlegen</button></div>
+    </form>
+  </div>
+</details>
+
+{% if not wettbewerbe %}
+<div class="panel">{{ m.leer("Noch keine Wettbewerbe", "", "pokal") }}</div>
+{% endif %}
+
+{% for w in wettbewerbe %}
+<div class="panel">
+  <div class="panel-kopf">
+    <div>
+      <h2>{{ w.title }}</h2>
+      <p class="meta">
+        {{ m.zustand(w.status) }}
+        {% if w.date %} · {{ w.date|datum_lang }}{% endif %}
+        {% if w.location %} · {{ w.location }}{% endif %}
+      </p>
+    </div>
+    <span class="marke">{{ teilnahmen.get(w.id, [])|length }} dabei</span>
+  </div>
+
+  {% if w.description %}<p>{{ w.description }}</p>{% endif %}
+
+  {% set dabei = teilnahmen.get(w.id, []) %}
+  {% if dabei %}
+  <div class="tabelle-rahmen" style="margin-top:var(--r3);">
+    <table>
+      <thead><tr><th>Platz</th><th>Person</th><th>Team</th><th class="rechts">Punkte</th><th></th></tr></thead>
+      <tbody>
+        {% for eintrag, person in dabei %}
+        <tr>
+          <td>{% if eintrag.placement %}
+            <span class="marke {% if eintrag.placement <= 3 %}zustand-erledigt{% endif %}">
+              {{ eintrag.placement }}.</span>
+          {% else %}<span class="meta">–</span>{% endif %}</td>
+          <td>{{ person.vorname }} {{ person.nachname }}</td>
+          <td>{{ eintrag.team_name or "–" }}</td>
+          <td class="zahl">{{ eintrag.points if eintrag.points is not none else "–" }}</td>
+          <td class="rechts">
+            {{ m.loeschen("/dashboard/wettbewerbe/teilnahme/" ~ eintrag.id ~ "/entfernen",
+                          "Teilnahme von " ~ person.vorname ~ " entfernen?", csrf,
+                          "Entfernen", "btn-still btn-klein") }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <details style="margin-top:var(--r3);">
+    <summary class="meta" style="cursor:pointer;">Teilnahme eintragen</summary>
+    <form hx-post="/dashboard/wettbewerbe/{{ w.id }}/teilnahme" hx-target="#tab-inhalt"
+          class="formular" style="margin-top:var(--r3);">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Person{{ m.personen_auswahl("person", personen, none, "– wählen –") }}</label>
+      <label>Team<input type="text" name="team" maxlength="200"></label>
+      <label>Platzierung<input type="number" name="platz" min="1" placeholder="z. B. 2"></label>
+      <label>Punkte<input type="number" name="punkte"></label>
+      <label class="voll">Notiz<textarea name="notiz" maxlength="2000"></textarea></label>
+      <div class="formular-fuss"><button type="submit">Eintragen</button></div>
+    </form>
+  </details>
+
+  <details style="margin-top:var(--r2);">
+    <summary class="meta" style="cursor:pointer;">Bearbeiten oder löschen</summary>
+    <form hx-post="/dashboard/wettbewerbe/{{ w.id }}/aendern" hx-target="#tab-inhalt"
+          class="formular" style="margin-top:var(--r3);">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Titel<input type="text" name="titel" value="{{ w.title }}" maxlength="200"></label>
+      <label class="voll">Beschreibung<textarea name="beschreibung" maxlength="4000">{{ w.description or "" }}</textarea></label>
+      <label>Stand
+        <select name="status">
+          {% for s in ["geplant", "aktiv", "abgeschlossen"] %}
+          <option value="{{ s }}" {% if w.status == s %}selected{% endif %}>{{ s|label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Datum<input type="date" name="wann" value="{{ w.date.isoformat() if w.date else '' }}"></label>
+      <label>Ort<input type="text" name="ort" value="{{ w.location or '' }}" maxlength="200"></label>
+      <div class="formular-fuss">
+        <button type="submit">Speichern</button>
+        {{ m.loeschen("/dashboard/wettbewerbe/" ~ w.id ~ "/loeschen",
+                      "„" ~ w.title ~ "“ in den Papierkorb legen?", csrf,
+                      "In den Papierkorb") }}
+      </div>
+    </form>
+  </details>
+</div>
+{% endfor %}

@@ -1,0 +1,214 @@
+{% extends "oeffentlich/basis_web.html" %}
+{#
+  Die Startseite. Der Text ist unverändert aus V1 übernommen - er ist
+  geschrieben und geschliffen worden, daran wird nichts angefasst.
+
+  Neu ist nur, woher zwei Abschnitte kommen: „Was du mitnimmst“ und
+  „Was wir konkret machen“ stehen jetzt in der Datenbank und sind im
+  Dashboard änderbar, statt hier festzustehen.
+#}
+{% block inhalt %}
+
+{#
+  Der Aufmacher trägt jetzt sichtbar mehr Gewicht als die übrigen Abschnitte:
+  Vorher war er genauso hoch wie das Kontaktformular, und die Seite las sich
+  als neun gleich große Blöcke hintereinander. Text links, Wappen rechts, und
+  darunter die vier Angaben, nach denen zuerst gefragt wird.
+#}
+<section id="start" class="abschnitt aufmacher">
+  <div class="aufmacher-text">
+    <span class="hut">Schüler-AG am Max-von-Laue-Gymnasium Koblenz</span>
+    <h1>Deine erste Aktie kaufst du nicht im Unterricht. Bei uns schon.</h1>
+    <p class="aufmacher-motto">An alle, die größer denken.</p>
+    <p class="fuehrung">Steuern, Verträge, Börse. Sachen, die später einfach wichtig
+      werden, kommen in der Schule kaum vor. Wir holen das nach. Kein Frontalvortrag.
+      Wir simulieren Portfolios, rechnen eigene Ideen durch und treten bei echten
+      Wettbewerben an.</p>
+    <div class="knopfzeile">
+      <a class="btn" href="/bewerbung">Jetzt bewerben</a>
+      <a class="btn btn-zweit" href="#ueber-uns">Mehr erfahren</a>
+    </div>
+  </div>
+  <div class="aufmacher-bild" aria-hidden="true">
+    <img src="{{ statisch('bilder/wappen.webp') }}" width="480" height="381"
+         alt="" decoding="async">
+  </div>
+</section>
+
+{# Die vier Fragen, die jede und jeder zuerst stellt - beantwortet, bevor man
+   scrollen muss. Die Angaben stehen weiter unten auch im Fließtext; hier sind
+   sie nur zum Überfliegen. #}
+<ul class="fakten" aria-label="Das Wichtigste in Kürze">
+  {# Kein "jede Schulform": Die AG gibt es nur an dieser einen Schule, da ist
+     die Schulform keine offene Frage. Der Schnitt dagegen schon - genau
+     danach fragen Leute, die sich unsicher sind. #}
+  <li><strong>Klasse 9–13</strong><span>Egal, welcher Schnitt</span></li>
+  <li><strong>Alle zwei Wochen</strong><span>Ein Nachmittag, dazwischen das Dashboard</span></li>
+  <li><strong>Ohne Vorwissen</strong><span>Interesse reicht als Voraussetzung</span></li>
+  <li><strong>Echte Wettbewerbe</strong><span>Planspiel Börse, Jugend Gründet</span></li>
+</ul>
+
+<section id="ueber-uns" class="abschnitt">
+  <div class="raster-2">
+    <div>
+      <span class="hut">Über uns</span>
+      <h2>Von Schülern geleitet. Sonst niemandem.</h2>
+      <p>Wir entscheiden selbst, woran wir arbeiten, wer was übernimmt und wer wann
+        Verantwortung trägt. Wer will, leitet irgendwann ein eigenes Projekt oder
+        landet im Core-Team, das die AG führt.</p>
+      <p>Getroffen wird alle zwei Wochen. Dazwischen läuft alles über unser eigenes
+        Dashboard. Aufgaben, Termine, Beschlüsse, alles an einem Ort.</p>
+      <p>Klassenstufen 9 bis 13. Vorkenntnisse brauchst du keine. Einser-Schnitt
+        auch nicht.</p>
+    </div>
+    <div class="vorteile-kasten">
+      <h3>Was du mitnimmst</h3>
+      <ul class="vorteile-liste">
+        {% for punkt in vorteile %}
+        <li>{{ punkt.titel }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="halbjahre" class="abschnitt">
+  <span class="hut">Jahresablauf</span>
+  <h2>Zwei Halbjahre, zwei Welten</h2>
+  <div class="raster-2" style="margin-top:var(--r6);">
+    <div class="panel halbjahr">
+      <span class="halbjahr-nummer" aria-hidden="true">1</span>
+      <h3>Wirtschaft &amp; Investment</h3>
+      <p>Angebot und Nachfrage, Risiko und Rendite, Diversifikation. Wir arbeiten
+        mit fiktiven Portfolios, checken echte Marktentwicklungen und starten beim
+        Planspiel Börse. Wer richtig gut ist, qualifiziert sich für die Wharton
+        Investment Challenge.</p>
+    </div>
+    <div class="panel halbjahr zwei">
+      <span class="halbjahr-nummer" aria-hidden="true">2</span>
+      <h3>Unternehmertum &amp; eigene Projekte</h3>
+      <p>Ihr entwickelt in Teams eigene Geschäftsideen, baut ein Geschäftsmodell und
+        findet raus, wer eure Zielgruppe überhaupt ist. Ziel ist Jugend Gründet oder
+        Startup Teens, mit einem Konzept, das ihr wirklich präsentieren könnt.</p>
+    </div>
+  </div>
+  <p class="halbjahr-fazit">Erst verstehen, dann machen, dann draufschauen, was
+    dabei rauskam. In der Reihenfolge.</p>
+</section>
+
+{% if angebot %}
+<section id="angebot" class="abschnitt">
+  <span class="hut">Aktivitäten</span>
+  <h2>Was wir konkret machen</h2>
+  <div class="raster-2" style="margin-top:var(--r6);">
+    {% for karte in angebot %}
+    <div class="panel arbeit-karte" style="--karte:{{ karte.farbe or '#0E2647' }}">
+      <h3>{{ karte.titel }}</h3>
+      <p>{{ karte.text }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if portfolio %}
+{#
+  Das Portfolio. Steht bewusst NACH den Aktivitäten: erst was wir tun, dann
+  was dabei herausgekommen ist. Ohne Einträge verschwindet der ganze
+  Abschnitt – eine leere Erfolgsliste wirbt gegen die AG.
+#}
+<section id="arbeit" class="abschnitt">
+  <span class="hut">Unsere Arbeit</span>
+  <h2>Was dabei herausgekommen ist</h2>
+  <p class="meta" style="max-width:56ch;">Kein Prospekt, sondern das, was
+    tatsächlich passiert ist – mit Zeitraum und Ergebnis.</p>
+
+  <ol class="portfolio">
+    {% for eintrag in portfolio %}
+    <li class="portfolio-karte" style="--karte:{{ eintrag.farbe or '#0E2647' }}">
+      {% if eintrag.zeitraum %}
+      <span class="portfolio-zeit">{{ eintrag.zeitraum }}</span>
+      {% endif %}
+      <div class="portfolio-inhalt">
+        <h3>{{ eintrag.titel }}</h3>
+        {% if eintrag.text %}<p>{{ eintrag.text }}</p>{% endif %}
+        {% if eintrag.ergebnis %}
+        <p class="portfolio-ergebnis">{{ eintrag.ergebnis }}</p>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endif %}
+
+<section id="weg" class="abschnitt">
+  <span class="hut">Dein Weg</span>
+  <h2>Du fängst an, wo du stehst</h2>
+  <ol class="stufen">
+    {% for stufe in stufen %}
+    <li><strong>{{ stufe.titel }}</strong><span>{{ stufe.text }}</span></li>
+    {% endfor %}
+  </ol>
+  <p class="stufen-fazit">Aufstieg nach Engagement, nicht nach Alter. Und den
+    Schwerpunkt kannst du jederzeit wechseln.</p>
+</section>
+
+<section id="quiz-anriss" class="abschnitt panel quiz-anriss">
+  <div>
+    <span class="hut">Wissenstest</span>
+    <h2>Wie gut kennst du dich schon aus?</h2>
+    <p class="meta">{{ quiz_anzahl }} Fragen zu Inflation, BIP, Angebot und Nachfrage.
+      Ein paar Minuten, Auswertung direkt danach. Keine Anmeldung, nichts wird
+      gespeichert.</p>
+  </div>
+  <a class="btn" href="/quiz">Quiz starten</a>
+</section>
+
+<section class="abschnitt aufruf">
+  <div>
+    <h2>Klingt nach dir?</h2>
+    <p>Keine Vorkenntnisse nötig, kein Einser-Schnitt gefordert. Interesse und
+      Zuverlässigkeit reichen. Die Bewerbung dauert fünf Minuten, dann melden
+      wir uns.</p>
+    <a class="btn" href="/bewerbung">Zur Bewerbung</a>
+  </div>
+</section>
+
+<section id="kontakt" class="abschnitt panel">
+  <span class="hut">Kontakt</span>
+  <h2>Fragen? Schreib einfach.</h2>
+  <div class="raster-2">
+    <div>
+      <p>Unsicher, ob die AG was für dich ist? Oder eine Frage zum Ablauf? Meld
+        dich, wir antworten so schnell wie möglich.</p>
+      {% if kontakt_erfolg %}
+      <div class="meldung meldung-gut"><div>Danke für deine Nachricht! Wir melden
+        uns bei dir.</div></div>
+      {% endif %}
+      {% if kontakt_fehler %}
+      <div class="meldung meldung-fehler"><div>{{ kontakt_fehler }}</div></div>
+      {% endif %}
+    </div>
+    <form method="post" action="/kontakt" class="kontakt-formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Dein Name
+        <input type="text" name="name" maxlength="160" required autocomplete="name">
+      </label>
+      <label>Deine E-Mail
+        <input type="email" name="email" maxlength="160" required autocomplete="email">
+      </label>
+      <label>Deine Nachricht
+        <textarea name="nachricht" maxlength="4000" required
+                  placeholder="Worum geht es?"></textarea>
+      </label>
+      {# Honigtopf gegen Formular-Roboter: ein Feld, das kein Mensch sieht und
+         kein Mensch ausfüllt. Ist es befüllt, war es ein Automat. #}
+      <div class="nur-lesehilfe" aria-hidden="true">
+        <label>Bitte leer lassen<input type="text" name="webseite" tabindex="-1" autocomplete="off"></label>
+      </div>
+      <button type="submit">Nachricht senden</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,198 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{% macro termin_formular(t, aktion, knopf) %}
+<form hx-post="{{ aktion }}" hx-target="#tab-inhalt" class="formular">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label class="voll">Titel
+    <input type="text" name="titel" maxlength="200" required
+           value="{{ t.title if t else '' }}"></label>
+  <label class="voll">Beschreibung
+    <textarea name="beschreibung" maxlength="4000" rows="2">{{ t.description if t else "" }}</textarea></label>
+  <label>Ort<input type="text" name="ort" maxlength="200" value="{{ t.location if t and t.location else '' }}"></label>
+  <div class="feldpaar">
+    <label>Von<input type="date" name="von" required
+                     value="{{ t.start_date.isoformat() if t else heute().isoformat() }}"></label>
+    <label>Bis <span class="meta">optional</span>
+      <input type="date" name="bis" value="{{ t.end_date.isoformat() if t and t.end_date else '' }}"></label>
+  </div>
+  <div class="feldpaar">
+    <label>Beginn <span class="meta">leer = ganztägig</span>
+      <input type="time" name="start" value="{{ t.start_time if t and t.start_time else '' }}"></label>
+    <label>Ende<input type="time" name="ende" value="{{ t.end_time if t and t.end_time else '' }}"></label>
+  </div>
+
+  <label class="voll">Für wen?
+    <select name="ziel" data-zielwahl>
+      <option value="alle" {% if not t or t.target_type == "alle" %}selected{% endif %}>Alle Mitglieder</option>
+      <option value="person" {% if t and t.target_type == "person" %}selected{% endif %}>Eine Person</option>
+      <option value="abteilung" {% if t and t.target_type == "abteilung" %}selected{% endif %}>Eine Abteilung</option>
+      <option value="auswahl" {% if t and t.target_type == "auswahl" %}selected{% endif %}>Frei zusammenstellen</option>
+    </select>
+  </label>
+  <label data-zielfeld="person" {% if not t or t.target_type != "person" %}hidden{% endif %}>
+    Person{{ m.personen_auswahl("person", personen, t.target_user_id if t else none, "– wählen –") }}
+  </label>
+  <label data-zielfeld="abteilung" {% if not t or t.target_type != "abteilung" %}hidden{% endif %}>
+    Abteilung{{ m.abteilungs_auswahl("abteilung", abteilungen_wahl,
+                                     t.target_department if t else none, "– wählen –") }}
+  </label>
+  <div class="empfaenger-kasten" data-zielfeld="auswahl"
+       style="grid-column:1 / -1;" {% if not t or t.target_type != "auswahl" %}hidden{% endif %}>
+    {% set gewaehlte_personen = t.targets|map(attribute="user_id")|select|list if t else [] %}
+    {% set gewaehlte_abteilungen = t.targets|map(attribute="department")|select|list if t else [] %}
+    <div class="empfaenger-kopf"><strong>Abteilungen</strong></div>
+    <div class="empfaenger-liste">
+      {% for key in abteilungen_wahl %}
+      <label class="haken">
+        <input type="checkbox" name="auswahl_abteilung" value="{{ key }}"
+               {% if key in gewaehlte_abteilungen %}checked{% endif %}>
+        <span>{{ abteilung_label(key) }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="empfaenger-kopf" style="margin-top:var(--r3);"><strong>Einzelne Personen</strong></div>
+    <div class="empfaenger-liste">
+      {% for p in personen %}
+      <label class="haken">
+        <input type="checkbox" name="auswahl_person" value="{{ p.id }}"
+               {% if p.id in gewaehlte_personen %}checked{% endif %}>
+        <span>{{ p.vorname }} {{ p.nachname }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="formular-fuss">
+    <button type="submit">{{ knopf }}</button>
+    {% if t %}
+    {{ m.loeschen("/dashboard/kalender/" ~ t.id ~ "/loeschen",
+                  "Termin „" ~ t.title ~ "“ löschen?", csrf, "In den Papierkorb") }}
+    {% endif %}
+  </div>
+</form>
+{% endmacro %}
+
+{{ m.kopf("Kalender", "Termine landen über das Abo direkt im Kalender deines Handys.") }}
+{{ m.rueckmeldung(meldung) }}
+
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Dein Kalender-Abo</h2>
+      <p class="meta">Diese Adresse in die Kalender-App eintragen – danach
+        erscheinen alle Termine automatisch und aktualisieren sich von selbst.
+        Die Adresse ist persönlich, also nicht weitergeben.</p></div>
+  </div>
+  <div class="reihe">
+    <input type="text" id="abo-adresse" value="{{ abo_adresse }}" readonly
+           aria-label="Adresse deines Kalender-Abos"
+           {# flex-basis statt min-width: auf einem 375px-Schirm ragte das Feld
+              sonst 18 Pixel über den Rand hinaus, statt umzubrechen. #}
+           style="flex:1 1 14rem;min-width:0;font-family:var(--schrift-mono);font-size:.8rem;">
+    <button type="button" class="btn-zweit" data-kopieren="#abo-adresse">Kopieren</button>
+    {# Wer "Kalender nicht gefunden" liest, kann hier selbst nachsehen, was
+       eine Kalender-App an dieser Adresse vorfindet. #}
+    <form hx-post="/dashboard/kalender/abo-pruefen" hx-target="#tab-inhalt">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn-still btn-klein">Adresse prüfen</button>
+    </form>
+    <form hx-post="/dashboard/kalender/abo-erneuern" hx-target="#tab-inhalt">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn-still btn-klein"
+              data-frage="Neue Adresse erzeugen? Die alte funktioniert danach nicht mehr und muss in jeder Kalender-App neu eingetragen werden.">
+        Neu erzeugen</button>
+    </form>
+  </div>
+</div>
+
+{% if darf_verwalten %}
+<details class="block">
+  <summary>Neuer Termin</summary>
+  <div class="aufklapp-inhalt">{{ termin_formular(none, "/dashboard/kalender", "Termin anlegen") }}</div>
+</details>
+{% endif %}
+
+{# --- AG-Treffen ---------------------------------------------------------
+   Bewusst ein eigener Block und nicht in die Terminliste gemischt: Ein
+   Treffen wird woanders bearbeitet (unter „Treffen“), hat Zu- und Absagen
+   und eine Tagesordnung. Stuende es zwischen den Terminen, waere die Haelfte
+   der Knoepfe daran wirkungslos. #}
+{% if treffen %}
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>AG-Treffen</h2>
+      <p class="meta">Zu- und absagen, Tagesordnung und Protokoll stehen unter
+        „Treffen“.</p></div>
+    <button type="button" class="btn-zweit btn-klein"
+            data-springe="treffen">Zu den Treffen</button>
+  </div>
+  <ul class="liste">
+    {% for t in treffen %}
+    <li>
+      <span class="liste-links">
+        <strong>{{ t.title }}</strong>
+        {% if t.date == heute() %}<span class="marke">heute</span>{% endif %}
+      </span>
+      <span class="liste-rechts meta">{{ t.date|datum_lang }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Kommende Termine</h2></div>
+    <span class="marke">{{ termine|length }}</span></div>
+  {% if termine %}
+  {{ m.suche("#termin-liste", "Termin, Ort oder Person suchen …", "Termine") }}
+  <div class="stapel" id="termin-liste">
+    {% for t in termine %}
+    <details class="block" data-suchbar>
+      <summary>
+        <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
+          <strong>{{ t.title }}</strong>
+          <span class="meta">{{ t.start_date|datum_lang }}
+            {% if t.start_time %} · {{ t.start_time }}{% if t.end_time %}–{{ t.end_time }}{% endif %} Uhr
+            {% else %} · ganztägig{% endif %}</span>
+          {% if t.location %}<span class="meta">{{ t.location }}</span>{% endif %}
+          {% if t.target_type != "alle" %}
+          <span class="marke zustand-geplant">
+            {% if t.target_type == "person" %}einzeln
+            {% elif t.target_type == "abteilung" %}{{ abteilung_label(t.target_department) }}
+            {% else %}Auswahl{% endif %}</span>
+          {% endif %}
+        </span>
+      </summary>
+      <div class="aufklapp-inhalt">
+        {% if t.description %}<p style="white-space:pre-wrap;">{{ t.description }}</p>{% endif %}
+        {% if darf_verwalten %}
+        <details style="margin-top:var(--r3);">
+          <summary class="meta" style="cursor:pointer;">Bearbeiten</summary>
+          <div style="margin-top:var(--r3);">
+            {{ termin_formular(t, "/dashboard/kalender/" ~ t.id ~ "/aendern", "Speichern") }}
+          </div>
+        </details>
+        {% endif %}
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}
+  {{ m.leer("Keine kommenden Termine",
+            "Der nächste AG-Nachmittag steht bestimmt schon fest.",
+            "kalender", "Termin eintragen") }}
+  {% endif %}
+</div>
+
+{% if vergangene %}
+<details class="block">
+  <summary>Vergangene Termine ({{ vergangene|length }})</summary>
+  <div class="aufklapp-inhalt">
+    <ul class="liste">
+      {% for t in vergangene %}
+      <li><span class="liste-links"><strong>{{ t.title }}</strong></span>
+          <span class="liste-rechts meta">{{ t.start_date|berlin }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+</details>
+{% endif %}

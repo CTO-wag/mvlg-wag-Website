@@ -1,0 +1,64 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("Datenbank", "Alles, was gespeichert ist – roh und ungefiltert.") }}
+{{ m.rueckmeldung(meldung) }}
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Systemzustand</h2>
+    <p class="meta">Läuft alles, was laufen soll?</p></div></div>
+  <div class="zustand-liste">
+    {% for p in zustand %}
+    <div class="zustand-punkt zustand-{{ p.art }}">
+      <span class="zustand-lampe" aria-hidden="true"></span>
+      <div><strong>{{ p.titel }}</strong><span>{{ p.text }}</span></div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Tabellen</h2>
+    <p class="meta">Passwörter und Token werden nicht angezeigt – auch dir nicht.</p></div></div>
+  <div class="db-kacheln">
+    {% for k in kacheln %}
+    <a href="#" class="db-kachel {% if not k.anzahl %}leer-kachel{% endif %}"
+       hx-get="/dashboard/datenbank/tabelle/{{ k.name }}" hx-target="#tab-inhalt">
+      <b>{{ k.anzahl }}</b>
+      <span>{{ k.titel }}</span>
+      <small>{{ k.name }}</small>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Aktivitätsprotokoll</h2>
+      <p class="meta">Wer wann was getan hat. Wird nach einem Jahr aufgeräumt.</p></div>
+    {% if rechte.aktivitaetslog_loeschen %}
+    <form hx-post="/dashboard/datenbank/protokoll-leeren" hx-target="#tab-inhalt">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn-gefahr btn-klein"
+              data-frage="Das gesamte Aktivitätsprotokoll löschen? Das lässt sich nicht rückgängig machen.">
+        Protokoll leeren</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if aktivitaet %}
+  <div class="tabelle-rahmen">
+    <table>
+      <thead><tr><th>Wann</th><th>Wer</th><th>Was</th><th>Wert</th></tr></thead>
+      <tbody>
+        {% for eintrag, person in aktivitaet %}
+        <tr>
+          <td class="meta">{{ eintrag.created_at|berlin("%d.%m. %H:%M") }}</td>
+          <td>{{ person.vorname ~ " " ~ person.nachname if person else "System" }}</td>
+          <td><code>{{ eintrag.event_type }}</code></td>
+          <td class="meta">{{ eintrag.value or "" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}{{ m.leer("Noch nichts protokolliert", "", "protokoll") }}{% endif %}
+</div>

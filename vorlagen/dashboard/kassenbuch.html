@@ -1,0 +1,263 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{% call m.kopf("Kassenbuch", "Beiträge, Sponsoring, Materialkosten – an einer Stelle statt auf Zetteln.") %}
+  <a class="btn-zweit btn-klein" href="/dashboard/kassenbuch/export.csv">Als CSV</a>
+{% endcall %}
+
+{{ m.rueckmeldung(meldung) }}
+
+<datalist id="kassen-kategorien">
+  {% for schluessel, name in kategorien %}<option value="{{ name }}">{% endfor %}
+</datalist>
+
+<div class="kennzahlen">
+  {{ m.kennzahl(statistik.stand|euro, "Kassenstand",
+                "kennzahl-warnung" if statistik.stand < 0 else "kennzahl-gut") }}
+  {{ m.kennzahl(statistik.einnahmen|euro, "Einnahmen (Zeitraum)") }}
+  {{ m.kennzahl(statistik.ausgaben|euro, "Ausgaben (Zeitraum)") }}
+  {{ m.kennzahl(statistik.anzahl, "Buchungen") }}
+</div>
+
+{% if faellig and darf_buchen %}
+<div class="meldung meldung-warnung"><div>
+  <strong>{{ faellig|length }} Dauerauftrag/-aufträge sind fällig.</strong>
+  <p>Sie werden beim nächsten Lauf automatisch gebucht – oder jetzt mit einem Klick.</p>
+  <form hx-post="/dashboard/kassenbuch/dauerauftraege-ausfuehren" hx-target="#tab-inhalt"
+        style="margin-top:var(--r2);">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn-klein">Jetzt buchen</button>
+  </form>
+</div></div>
+{% endif %}
+
+{% if darf_buchen %}
+<details class="block" {% if formular_offen %}open{% endif %}>
+  <summary>Neue Buchung</summary>
+  <div class="aufklapp-inhalt">
+    <form hx-post="/dashboard/kassenbuch" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Wofür?
+        <input type="text" name="zweck" maxlength="200" required
+               placeholder="z. B. Druck der Plakate"></label>
+      <label>Betrag <span class="meta">z. B. 12,50</span>
+        <input type="text" name="betrag" required inputmode="decimal"
+               placeholder="0,00"></label>
+      <label>Ein oder aus?
+        <select name="richtung">
+          <option value="aus" selected>Ausgabe</option>
+          <option value="ein">Einnahme</option>
+        </select>
+      </label>
+      <label>Kategorie
+        <input type="text" name="kategorie" list="kassen-kategorien" maxlength="40"
+               placeholder="Material & Druck"></label>
+      <label>Abteilung{{ m.abteilungs_auswahl("abteilung", abteilungen_wahl, none, "– keine –") }}</label>
+      <label>Datum<input type="date" name="wann" value="{{ heute().isoformat() }}"></label>
+      <label>Belegnummer<input type="text" name="beleg" maxlength="60"></label>
+      <label class="voll">Notiz<textarea name="notiz" maxlength="2000" rows="2"></textarea></label>
+      <div class="formular-fuss"><button type="submit">Buchen</button></div>
+    </form>
+  </div>
+</details>
+{% endif %}
+
+<div class="raster-2">
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Verlauf</h2>
+      <p class="meta">Einnahmen und Ausgaben je Monat.</p></div></div>
+    <div class="stapel">
+      {% for name, ein, aus in verlauf %}
+      <div>
+        <div class="reihe" style="justify-content:space-between;">
+          <span class="meta">{{ name }}</span>
+          <span class="meta">
+            <span style="color:var(--gruen)">+{{ ein|euro }}</span> ·
+            <span style="color:var(--rot)">−{{ aus|euro }}</span>
+          </span>
+        </div>
+        <div class="balken" style="height:.5rem;margin-top:.2rem;">
+          <span style="width:{{ prozent(ein, ein + aus) }}%;"></span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Wofür geht das Geld?</h2></div></div>
+    {{ ausgaben_diagramm }}
+    <h4 style="margin-top:var(--r5);">Woher kommt es?</h4>
+    {{ einnahmen_diagramm }}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Budgets</h2>
+    <p class="meta">Was einer Abteilung für einen Zeitraum zur Verfügung steht.
+      Der Verbrauch wird aus den Buchungen gerechnet, nicht mitgeführt.</p></div></div>
+
+  {% if budgets %}
+  <div class="stapel">
+    {% for b in budgets %}
+    <div>
+      <div class="reihe" style="justify-content:space-between;">
+        <span>
+          <strong>{{ b.budget.bezeichnung }}</strong>
+          {{ b.budget.abteilung|abt_marke }}
+          {% if b.vorbei %}<span class="marke">abgelaufen</span>
+          {% elif b.laeuft %}<span class="marke zustand-in_bearbeitung">läuft</span>
+          {% else %}<span class="marke zustand-geplant">künftig</span>{% endif %}
+        </span>
+        <span class="meta">{{ b.verbraucht|euro }} von {{ b.budget.betrag_cent|euro }}</span>
+      </div>
+      <div class="balken {% if b.anteil >= 90 %}rot{% elif b.anteil >= 70 %}amber{% endif %}"
+           style="margin-top:.25rem;">
+        <span style="width:{{ b.anteil }}%"></span>
+      </div>
+      <div class="reihe" style="justify-content:space-between;margin-top:.2rem;">
+        <span class="meta">{{ b.budget.von|berlin }} – {{ b.budget.bis|berlin }}</span>
+        <span class="meta">
+          {% if b.rest >= 0 %}noch {{ b.rest|euro }}
+          {% else %}<strong style="color:var(--rot)">{{ (-b.rest)|euro }} überzogen</strong>{% endif %}
+          {% if darf_buchen %}
+          {{ m.loeschen("/dashboard/kassenbuch/budget/" ~ b.budget.id ~ "/loeschen",
+                        "Budget löschen?", csrf, "Entfernen", "btn-still btn-klein") }}
+          {% endif %}
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}{{ m.leer("Noch keine Budgets",
+                          "Ein Budget zeigt, wie viel eine Abteilung noch hat.",
+                          "kasse") }}{% endif %}
+
+  {% if darf_buchen %}
+  <details style="margin-top:var(--r4);">
+    <summary class="meta" style="cursor:pointer;">Budget anlegen</summary>
+    <form hx-post="/dashboard/kassenbuch/budget" hx-target="#tab-inhalt"
+          class="formular" style="margin-top:var(--r3);">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Abteilung{{ m.abteilungs_auswahl("abteilung", abteilungen_wahl, none, "") }}</label>
+      <label>Bezeichnung<input type="text" name="bezeichnung" maxlength="120" required
+                               placeholder="z. B. Materialbudget 1. Halbjahr"></label>
+      <label>Betrag<input type="text" name="betrag" required placeholder="200,00"></label>
+      <div class="feldpaar">
+        <label>Von<input type="date" name="von" required></label>
+        <label>Bis<input type="date" name="bis" required></label>
+      </div>
+      <div class="formular-fuss"><button type="submit">Anlegen</button></div>
+    </form>
+  </details>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Daueraufträge</h2>
+    <p class="meta">Wiederkehrende Buchungen. Verpasste werden nachgeholt –
+      war der Rechner drei Wochen aus, stimmt die Kasse trotzdem.</p></div></div>
+
+  {% if auftraege %}
+  <div class="tabelle-rahmen">
+    <table>
+      <thead><tr><th>Zweck</th><th class="rechts">Betrag</th><th>Rhythmus</th>
+        <th>Nächste</th><th>Bisher</th><th></th></tr></thead>
+      <tbody>
+        {% for d in auftraege %}
+        <tr {% if not d.aktiv %}style="opacity:.55"{% endif %}>
+          <td><strong>{{ d.zweck }}</strong>
+            {% if d.abteilung %}<br>{{ d.abteilung|abt_marke }}{% endif %}</td>
+          <td class="zahl" style="color:{{ 'var(--gruen)' if d.betrag_cent > 0 else 'var(--rot)' }}">
+            {{ d.betrag_cent|euro }}</td>
+          <td>{{ d.rhythmus|label }}</td>
+          <td>{{ d.naechste_faelligkeit|berlin }}</td>
+          <td class="zahl">{{ d.ausfuehrungen }}×</td>
+          <td class="rechts">
+            {% if darf_buchen %}
+            <div class="knopfzeile" style="justify-content:flex-end;">
+              <form hx-post="/dashboard/kassenbuch/dauerauftrag/{{ d.id }}/umschalten"
+                    hx-target="#tab-inhalt">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button type="submit" class="btn-still btn-klein">
+                  {{ "Pausieren" if d.aktiv else "Fortsetzen" }}</button>
+              </form>
+              {{ m.loeschen("/dashboard/kassenbuch/dauerauftrag/" ~ d.id ~ "/loeschen",
+                            "Dauerauftrag löschen? Bereits angelegte Buchungen bleiben.",
+                            csrf, "Entfernen", "btn-still btn-klein") }}
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}{{ m.leer("Keine Daueraufträge", "", "") }}{% endif %}
+
+  {% if darf_buchen %}
+  <details style="margin-top:var(--r4);">
+    <summary class="meta" style="cursor:pointer;">Dauerauftrag anlegen</summary>
+    <form hx-post="/dashboard/kassenbuch/dauerauftrag" hx-target="#tab-inhalt"
+          class="formular" style="margin-top:var(--r3);">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Zweck<input type="text" name="zweck" maxlength="200" required
+                                      placeholder="z. B. Mitgliedsbeiträge"></label>
+      <label>Betrag<input type="text" name="betrag" required placeholder="2,00"></label>
+      <label>Ein oder aus?
+        <select name="richtung">
+          <option value="ein" selected>Einnahme</option>
+          <option value="aus">Ausgabe</option>
+        </select>
+      </label>
+      <label>Kategorie<input type="text" name="kategorie" list="kassen-kategorien" maxlength="40"></label>
+      <label>Abteilung{{ m.abteilungs_auswahl("abteilung", abteilungen_wahl, none, "– keine –") }}</label>
+      <label>Rhythmus
+        <select name="rhythmus">
+          {% for schluessel, name, _ in rhythmen %}
+          <option value="{{ schluessel }}">{{ name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Erstmals am<input type="date" name="start" value="{{ heute().isoformat() }}"></label>
+      <div class="formular-fuss"><button type="submit">Anlegen</button></div>
+    </form>
+  </details>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Buchungen</h2>
+    <p class="meta">Die letzten {{ buchungen|length }}.</p></div></div>
+  {% if buchungen %}
+  {{ m.suche("#buchungen-liste", "Zweck, Kategorie oder Beleg suchen …", "Buchungen") }}
+  <div class="tabelle-rahmen" id="buchungen-liste">
+    <table>
+      <thead><tr><th>Datum</th><th>Zweck</th><th>Kategorie</th>
+        <th class="rechts">Betrag</th><th></th></tr></thead>
+      <tbody>
+        {% for b in buchungen %}
+        <tr data-suchbar>
+          <td class="meta">{{ b.datum|berlin }}</td>
+          <td><strong>{{ b.zweck }}</strong>
+            {% if b.abteilung %} {{ b.abteilung|abt_marke }}{% endif %}
+            {% if b.dauerauftrag_id %}<span class="marke" title="aus einem Dauerauftrag"></span>{% endif %}
+            {% if b.beleg %}<br><span class="meta">Beleg {{ b.beleg }}</span>{% endif %}
+          </td>
+          <td class="meta">{{ b.kategorie|label }}</td>
+          <td class="zahl" style="color:{{ 'var(--gruen)' if b.betrag_cent > 0 else 'var(--rot)' }}">
+            {{ b.betrag_cent|euro }}</td>
+          <td class="rechts">
+            {% if darf_buchen %}
+            {{ m.loeschen("/dashboard/kassenbuch/" ~ b.id ~ "/stornieren",
+                          "Buchung stornieren? Sie landet im Papierkorb.", csrf,
+                          "Stornieren", "btn-still btn-klein") }}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}{{ m.leer("Noch keine Buchungen",
+                          "Jede Ausgabe und jede Einnahme gehört hier hinein.",
+                          "kasse", "Erste Buchung erfassen") }}{% endif %}
+</div>

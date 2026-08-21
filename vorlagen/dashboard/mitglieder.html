@@ -1,0 +1,56 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("Mitgliederliste", gesamt ~ " aktive Mitglieder, nach Abteilung sortiert.") }}
+
+{% if nach_abteilung %}
+{{ m.suche("#mitglieder-liste", "Name, Rolle oder E-Mail suchen …", "Mitglieder") }}
+{% endif %}
+
+<div id="mitglieder-liste">
+{% for key, personen in nach_abteilung.items() %}
+<div class="panel" data-such-gruppe>
+  <div class="panel-kopf">
+    <div><h2>{{ abteilung_label(key) }}</h2></div>
+    <span class="marke">{{ personen|length }}</span>
+  </div>
+  <div class="tabelle-rahmen">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th><th>Rolle</th><th>E-Mail</th><th>Telefon</th>
+          <th>Dabei seit</th>
+          {% if zeigt_werte %}<th class="rechts">Leadership</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in personen %}
+        <tr data-suchbar>
+          <td><strong>{{ p.vorname }} {{ p.nachname }}</strong></td>
+          <td><span class="marke">{{ p.role|label }}</span></td>
+          <td><a href="mailto:{{ p.email }}">{{ p.email }}</a></td>
+          <td>{% if p.telefonnummer %}
+            <a href="{{ p.telefonnummer|telefon_link }}">{{ p.telefonnummer|telefon }}</a>
+          {% else %}<span class="meta">–</span>{% endif %}</td>
+          <td>{{ p.eintrittsdatum|berlin if p.eintrittsdatum else "–" }}</td>
+          {% if zeigt_werte %}
+          <td class="zahl">
+            {% set w = werte.get(p.id) %}
+            {% if w %}
+              <span class="marke {% if w.gesamt >= 75 %}zustand-erledigt{% elif w.gesamt >= 50 %}zustand-in_bearbeitung{% endif %}">
+                {{ w.gesamt }}</span>
+            {% else %}<span class="meta">–</span>{% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+</div>
+
+{% if not nach_abteilung %}
+<div class="panel">{{ m.leer("Noch keine aktiven Mitglieder",
+    "Konten legst du im Bereich Konten an.", "personen") }}</div>
+{% endif %}

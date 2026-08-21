@@ -1,0 +1,114 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{% call m.kopf("Papierkorb & Sicherungen", "Gelöschtes bleibt " ~ frist ~ " Tage liegen und lässt sich zurückholen.") %}
+  <form hx-post="/dashboard/papierkorb/sicherung" hx-target="#tab-inhalt">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn-zweit btn-klein">Sicherung jetzt anlegen</button>
+  </form>
+{% endcall %}
+
+{{ m.rueckmeldung(meldung) }}
+
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Papierkorb</h2>
+      <p class="meta">Beim Wiederherstellen kommen auch die abhängigen Daten
+        zurück – bei einer Aufgabe etwa ihre Teilschritte und Kommentare.</p></div>
+    {% if eintraege %}
+    <form hx-post="/dashboard/papierkorb/leeren" hx-target="#tab-inhalt">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {# Die Zahl gehört in die Rückfrage: "Papierkorb leeren" klingt nach
+         Aufräumen, "17 Einträge endgültig löschen" nach dem, was es ist. #}
+      <button type="submit" class="btn-gefahr btn-klein"
+              data-frage="{{ eintraege|length }} Eintrag/Einträge endgültig löschen? Sie sind danach unwiederbringlich weg – auch die Aufgaben, Termine und Buchungen darin.">
+        Papierkorb leeren ({{ eintraege|length }})</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if eintraege %}
+  {{ m.suche("#papierkorb-liste", "Bezeichnung suchen …", "Einträge") }}
+  <div class="tabelle-rahmen" id="papierkorb-liste">
+    <table>
+      <thead><tr><th>Was</th><th>Bezeichnung</th><th>Gelöscht</th><th></th></tr></thead>
+      <tbody>
+        {% for e in eintraege %}
+        <tr data-suchbar>
+          <td><span class="marke">
+            {{ arten[e.entity_type][1] if e.entity_type in arten else e.entity_type }}</span></td>
+          <td><strong>{{ e.label }}</strong></td>
+          <td class="meta">{{ e.deleted_at|relativ }}</td>
+          <td class="rechts">
+            <div class="knopfzeile" style="justify-content:flex-end;">
+              <form hx-post="/dashboard/papierkorb/{{ e.id }}/wiederherstellen"
+                    hx-target="#tab-inhalt">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button type="submit" class="btn-zweit btn-klein">Zurückholen</button>
+              </form>
+              {{ m.loeschen("/dashboard/papierkorb/" ~ e.id ~ "/endgueltig",
+                            "Endgültig löschen? Das lässt sich nicht rückgängig machen.",
+                            csrf, "Endgültig", "btn-still btn-klein") }}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ m.leer("Der Papierkorb ist leer",
+            "Gelöschtes landet hier und bleibt " ~ frist ~ " Tage liegen.",
+            "papierkorb") }}
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Sicherungen</h2>
+    <p class="meta">Vollständige Kopien der Datenbank. Herunterladen zum
+      Aufbewahren, Einspielen zum Zurücksetzen – dabei geht alles verloren,
+      was seit der Sicherung eingetragen wurde. Die Sicherung vom Umstieg auf
+      V2 bleibt dauerhaft erhalten; sie ist der Weg zurück.</p></div></div>
+
+  {% if sicherungen %}
+  <div class="tabelle-rahmen">
+    <table>
+      <thead><tr><th>Datei</th><th>Wann</th><th class="rechts">Größe</th><th></th></tr></thead>
+      <tbody>
+        {% for s in sicherungen %}
+        <tr>
+          <td><code>{{ s.name }}</code>
+            {% if s.vor_umstieg %}
+            <span class="marke zustand-geplant">vor dem Umstieg</span>{% endif %}</td>
+          <td class="meta">{{ s.zeitpunkt.strftime("%d.%m.%Y %H:%M") }}</td>
+          <td class="zahl">{{ (s.groesse / 1024 / 1024)|round(1) }} MB</td>
+          <td class="rechts">
+            <a class="btn btn-zweit btn-klein"
+               href="/dashboard/papierkorb/sicherung/{{ s.name }}">Herunterladen</a>
+            <details class="einspielen">
+              <summary class="btn-still btn-klein">Einspielen</summary>
+              <form hx-post="/dashboard/papierkorb/sicherung/{{ s.name }}/einspielen"
+                    hx-target="#tab-inhalt" class="formular">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <p class="meta">Setzt die gesamte Datenbank auf den Stand vom
+                  {{ s.zeitpunkt.strftime("%d.%m.%Y %H:%M") }} zurück. Alles,
+                  was danach eingetragen wurde, ist weg. Der jetzige Stand
+                  wird vorher automatisch als eigene Sicherung abgelegt.</p>
+                <label class="voll">Zum Bestätigen <code>EINSPIELEN</code> eintippen
+                  <input type="text" name="bestaetigung" required
+                         autocomplete="off" spellcheck="false"
+                         placeholder="EINSPIELEN"></label>
+                <div class="formular-fuss">
+                  <button type="submit" class="btn-gefahr">Wirklich einspielen</button>
+                </div>
+              </form>
+            </details>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ m.leer("Noch keine Sicherung", "Oben rechts lässt sich eine anlegen.", "sicherung") }}
+  {% endif %}
+</div>

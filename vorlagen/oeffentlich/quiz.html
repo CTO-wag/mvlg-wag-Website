@@ -1,0 +1,57 @@
+{% extends "oeffentlich/basis_web.html" %}
+{% block hauptklasse %}schmal{% endblock %}
+{% block inhalt %}
+<section class="abschnitt">
+  <span class="hut">Wissenstest</span>
+  <h1>Wirtschafts-Quiz</h1>
+  <p class="meta">{{ fragen|length }} Fragen zu Geld, Märkten und Unternehmen –
+    die Grundlagen, mit denen wir in der AG arbeiten. Nach jeder Antwort siehst
+    du sofort, ob sie stimmt. Es wird nichts gespeichert und nichts verschickt.</p>
+</section>
+
+<section class="panel" id="quiz">
+  <div class="quiz-fortschritt">
+    <div class="quiz-fortschritt-kopf">
+      <span id="quiz-zaehler">Frage 1 von {{ fragen|length }}</span>
+      <span id="quiz-stand">0 richtig</span>
+    </div>
+    <div class="balken" role="progressbar" aria-label="Fortschritt"
+         aria-valuemin="0" aria-valuemax="{{ fragen|length }}" aria-valuenow="0"
+         id="quiz-balken"><span id="quiz-fuellung" style="width:0"></span></div>
+  </div>
+
+  <noscript><div class="meldung meldung-fehler"><div>Für das Quiz muss
+    JavaScript aktiviert sein.</div></div></noscript>
+
+  {% for f in fragen %}
+  <article class="quiz-frage" data-richtig="{{ f.richtig }}" hidden>
+    <h2 class="quiz-frage-text" tabindex="-1">{{ f.frage }}</h2>
+    <div class="quiz-optionen">
+      {% for text in f.optionen %}
+      <button type="button" class="quiz-option" data-nr="{{ loop.index0 }}">
+        <span class="quiz-marke" aria-hidden="true">{{ "ABCDEF"[loop.index0] }}</span>
+        <span class="quiz-option-text">{{ text }}</span>
+      </button>
+      {% endfor %}
+    </div>
+    <div class="quiz-rueckmeldung" role="status" hidden></div>
+    <div class="quiz-fuss">
+      <button type="button" class="quiz-weiter" hidden>{% if loop.last %}Ergebnis anzeigen{% else %}Nächste Frage{% endif %}</button>
+    </div>
+  </article>
+  {% endfor %}
+
+  <div id="quiz-ergebnis" tabindex="-1" hidden>
+    <span class="hut">Ergebnis</span>
+    <p class="quiz-punktzahl"><span id="quiz-treffer">0</span> von {{ fragen|length }}</p>
+    <p id="quiz-urteil"></p>
+    <ul class="quiz-bilanz" id="quiz-bilanz"></ul>
+    <div class="quiz-ergebnis-knoepfe">
+      <button type="button" id="quiz-neu">Noch einmal</button>
+      <a class="btn btn-zweit" href="/bewerbung">Zur Bewerbung</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block skripte %}<script nonce="{{ nonce }}" src="{{ statisch('js/quiz.js') }}"></script>{% endblock %}

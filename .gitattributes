@@ -1,0 +1,18 @@
+# config.cmd und start.bat werden von cmd.exe ausgefuehrt und brauchen CRLF.
+# Mit LF laufen sie nicht.
+
+* text=auto eol=lf
+
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+*.png    binary
+*.webp   binary
+*.jpg    binary
+*.ico    binary
+*.woff2  binary
+*.db     binary
+*.pdf    binary
+
+package-lock.json  -diff

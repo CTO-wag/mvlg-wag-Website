@@ -1,0 +1,239 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("Rollen & Rechte", "Drei Achsen: Rolle, Abteilung, Person. Rolle und Abteilung geben frei, eine persönliche Ausnahme kann auch entziehen.") }}
+{{ m.rueckmeldung(meldung) }}
+
+<div class="meldung meldung-info"><div>
+  <strong>Wie das zusammenspielt.</strong>
+  <p>Ein Recht gilt, wenn die <em>Rolle</em> es hat <em>oder</em> eine
+    <em>Abteilung</em> der Person es freigibt. Beides gilt für Gruppen. Für
+    einzelne Ausnahmen gibt es die dritte Achse unter „Konten“ – dort lässt
+    sich einer einzelnen Person ein Recht zusätzlich geben oder ausdrücklich
+    entziehen. Ein Entzug schlägt alles andere.</p>
+  <p class="meta">Der <strong>Rang</strong> begrenzt, wen jemand bearbeiten
+    darf: Nur Konten mit gleichem oder niedrigerem Rang. Damit kann jemand mit
+    dem Recht „Konten“ nicht mehr den CTO umstellen.</p>
+</div></div>
+
+<h2>Rollen</h2>
+<div class="stapel">
+  {% for r in rollen_zeilen %}
+  <div class="rollen-karte">
+    <div class="rollen-kopf">
+      <div class="rollen-titel">
+        <strong>{{ r.label }}</strong>
+        <code>{{ r.key }}</code>
+        <span class="marke">Rang {{ r.rang }}</span>
+        {% if r.protected %}<span class="marke zustand-geplant">geschützt</span>{% endif %}
+        <span class="meta">{{ belegung.get(r.key, 0) }} Konto/Konten</span>
+      </div>
+      <div class="rollen-stand">
+        {% set gesamt_an = stand[r.key].values()|map(attribute=0)|sum %}
+        {% set gesamt = stand[r.key].values()|map(attribute=1)|sum %}
+        <span class="meta">{{ gesamt_an }} von {{ gesamt }} Rechten</span>
+        <span class="balken"><span style="width:{{ (gesamt_an / gesamt * 100) if gesamt else 0 }}%"></span></span>
+      </div>
+    </div>
+
+    <div class="rollen-gruppen">
+      {% for name, (an, gesamt) in stand[r.key].items() %}
+      <span class="rollen-gruppe {% if not an %}leer{% endif %}">
+        {{ name }} <b>{{ an }}/{{ gesamt }}</b></span>
+      {% endfor %}
+    </div>
+
+    <details>
+      <summary style="padding:var(--r3) var(--r4);cursor:pointer;font-weight:600;color:var(--navy);">
+        Rechte bearbeiten
+      </summary>
+      <div class="aufklapp-inhalt">
+        {% if (r.rang or 0) > mein_rang %}
+        <div class="meldung meldung-info"><div>
+          Diese Rolle steht über deiner eigenen – du siehst sie, kannst sie
+          aber nicht ändern.
+        </div></div>
+        {% else %}
+        <form hx-post="/dashboard/rollen/{{ r.key }}/aendern" hx-target="#tab-inhalt"
+              class="formular">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Name<input type="text" name="name" value="{{ r.label }}" maxlength="80"></label>
+          <label>Rang <span class="meta">höher = darf mehr Konten bearbeiten</span>
+            <input type="number" name="rang" value="{{ r.rang }}" min="0" max="{{ mein_rang }}"></label>
+          <label class="voll">Beschreibung
+            <input type="text" name="beschreibung" value="{{ r.beschreibung or '' }}" maxlength="500"
+                   placeholder="Wofür ist diese Rolle da?"></label>
+
+          <div class="voll">
+            <div class="vorlagen-reihe">
+              <span class="vorlagen-titel">Vorlage:</span>
+              {% for schluessel, name in ROLLEN_VORLAGEN.items() %}
+              <button type="button" data-vorlage="{{ schluessel }}">{{ name }}</button>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="rechte-spalten voll">
+            {% for gruppe, eintraege in gruppen %}
+            <fieldset class="rechte-gruppe">
+              <legend>{{ gruppe }}</legend>
+              {% for perm, name, hilfe in eintraege %}
+              {% set fest = r.key == "cto" and perm in kernrechte %}
+              <label class="haken" title="{{ hilfe }}">
+                <input type="checkbox" name="rechte" value="{{ perm }}"
+                       {% if r[perm] %}checked{% endif %}
+                       {% if fest %}checked disabled{% endif %}>
+                <span>{{ name }}{% if fest %} <span class="meta">(fest)</span>{% endif %}</span>
+              </label>
+              {% if fest %}<input type="hidden" name="rechte" value="{{ perm }}">{% endif %}
+              {% endfor %}
+            </fieldset>
+            {% endfor %}
+          </div>
+
+          <div class="formular-fuss">
+            <button type="submit">Speichern</button>
+            {% if not r.protected and not belegung.get(r.key) %}
+            <span class="meta">Diese Rolle ist keinem Konto zugewiesen.</span>
+            {% endif %}
+          </div>
+        </form>
+
+        {% if not r.protected %}
+        <div class="knopfzeile" style="margin-top:var(--r3);">
+          {{ m.loeschen("/dashboard/rollen/" ~ r.key ~ "/loeschen",
+                        "Rolle „" ~ r.label ~ "“ löschen?", csrf, "Rolle löschen") }}
+        </div>
+        {% endif %}
+        {% endif %}
+      </div>
+    </details>
+  </div>
+  {% endfor %}
+</div>
+
+<details class="block">
+  <summary>Neue Rolle anlegen</summary>
+  <div class="aufklapp-inhalt">
+    <form hx-post="/dashboard/rollen" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Kennung <span class="meta">klein, ohne Leerzeichen – z. B. cfo</span>
+        <input type="text" name="schluessel" maxlength="40" required
+               pattern="[a-z0-9_-]+"></label>
+      <label>Name<input type="text" name="name" maxlength="80" required
+                        placeholder="z. B. Finanzvorstand"></label>
+      <label>Rang<input type="number" name="rang" value="20" min="0" max="{{ mein_rang }}"></label>
+      <label class="voll">Beschreibung
+        <input type="text" name="beschreibung" maxlength="500"></label>
+      <div class="formular-fuss">
+        <button type="submit">Anlegen</button>
+        <span class="meta">Die neue Rolle startet ohne Rechte – die vergibst du danach.</span>
+      </div>
+    </form>
+  </div>
+</details>
+
+<div class="trenner">
+  <h2>Abteilungen</h2>
+  <p class="meta">Eine Abteilung kann Funktionen für alle ihre Mitglieder
+    freigeben – unabhängig von deren Rolle.</p>
+</div>
+
+<div class="stapel">
+  {% for abt in abteilungen_liste %}
+  <details class="block" style="border-left:4px solid {{ abt.farbe }};">
+    <summary>
+      <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
+        <strong>{{ abt.label }}</strong>
+        <code>{{ abt.key }}</code>
+        <span class="meta">{{ abt_belegung.get(abt.key, 0) }} Person(en)</span>
+        {% if abt.geschuetzt %}<span class="marke zustand-geplant">geschützt</span>{% endif %}
+        {% if not abt.aktiv %}<span class="marke zustand-abgelehnt">inaktiv</span>{% endif %}
+      </span>
+    </summary>
+    <div class="aufklapp-inhalt">
+      <form hx-post="/dashboard/abteilungen/{{ abt.key }}/aendern" hx-target="#tab-inhalt"
+            class="formular">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Name<input type="text" name="name" value="{{ abt.label }}" maxlength="60"></label>
+        <label>Farbe<input type="color" name="farbe" value="{{ abt.farbe }}"></label>
+        <label class="voll">Beschreibung
+          <input type="text" name="beschreibung" value="{{ abt.beschreibung }}" maxlength="500"></label>
+        {% if not abt.geschuetzt %}
+        <label class="haken voll">
+          <input type="checkbox" name="aktiv" value="1" {% if abt.aktiv %}checked{% endif %}>
+          <span>Aktiv <span class="meta">Inaktive Abteilungen stehen nicht mehr zur Wahl.</span></span>
+        </label>
+        {% endif %}
+
+        <div class="voll">
+          <h4>Abteilungseigene Funktionen</h4>
+          <div class="raster-auto-klein">
+            {% for key, name, hilfe in dept_features %}
+            <label class="haken" title="{{ hilfe }}">
+              <input type="checkbox" name="funktionen" value="{{ key }}"
+                     {% if abt[key] %}checked{% endif %}>
+              <span>{{ name }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <details class="voll">
+          <summary class="meta" style="cursor:pointer;">
+            Zusätzlich Rollenrechte freigeben (selten nötig)</summary>
+          <p class="meta" style="margin-top:var(--r2);">
+            Damit bekommt <strong>jede</strong> Person dieser Abteilung das
+            Recht – unabhängig von ihrer Rolle. Für einzelne Personen ist die
+            Ausnahme unter „Konten“ der bessere Weg.</p>
+          <div class="rechte-spalten" style="margin-top:var(--r3);">
+            {% for gruppe, eintraege in gruppen %}
+            <fieldset class="rechte-gruppe">
+              <legend>{{ gruppe }}</legend>
+              {% for perm, name, hilfe in eintraege %}
+              <label class="haken" title="{{ hilfe }}">
+                <input type="checkbox" name="funktionen" value="{{ perm }}"
+                       {% if abt[perm] %}checked{% endif %}>
+                <span>{{ name }}</span>
+              </label>
+              {% endfor %}
+            </fieldset>
+            {% endfor %}
+          </div>
+        </details>
+
+        <div class="formular-fuss"><button type="submit">Speichern</button></div>
+      </form>
+
+      {% if not abt.geschuetzt %}
+      <div class="knopfzeile" style="margin-top:var(--r3);">
+        {{ m.loeschen("/dashboard/abteilungen/" ~ abt.key ~ "/loeschen",
+                      "Abteilung „" ~ abt.label ~ "“ löschen?", csrf,
+                      "Abteilung löschen") }}
+      </div>
+      {% endif %}
+    </div>
+  </details>
+  {% endfor %}
+</div>
+
+<details class="block">
+  <summary>Neue Abteilung anlegen</summary>
+  <div class="aufklapp-inhalt">
+    <form hx-post="/dashboard/abteilungen" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Kennung<input type="text" name="schluessel" maxlength="30" required
+                           pattern="[a-z0-9_-]+"></label>
+      <label>Name<input type="text" name="name" maxlength="60" required></label>
+      <label>Farbe<input type="color" name="farbe" value="#4A5568"></label>
+      <label class="voll">Beschreibung<input type="text" name="beschreibung" maxlength="500"></label>
+      <div class="formular-fuss"><button type="submit">Anlegen</button></div>
+    </form>
+  </div>
+</details>
+{#
+  Die Rollen-Vorlagen als Attribut, nicht als <script>-Block: htmx wirft
+  Skript-Elemente beim Austausch weg - auch solche, die nur Daten tragen.
+  Ein Attribut übersteht den Austausch, und Jinja maskiert es korrekt;
+  der Browser gibt es über dataset entschlüsselt zurück.
+#}
+<div id="rollen-vorlagen" hidden data-vorlagen="{{ ROLLEN_VORLAGEN_JSON }}"></div>

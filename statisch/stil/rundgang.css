@@ -1,0 +1,221 @@
+/* ===========================================================================
+   Rundgang durch das Dashboard
+   ===========================================================================
+   Das Problem in V1: Auf dem Handy war die Karte zu groß. Sie hatte eine
+   feste Breite von 400px, keine Höhenbegrenzung und keinen eigenen
+   Scrollbereich. Ein Schritt mit Aufzählung und Kopierfeld wurde dadurch
+   höher als der Bildschirm - der Knopf "Weiter" lag unterhalb der Kante und
+   war nicht erreichbar. Dazu kam, dass die Karte über `position:fixed` an
+   einer berechneten Stelle klebte und die Adressleiste des Browsers beim
+   Scrollen ein- und ausfuhr.
+
+   Die Lösung hier: auf schmalen Bildschirmen ist der Rundgang kein
+   schwebendes Kästchen mehr, sondern ein Blatt, das von unten hereinfährt.
+   Es ist höchstens 78 % des Bildschirms hoch (in dvh, also unter Beachtung
+   der Adressleiste), der Textteil rollt für sich, und die Fußzeile mit den
+   Knöpfen klebt am unteren Rand des Blattes - sie kann gar nicht mehr
+   wegrutschen.
+   ========================================================================= */
+
+/* Das Loch im Schleier, das auf das erklärte Element zeigt. */
+.tour-loch{
+  position:fixed; z-index:9000; border-radius:10px; pointer-events:none;
+  box-shadow:0 0 0 9999px rgba(8,15,26,.62), 0 0 0 3px var(--amber);
+  transition:top .25s ease, left .25s ease, width .25s ease, height .25s ease;
+}
+/* Beim Rollen ohne Übergang: sonst zieht die Markierung dem Element eine
+   Viertelsekunde hinterher und sitzt die ganze Zeit daneben. Der weiche
+   Übergang ist für den Schrittwechsel gedacht, wo er zeigt, wohin es geht -
+   nicht fürs Mitwandern. */
+.tour-loch.springt{ transition:none; }
+
+.tour-karte{
+  position:fixed; z-index:9001;
+  width:min(400px, calc(100vw - 2rem));
+  display:flex; flex-direction:column;
+  /* Auch am großen Bildschirm begrenzt: ein Schritt mit langer Liste soll
+     nicht über die Fensterkante hinauslaufen. */
+  max-height:min(80vh, 40rem);
+  background:var(--flaeche); color:var(--text);
+  border:1px solid var(--linie); border-radius:var(--rund);
+  box-shadow:0 18px 50px rgba(8,15,26,.32);
+  overflow:hidden;
+}
+.tour-karte.mittig{
+  top:50%; left:50%; transform:translate(-50%,-50%);
+  width:min(520px, calc(100vw - 2rem));
+}
+
+.tour-kopf{ padding:var(--r4) var(--r5) 0; flex-shrink:0; }
+.tour-zaehler{
+  font-family:var(--schrift-mono); font-size:.66rem; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--gedaempft-2); margin:0 0 var(--r1);
+}
+.tour-karte h3{ margin:0; font-size:1.1rem; }
+
+/* Der Teil, der rollt. Alles andere bleibt stehen. */
+.tour-koerper{
+  padding:var(--r3) var(--r5);
+  overflow-y:auto; overscroll-behavior:contain;
+  flex:1 1 auto; min-height:0;
+  -webkit-overflow-scrolling:touch;
+  /* Ohne das reisst eine lange Adresse ("http://.../benachrichtigungen") die
+     Breite des rollenden Kastens auf. overflow-y:auto macht daraus zugleich
+     ein waagerechtes Rollfeld - und dann werden auch alle normalen Absaetze
+     auf diese Breite gesetzt und am Kartenrand abgeschnitten. Auf dem Handy
+     stand danach von jedem Satz nur die linke Haelfte da. */
+  overflow-wrap:anywhere;
+}
+.tour-koerper p{ margin:0 0 var(--r3); font-size:.92rem; line-height:1.6; color:var(--gedaempft); }
+.tour-koerper p:last-child{ margin-bottom:0; }
+.tour-koerper strong{ color:var(--text); }
+.tour-koerper ol, .tour-koerper ul{
+  margin:0 0 var(--r3); padding-left:1.15rem;
+  font-size:.9rem; line-height:1.6; color:var(--gedaempft);
+}
+.tour-koerper li{ margin-bottom:var(--r1); }
+.tour-koerper li strong{ color:var(--text); }
+
+.tour-fuss{
+  display:flex; align-items:center; gap:var(--r2); flex-wrap:wrap;
+  padding:var(--r3) var(--r5) var(--r4);
+  border-top:1px solid var(--linie); background:var(--flaeche);
+  flex-shrink:0;
+}
+.tour-fuss .tour-weiter{ margin-left:auto; }
+.tour-punkte{ display:flex; gap:4px; }
+.tour-punkt{ width:6px; height:6px; border-radius:50%; background:var(--linie); }
+.tour-punkt.aktiv{ background:var(--navy); width:16px; border-radius:3px; }
+.tour-abbrechen{
+  background:none; border:none; padding:.3rem 0; min-height:0;
+  color:var(--gedaempft-2); font-size:.8rem; text-decoration:underline;
+  cursor:pointer; font-weight:400;
+}
+.tour-abbrechen:hover{ color:var(--text); background:none; }
+
+/* Kopierzeile (ntfy-Thema, Kalenderadresse) */
+.tour-kopieren{ display:flex; gap:var(--r2); margin:0 0 var(--r3); }
+.tour-kopieren input{
+  flex:1; min-width:0; font-family:var(--schrift-mono); font-size:.8rem;
+}
+.tour-kopieren button{ flex-shrink:0; }
+
+/* Abgesetzter Hinweis - etwa "erst auf den Startbildschirm legen". Auf dem
+   iPhone ist das Voraussetzung für alles Weitere; wer es überliest, tippt
+   danach vergeblich auf "Benachrichtigungen erlauben". */
+.tour-hinweis{
+  border:1px solid var(--linie); border-left:3px solid var(--amber);
+  border-radius:var(--rund-klein); background:var(--flaeche-2);
+  padding:var(--r3); margin:0 0 var(--r3); font-size:.87rem;
+}
+.tour-hinweis > p{ margin:0 0 var(--r2); color:var(--text); }
+.tour-hinweis > p:last-child{ margin-bottom:0; }
+.tour-hinweis details{ margin-top:var(--r2); }
+.tour-hinweis summary{ cursor:pointer; font-weight:600; color:var(--navy); }
+.tour-hinweis ol{ margin:var(--r2) 0 0; }
+
+.tour-geraete{ display:flex; gap:var(--r1); margin:0 0 var(--r3); flex-wrap:wrap; }
+.tour-geraet{
+  padding:.3rem .7rem; min-height:0; border-radius:var(--rund-voll);
+  border:1px solid var(--linie); background:var(--flaeche-2);
+  color:var(--gedaempft); font-size:.79rem; font-weight:500;
+}
+.tour-geraet:hover{ background:var(--flaeche-3); color:var(--text); }
+.tour-geraet.aktiv{ background:var(--navy); border-color:var(--navy); color:var(--navy-schrift); }
+
+/* ---------------------------------------------------------------------------
+   Schmale Bildschirme: aus der Karte wird ein Blatt am unteren Rand.
+   --------------------------------------------------------------------------- */
+@media (max-width:640px){
+  .tour-karte, .tour-karte.mittig{
+    /* Das !important ist hier nötig und nicht faul: die Position setzt das
+       Skript beim Zeichnen als style-Attribut am Element, und ein
+       style-Attribut schlägt jede Regel aus dem Stylesheet. Auf dem Handy
+       soll das Blatt aber immer unten kleben, egal wo das erklärte Element
+       gerade sitzt. */
+    top:auto !important; bottom:0 !important;
+    left:0 !important; right:0 !important;
+    width:100% !important; transform:none !important;
+    max-height:78dvh;
+    border-radius:var(--rund) var(--rund) 0 0;
+    border-bottom:none;
+    /* Unter der Fußzeile Platz für die Gestenleiste des Telefons. */
+    padding-bottom:env(safe-area-inset-bottom, 0);
+    box-shadow:0 -12px 40px rgba(8,15,26,.35);
+    animation:blatt-herein .24s ease-out;
+  }
+  @keyframes blatt-herein{ from{ transform:translateY(100%); } to{ transform:translateY(0); } }
+
+  .tour-kopf{ padding:var(--r4) var(--r4) 0; }
+  .tour-karte h3{ font-size:1.05rem; }
+  .tour-koerper{ padding:var(--r3) var(--r4); }
+  .tour-koerper p, .tour-koerper ol, .tour-koerper ul{ font-size:.88rem; }
+  .tour-fuss{ padding:var(--r3) var(--r4); }
+  /* Auf dem Handy trägt die Fußzeile die Hauptlast: Knöpfe groß genug zum
+     Treffen, "Weiter" nimmt die freie Breite. */
+  .tour-fuss .tour-weiter{ flex:1 1 auto; min-height:2.8rem; }
+  .tour-fuss .btn-klein{ min-height:2.8rem; }
+  .tour-abbrechen{ flex:1 1 100%; text-align:center; order:9; }
+
+  /* Der Griff oben - macht sichtbar, dass das ein Blatt ist. */
+  .tour-kopf::before{
+    content:""; display:block; width:2.4rem; height:4px; margin:0 auto var(--r3);
+    border-radius:var(--rund-voll); background:var(--linie);
+  }
+
+  /* Das Loch bleibt, rückt aber nach oben aus dem Weg: das Blatt verdeckt
+     sonst genau das Element, das es erklärt. */
+  .tour-loch{ box-shadow:0 0 0 9999px rgba(8,15,26,.55), 0 0 0 3px var(--amber); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .tour-loch{ transition:none; }
+  .tour-karte{ animation:none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Einladung zum Rundgang bei den ersten Anmeldungen
+   --------------------------------------------------------------------------- */
+.tour-einladung{
+  position:fixed; inset:0; z-index:8000;
+  display:flex; align-items:center; justify-content:center;
+  padding:var(--r4); background:rgba(8,15,26,.55);
+}
+.einladung-karte{
+  width:min(460px, 100%); max-height:88dvh; overflow-y:auto;
+  background:var(--flaeche); color:var(--text);
+  border:1px solid var(--linie); border-radius:var(--rund);
+  box-shadow:0 24px 60px rgba(8,15,26,.38);
+  padding:var(--r6) var(--r6) var(--r5);
+  animation:einladung-auf .26s ease-out;
+}
+@keyframes einladung-auf{
+  from{ opacity:0; transform:translateY(10px) scale(.98); }
+  to{ opacity:1; transform:none; }
+}
+.einladung-hut{
+  margin:0 0 var(--r1); font-family:var(--schrift-mono); font-size:.66rem;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--gedaempft-2);
+}
+.einladung-karte h2{ margin:0 0 var(--r3); font-size:1.3rem; }
+.einladung-karte p{ margin:0 0 var(--r4); font-size:.94rem; line-height:1.65; color:var(--gedaempft); }
+.einladung-knoepfe{ display:flex; gap:var(--r3); flex-wrap:wrap; }
+.einladung-knoepfe > *{ flex:1 1 auto; }
+.einladung-nie{
+  display:block; margin:var(--r4) auto 0; background:none; border:none;
+  padding:var(--r1); min-height:0; color:var(--gedaempft-2); font-size:.82rem;
+  text-decoration:underline; cursor:pointer; font-weight:400;
+}
+.einladung-nie:hover{ color:var(--text); background:none; }
+@media (prefers-reduced-motion: reduce){ .einladung-karte{ animation:none; } }
+
+/* Der Startknopf im Support-Bereich - auffällig, weil so etwas sonst
+   übersehen wird. */
+.tour-start{
+  display:flex; align-items:center; gap:var(--r4); flex-wrap:wrap;
+  padding:var(--r4); border:1px solid var(--navy);
+  border-radius:var(--rund); background:var(--navy-hauch);
+}
+.tour-start > div{ flex:1 1 260px; }
+.tour-start strong{ display:block; font-size:1rem; margin-bottom:.15rem; }
+.tour-start span{ font-size:.88rem; color:var(--gedaempft); }

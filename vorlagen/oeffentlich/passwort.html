@@ -1,0 +1,88 @@
+{% extends "oeffentlich/basis_web.html" %}
+{% block ticker %}{% endblock %}
+{% block inhalt %}
+<section class="panel anmeldung-karte">
+  <span class="hut">Konto</span>
+
+  {# --- Schritt 1: Adresse eingeben ------------------------------------- #}
+  {% if art == "anfordern" %}
+  <h1 style="font-size:1.6rem;">Passwort vergessen</h1>
+  {% if erfolg %}
+  <div class="meldung meldung-gut"><div>
+    Wenn es zu dieser Adresse ein Konto gibt, ist eine E-Mail unterwegs. Der
+    Link darin gilt {{ minuten }} Minuten und funktioniert genau einmal.
+  </div></div>
+  <p class="meta">Nichts angekommen? Sieh im Spam-Ordner nach. Und prüfe, ob du
+    dieselbe Adresse benutzt hast, die im Konto hinterlegt ist.</p>
+  <div class="knopfzeile" style="margin-top:var(--r4);">
+    <a class="btn btn-zweit" href="/login">Zurück zur Anmeldung</a>
+  </div>
+  {% else %}
+  {% if fehler %}<div class="meldung meldung-fehler"><div>{{ fehler }}</div></div>{% endif %}
+  {% if not mail_moeglich %}
+  <div class="meldung meldung-warnung"><div>
+    Auf diesem Server ist zurzeit kein Mailversand eingerichtet. Bitte wende
+    dich direkt an den Vorstand – er kann dir ein neues Passwort setzen.
+  </div></div>
+  {% endif %}
+  <p class="meta">Gib die Adresse deines Kontos ein. Wir schicken dir einen Link,
+    mit dem du ein neues Passwort setzen kannst.</p>
+  <form method="post" action="/passwort-vergessen">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>E-Mail
+      <input type="email" name="email" required autocomplete="username" autofocus
+             maxlength="160">
+    </label>
+    <button type="submit" class="btn-breit">Link anfordern</button>
+  </form>
+  <div class="anmeldung-fuss"><a href="/login">Zurück zur Anmeldung</a></div>
+  {% endif %}
+
+  {# --- Schritt 2: neues Passwort setzen -------------------------------- #}
+  {% elif art == "neu" %}
+  <h1 style="font-size:1.6rem;">Neues Passwort setzen</h1>
+  {% if erfolg %}
+  <div class="meldung meldung-gut"><div>Passwort geändert. Du kannst dich jetzt
+    anmelden.</div></div>
+  <div class="knopfzeile" style="margin-top:var(--r4);">
+    <a class="btn" href="/login">Zur Anmeldung</a>
+  </div>
+  {% elif not gueltig %}
+  <div class="meldung meldung-fehler"><div>Dieser Link ist abgelaufen oder wurde
+    schon benutzt. Fordere einfach einen neuen an.</div></div>
+  <div class="knopfzeile" style="margin-top:var(--r4);">
+    <a class="btn" href="/passwort-vergessen">Neuen Link anfordern</a>
+  </div>
+  {% else %}
+  {% if fehler %}<div class="meldung meldung-fehler"><div>{{ fehler }}</div></div>{% endif %}
+  <p class="meta">{{ regel }}</p>
+  <form method="post" action="/passwort-neu">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="token" value="{{ token }}">
+    <label>Neues Passwort
+      <input type="password" name="passwort" required autocomplete="new-password"
+             minlength="12" autofocus>
+    </label>
+    <label>Noch einmal
+      <input type="password" name="passwort2" required autocomplete="new-password"
+             minlength="12">
+    </label>
+    <button type="submit" class="btn-breit">Passwort speichern</button>
+  </form>
+  {% endif %}
+
+  {# --- Adresswechsel bestätigt ----------------------------------------- #}
+  {% else %}
+  <h1 style="font-size:1.6rem;">E-Mail-Adresse</h1>
+  {% if erfolg %}
+  <div class="meldung meldung-gut"><div>Deine neue Adresse ist jetzt
+    gültig: <strong>{{ neue_adresse }}</strong>. Melde dich ab sofort damit an.</div></div>
+  {% else %}
+  <div class="meldung meldung-fehler"><div>{{ fehler or "Dieser Bestätigungslink ist abgelaufen oder wurde schon benutzt." }}</div></div>
+  {% endif %}
+  <div class="knopfzeile" style="margin-top:var(--r4);">
+    <a class="btn" href="/login">Zur Anmeldung</a>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

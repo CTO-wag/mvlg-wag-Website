@@ -1,0 +1,81 @@
+{#
+  Der Kopplungskasten. Wird alle vier Sekunden neu geladen, solange ein
+  QR-Code angezeigt wird: WhatsApp tauscht ihn etwa jede Minute aus, und ein
+  abgelaufener Code lässt sich zwar scannen, tut aber nichts.
+#}
+<div id="wa-kopplung"
+     {% if web.zustand in ("qr", "start") %}
+     hx-get="/dashboard/whatsapp/kopplung"
+     hx-trigger="every 4s"
+     hx-target="#wa-kopplung"
+     hx-swap="outerHTML"
+     {% endif %}>
+
+  {% if web.zustand == "bereit" %}
+  <div class="wa-zustand wa-bereit">
+    <span class="wa-lampe" aria-hidden="true"></span>
+    <div>
+      <strong>Verbunden{% if web.nummer %} als +{{ web.nummer }}{% endif %}</strong>
+      <p class="meta">Neue Mitglieder werden automatisch begrüßt. Das Handy mit
+        dieser Nummer muss gelegentlich online sein, sonst trennt WhatsApp die
+        Verknüpfung.</p>
+    </div>
+  </div>
+
+  {% elif web.zustand == "qr" %}
+  <div class="wa-kopplung-kasten">
+    <div class="wa-qr">
+      {% if web.qr %}
+      <img src="{{ web.qr }}" width="320" height="320"
+           alt="QR-Code zum Verknüpfen mit WhatsApp">
+      {% else %}
+      <div class="platzhalter" style="width:320px;height:320px;"></div>
+      {% endif %}
+    </div>
+    <div class="wa-kopplung-text">
+      <strong>Einmal koppeln</strong>
+      <ol>
+        <li>WhatsApp auf dem Handy öffnen</li>
+        <li>Einstellungen &rarr; <em>Verknüpfte Geräte</em></li>
+        <li><em>Gerät verknüpfen</em> antippen</li>
+        <li>Diesen Code scannen</li>
+      </ol>
+      <p class="meta">Der Code wird jede Minute erneuert – die Seite holt ihn
+        automatisch nach. Danach bleibt die Verknüpfung bestehen, auch über
+        Neustarts hinweg.</p>
+    </div>
+  </div>
+
+  {% elif web.zustand == "start" %}
+  <div class="wa-zustand">
+    <span class="wa-lampe" aria-hidden="true"></span>
+    <div>
+      <strong>Der Dienst startet</strong>
+      <p class="meta">{{ web.meldung }} Beim ersten Mal dauert das eine Minute –
+        im Hintergrund fährt ein Browser hoch.</p>
+    </div>
+  </div>
+
+  {% elif web.zustand == "aus" %}
+  <div class="wa-zustand wa-schlecht">
+    <span class="wa-lampe" aria-hidden="true"></span>
+    <div>
+      <strong>Der Dienst läuft nicht</strong>
+      <p class="meta">{{ web.meldung }}</p>
+      <p class="meta">Er wird von <code>start.bat</code> mitgestartet, sobald
+        in <code>config.cmd</code> <code>WHATSAPP_MODUS=web</code> steht. Beim
+        allerersten Mal installiert start.bat die Node-Pakete – das dauert ein
+        paar Minuten.</p>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="wa-zustand wa-warnung">
+    <span class="wa-lampe" aria-hidden="true"></span>
+    <div>
+      <strong>{{ web.zustand|capitalize }}</strong>
+      <p class="meta">{{ web.meldung }}</p>
+    </div>
+  </div>
+  {% endif %}
+</div>

@@ -1,0 +1,39 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("Statistiken", "Was die AG in Zahlen gemacht hat.") }}
+
+<div class="kennzahlen">
+  {{ m.kennzahl(aktive, "aktive Mitglieder") }}
+  {{ m.kennzahl(aufgaben_gesamt, "Aufgaben insgesamt") }}
+  {{ m.kennzahl(erledigt_anteil ~ " %", "davon erledigt", "kennzahl-gut") }}
+  {{ m.kennzahl(treffen, "AG-Treffen") }}
+  {{ m.kennzahl(anwesenheiten, "Anwesenheiten") }}
+  {% if kassenstand is not none %}
+  {{ m.kennzahl(kassenstand|euro, "Kassenstand",
+                "kennzahl-warnung" if kassenstand < 0 else "kennzahl-gut") }}
+  {% endif %}
+</div>
+
+<div class="raster-2">
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Aufgaben nach Stand</h2></div></div>
+    {{ status_diagramm }}
+  </div>
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Bewerbungen</h2></div></div>
+    {{ bewerbungs_diagramm }}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Erledigt je Monat</h2>
+    <p class="meta">Aus dem Leistungsnachweis – zählt auch Aufgaben mit, die
+      inzwischen gelöscht wurden. Die Zahl bleibt also stabil, wenn jemand
+      aufräumt.</p></div></div>
+  {{ monats_diagramm }}
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Aufgaben nach Abteilung</h2></div></div>
+  {{ abteilung_diagramm }}
+</div>

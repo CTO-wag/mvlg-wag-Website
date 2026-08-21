@@ -1,0 +1,15 @@
+{% if not gruppen %}
+<div class="suche-leer">Nichts gefunden{% if begriff %} zu „{{ begriff }}“{% endif %}.</div>
+{% else %}
+{% for name, eintraege in gruppen %}
+<div class="suche-gruppe">
+  <span class="suche-gruppe-titel">{{ name }}</span>
+  {% for e in eintraege %}
+  <button type="button" class="suche-eintrag" data-bereich="{{ e.bereich }}" role="option">
+    <span>{{ e.text }}</span>
+    {% if e.meta %}<span class="meta">{{ e.meta }}</span>{% endif %}
+  </button>
+  {% endfor %}
+</div>
+{% endfor %}
+{% endif %}

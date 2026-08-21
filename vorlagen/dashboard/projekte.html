@@ -1,0 +1,117 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("Projekte", "Was über Wochen läuft – mit Team und Fortschritt.") }}
+{{ m.rueckmeldung(meldung) }}
+
+<details class="block">
+  <summary>Neues Projekt</summary>
+  <div class="aufklapp-inhalt">
+    <form hx-post="/dashboard/projekte" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Titel
+        <input type="text" name="titel" maxlength="200" required>
+      </label>
+      <label class="voll">Worum geht es?
+        <textarea name="beschreibung" maxlength="4000"></textarea>
+      </label>
+      <label>Leitung
+        {{ m.personen_auswahl("leitung", personen, none, "– noch offen –") }}
+      </label>
+      <label>Frist
+        <input type="date" name="frist">
+      </label>
+      <div class="formular-fuss"><button type="submit">Projekt anlegen</button></div>
+    </form>
+  </div>
+</details>
+
+{% if not projekte %}
+<div class="panel">
+  {{ m.leer("Noch keine Projekte",
+            "Ein Projekt bündelt, was über mehrere Wochen läuft.", "projekt") }}
+</div>
+{% endif %}
+
+{% for p in projekte %}
+<div class="panel">
+  <div class="panel-kopf">
+    <div>
+      <h2>{{ p.title }}</h2>
+      <p class="meta">
+        {{ m.zustand(p.status) }}
+        {% if p.deadline %} · bis {{ p.deadline|berlin }}{% endif %}
+        {% if p.lead_id %}
+          {% set chef = personen|selectattr("id", "equalto", p.lead_id)|first %}
+          {% if chef %} · Leitung: {{ chef.vorname }} {{ chef.nachname }}{% endif %}
+        {% endif %}
+      </p>
+    </div>
+    <span class="marke">{{ p.progress }} %</span>
+  </div>
+
+  <div class="balken {{ 'amber' if p.progress < 100 else '' }}">
+    <span style="width:{{ p.progress }}%"></span>
+  </div>
+
+  {% if p.description %}<p style="margin-top:var(--r3);">{{ p.description }}</p>{% endif %}
+
+  <h4 style="margin-top:var(--r4);">Team</h4>
+  {% set team = teams.get(p.id, []) %}
+  {% if team %}
+  <ul class="liste">
+    {% for eintrag, person in team %}
+    <li>
+      <span class="liste-links">
+        <strong>{{ person.vorname }} {{ person.nachname }}</strong>
+        <span class="meta">{{ eintrag.role or "Mitarbeit" }} ·
+          seit {{ eintrag.joined_at|berlin("%d.%m.%Y") }}</span>
+      </span>
+      <span class="liste-rechts">
+        {{ m.loeschen("/dashboard/projekte/mitglied/" ~ eintrag.id ~ "/entfernen",
+                      person.vorname ~ " aus dem Team nehmen?", csrf, "Entfernen",
+                      "btn-still btn-klein") }}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="meta">Noch niemand im Team.</p>
+  {% endif %}
+
+  <form hx-post="/dashboard/projekte/{{ p.id }}/mitglied" hx-target="#tab-inhalt"
+        style="flex-direction:row;gap:var(--r2);margin-top:var(--r3);flex-wrap:wrap;">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {{ m.personen_auswahl("person", personen, none, "– Person wählen –") }}
+    <input type="text" name="rolle" maxlength="80" placeholder="Rolle im Team">
+    <button type="submit" class="btn-zweit btn-klein">Hinzufügen</button>
+  </form>
+
+  <details style="margin-top:var(--r4);">
+    <summary class="meta" style="cursor:pointer;">Bearbeiten oder löschen</summary>
+    <form hx-post="/dashboard/projekte/{{ p.id }}/aendern" hx-target="#tab-inhalt"
+          class="formular" style="margin-top:var(--r3);">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Titel<input type="text" name="titel" value="{{ p.title }}" maxlength="200"></label>
+      <label class="voll">Beschreibung<textarea name="beschreibung" maxlength="4000">{{ p.description or "" }}</textarea></label>
+      <label>Stand
+        <select name="status">
+          {% for s in ["planung", "laufend", "abgeschlossen"] %}
+          <option value="{{ s }}" {% if p.status == s %}selected{% endif %}>{{ s|label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Fortschritt (%)
+        <input type="number" name="fortschritt" min="0" max="100" value="{{ p.progress }}">
+      </label>
+      <label>Leitung{{ m.personen_auswahl("leitung", personen, p.lead_id, "– offen –") }}</label>
+      <label>Frist<input type="date" name="frist" value="{{ p.deadline.isoformat() if p.deadline else '' }}"></label>
+      <div class="formular-fuss">
+        <button type="submit">Speichern</button>
+        {{ m.loeschen("/dashboard/projekte/" ~ p.id ~ "/loeschen",
+                      "Projekt „" ~ p.title ~ "“ in den Papierkorb legen?", csrf,
+                      "In den Papierkorb") }}
+      </div>
+    </form>
+  </details>
+</div>
+{% endfor %}

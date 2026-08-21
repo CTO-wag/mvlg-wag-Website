@@ -1,0 +1,42 @@
+{#
+  Die Rechtetafel EINER Person.
+
+  Steht in einer eigenen Datei, weil sie erst beim Aufklappen geladen wird.
+  Vorher lieferte die Kontenseite diese Tafel für jedes einzelne Konto mit -
+  bei dreissig Konten waren das 283 Kilobyte HTML, von denen man fast nie
+  mehr als eine Tafel zu sehen bekam. Auf dem Handy merkt man das deutlich.
+#}
+<p class="meta">
+  Was die Rolle oder die Abteilung erlaubt, ist die Grundlage. Ein Eintrag
+  hier gibt zusätzlich frei oder entzieht ausdrücklich – und ein Entzug
+  schlägt alles andere.
+</p>
+<div class="rechte-spalten" style="margin-top:var(--r3);">
+  {% for gruppe, eintraege in perm_gruppen %}
+  <fieldset class="rechte-gruppe">
+    <legend>{{ gruppe }}</legend>
+    {% for perm, name, hilfe in eintraege %}
+    {% set ausnahme = ausnahmen.get(perm) %}
+    <div class="reihe" style="gap:var(--r1);margin-bottom:.2rem;">
+      <span style="flex:1;font-size:.82rem;" title="{{ hilfe }}">{{ name }}</span>
+      <form hx-post="/dashboard/konten/{{ konto.id }}/recht"
+            hx-target="closest .konto-rechte" hx-swap="innerHTML"
+            style="flex-direction:row;gap:2px;">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="perm" value="{{ perm }}">
+        <button type="submit" name="wert" value="an"
+                class="filter-marke {% if ausnahme is true %}aktiv{% endif %}"
+                title="Ausdrücklich erlauben">&plus;</button>
+        <button type="submit" name="wert" value=""
+                class="filter-marke {% if ausnahme is none %}aktiv{% endif %}"
+                title="Nach Rolle und Abteilung">auto</button>
+        <button type="submit" name="wert" value="aus"
+                class="filter-marke {% if ausnahme is false %}aktiv{% endif %}"
+                title="Ausdrücklich entziehen">&minus;</button>
+      </form>
+    </div>
+    {% endfor %}
+  </fieldset>
+  {% endfor %}
+</div>
+{% if meldung %}<p class="meta">{{ meldung.text }}</p>{% endif %}

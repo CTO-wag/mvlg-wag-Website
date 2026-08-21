@@ -1,0 +1,78 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{% call m.kopf("E-Mail-Vordrucke", "Betreff und Text der automatischen Mails – änderbar, ohne den Code anzufassen.") %}
+  <form hx-post="/dashboard/vordrucke/testmodus" hx-target="#tab-inhalt">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="{{ 'btn-gut' if testmodus else 'btn-zweit' }} btn-klein">
+      Testmodus {{ "an" if testmodus else "aus" }}</button>
+  </form>
+{% endcall %}
+
+{{ m.rueckmeldung(meldung) }}
+
+{% if testmodus %}
+<div class="meldung meldung-warnung"><div>
+  <strong>Testmodus ist an.</strong> E-Mails gehen nur an Konten mit dem Recht
+  „E-Mail-Vordrucke“ – also an dich und alle, die das ebenfalls dürfen. Alle
+  anderen bekommen nichts. Nicht vergessen, ihn wieder auszuschalten.
+</div></div>
+{% endif %}
+
+{% if not mail_moeglich %}
+<div class="meldung meldung-info"><div>
+  Auf diesem Server ist kein Mailversand eingerichtet (<code>SMTP_HOST</code>
+  fehlt in config.cmd). Die Texte lassen sich trotzdem pflegen – verschickt
+  wird erst, wenn ein Postfach hinterlegt ist. Bis dahin laufen alle Meldungen
+  über die App und über Push.
+</div></div>
+{% endif %}
+
+{% for v in vordrucke %}
+<details class="block">
+  <summary>
+    <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
+      <strong>{{ v.betreff }}</strong>
+      <code>{{ v.key }}</code>
+      {% if v.abweichend %}<span class="marke zustand-geplant">angepasst</span>{% endif %}
+    </span>
+  </summary>
+  <div class="aufklapp-inhalt">
+    <p class="meta">{{ v.beschreibung }}</p>
+    <p class="meta" style="margin-top:var(--r2);">
+      Platzhalter:
+      {% for p in v.platzhalter %}<code class="platzhalter-marke">{{ "{" }}{{ p }}{{ "}" }}</code>{% endfor %}
+    </p>
+
+    <form hx-post="/dashboard/vordrucke/{{ v.key }}" hx-target="#tab-inhalt"
+          class="formular" style="margin-top:var(--r3);">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Betreff
+        <input type="text" name="betreff" value="{{ v.betreff }}" maxlength="200" required></label>
+      <label class="voll">Text
+        <textarea name="text" maxlength="20000" rows="12"
+                  style="font-family:var(--schrift-mono);font-size:.85rem;">{{ v.text }}</textarea></label>
+      <div class="formular-fuss">
+        <button type="submit">Speichern</button>
+      </div>
+    </form>
+
+    <div class="knopfzeile" style="margin-top:var(--r3);">
+      <form hx-post="/dashboard/vordrucke/{{ v.key }}/testen" hx-target="#tab-inhalt">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="btn-zweit btn-klein"
+                {% if not mail_moeglich %}disabled{% endif %}>
+          Testmail an mich</button>
+      </form>
+      <form hx-post="/dashboard/vordrucke/{{ v.key }}/zuruecksetzen" hx-target="#tab-inhalt">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="btn-still btn-klein"
+                data-frage="Auf den ursprünglichen Text zurücksetzen?">
+          Zurücksetzen</button>
+      </form>
+      {% if v.geaendert %}
+      <span class="meta">Zuletzt geändert {{ v.geaendert|relativ }}</span>
+      {% endif %}
+    </div>
+  </div>
+</details>
+{% endfor %}

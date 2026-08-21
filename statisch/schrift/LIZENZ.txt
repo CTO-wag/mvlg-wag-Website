@@ -1,0 +1,17 @@
+Schriften auf dieser Website
+============================
+
+IBM Plex Sans, IBM Plex Mono
+  Copyright (c) 2017 IBM Corp. https://github.com/IBM/plex
+  Lizenz: SIL Open Font License, Version 1.1
+
+Space Grotesk
+  Copyright (c) 2020 Florian Karsten
+  Lizenz: SIL Open Font License, Version 1.1
+
+Beide Schriftfamilien stehen unter der SIL Open Font License 1.1. Sie duerfen
+frei verwendet, eingebettet und weitergegeben werden - auch kommerziell.
+Bedingung ist, dass dieser Hinweis samt Lizenz mitgeliefert wird und die
+Schriften nicht fuer sich allein verkauft werden.
+
+Der vollstaendige Lizenztext: https://openfontlicense.org

@@ -1,0 +1,261 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{% call m.kopf("Aufgaben", "Was zu tun ist – und wer dran ist.") %}
+  <a class="btn-zweit btn-klein" href="/dashboard/aufgaben/export.csv">Als CSV</a>
+{% endcall %}
+
+{{ m.rueckmeldung(meldung) }}
+
+<div class="kennzahlen">
+  {{ m.kennzahl(zahlen.offen, "offen") }}
+  {{ m.kennzahl(zahlen.in_arbeit, "in Arbeit") }}
+  {{ m.kennzahl(zahlen.heute, "heute fällig") }}
+  {{ m.kennzahl(zahlen.ueberfaellig, "überfällig",
+                "kennzahl-warnung" if zahlen.ueberfaellig else "") }}
+  {{ m.kennzahl(zahlen.erledigt, "erledigt", "kennzahl-gut") }}
+</div>
+
+<div class="filter">
+  <form hx-post="/dashboard/aufgaben/ansicht" hx-target="#tab-inhalt"
+        style="flex-direction:row;align-items:center;gap:var(--r2);">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <span class="meta">Ansicht:</span>
+    <button type="submit" name="ansicht" value="personal"
+            class="filter-marke {% if ansicht == 'personal' %}aktiv{% endif %}">
+      Nur meine
+    </button>
+    <button type="submit" name="ansicht" value="department"
+            class="filter-marke {% if ansicht != 'personal' %}aktiv{% endif %}">
+      Alles Sichtbare
+    </button>
+  </form>
+</div>
+
+<details class="block" {% if formular_offen %}open{% endif %}>
+  <summary>Neue Aufgabe anlegen</summary>
+  <div class="aufklapp-inhalt">
+    <form hx-post="/dashboard/aufgaben" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Titel
+        <input type="text" name="titel" maxlength="160" required
+               placeholder="Was ist zu tun?">
+      </label>
+      <label class="voll">Beschreibung <span class="meta">Optional, aber hilfreich.</span>
+        <textarea name="beschreibung" maxlength="4000"></textarea>
+      </label>
+      <label class="voll">Zuständig
+        <span class="meta">Eine Person oder eine ganze Abteilung.</span>
+        {{ m.zustaendig_auswahl("zustaendig", personen, abteilungen_wahl) }}
+      </label>
+      <label>Frist
+        <input type="date" name="frist">
+      </label>
+      <label>Priorität
+        <select name="rang">
+          <option value="niedrig">Niedrig</option>
+          <option value="mittel" selected>Mittel</option>
+          <option value="hoch">Hoch</option>
+        </select>
+      </label>
+      <div class="formular-fuss">
+        <button type="submit">Aufgabe anlegen</button>
+      </div>
+    </form>
+  </div>
+</details>
+
+{% if not gruppen %}
+<div class="panel">
+  {{ m.leer("Keine Aufgaben",
+            "Leg eine an – oder warte, bis dir jemand eine zuteilt.",
+            "aufgabe", "Neue Aufgabe anlegen") }}
+</div>
+{% endif %}
+
+{% if gruppen %}
+{{ m.suche("#aufgaben-liste", "Aufgabe, Person oder Abteilung suchen …", "Aufgaben") }}
+{% endif %}
+
+{% if verborgen %}
+{# Erledigtes älter als 30 Tage wird nicht mitgeschleppt. Es ist nicht weg -
+   deshalb steht hier, wie viel es ist und wie man es sieht. #}
+<p class="meta" style="margin:calc(var(--r4) * -1) 0 var(--r4);">
+  {{ verborgen }} ältere erledigte Aufgabe{{ "n" if verborgen != 1 }} ausgeblendet.
+  <a href="#aufgaben" hx-get="/dashboard/aufgaben?alles=1" hx-target="#tab-inhalt">
+    Auch ältere zeigen</a>
+</p>
+{% elif alles %}
+<p class="meta" style="margin:calc(var(--r4) * -1) 0 var(--r4);">
+  Auch ältere erledigte Aufgaben werden gezeigt.
+  <a href="#aufgaben" hx-get="/dashboard/aufgaben" hx-target="#tab-inhalt">
+    Wieder nur die letzten 30 Tage</a>
+</p>
+{% endif %}
+
+<div id="aufgaben-liste">
+{% for status, aufgaben in gruppen %}
+<div class="panel" data-such-gruppe>
+  <div class="panel-kopf">
+    <div><h2>{{ status|label }}</h2></div>
+    <span class="marke zustand-{{ status }}">{{ aufgaben|length }}</span>
+  </div>
+  <div class="stapel">
+    {% for t in aufgaben %}
+    <details data-suchbar
+             class="aufgabe rang-{{ t.priority }} {% if t.status == 'erledigt' %}ist-erledigt{% endif %}">
+      <summary class="aufgabe-kopf">
+        <span class="aufgabe-titel">
+          <strong>{{ t.titel }}</strong>
+          <span class="aufgabe-marken">
+            {% if t.assignee %}
+              <span class="meta">{{ t.assignee.vorname }} {{ t.assignee.nachname }}</span>
+            {% elif t.assignee_department %}
+              {{ t.assignee_department|abt_marke }}
+            {% else %}
+              <span class="meta">niemand zugeteilt</span>
+            {% endif %}
+            {% if t.deadline %}
+              {% if t.status != 'erledigt' and t.deadline < heute() %}
+                <span class="marke marke-alarm">überfällig seit {{ t.deadline|berlin }}</span>
+              {% else %}
+                <span class="meta">bis {{ t.deadline|berlin }}</span>
+              {% endif %}
+            {% endif %}
+            {{ m.rang(t.priority) }}
+            {% set punkte = checklisten.get(t.id, []) %}
+            {% if punkte %}
+            <span class="meta">{{ punkte|selectattr("done")|list|length }}/{{ punkte|length }}</span>
+            {% endif %}
+            {% set anmerkungen = kommentare.get(t.id, []) %}
+            {% if anmerkungen %}<span class="meta">{{ anmerkungen|length }}</span>{% endif %}
+          </span>
+        </span>
+      </summary>
+
+      <div class="aufgabe-koerper">
+        {% if t.beschreibung %}
+        <p class="aufgabe-beschreibung">{{ t.beschreibung }}</p>
+        {% endif %}
+
+        {% if aenderbar.get(t.id) %}
+        <div class="knopfzeile">
+          {% for ziel in ["offen", "in_bearbeitung", "erledigt"] %}
+          {% if t.status != ziel %}
+          <form hx-post="/dashboard/aufgaben/{{ t.id }}/status" hx-target="#tab-inhalt">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="status" value="{{ ziel }}">
+            <button type="submit" class="btn-zweit btn-klein">
+              {% if ziel == "erledigt" %}Erledigt{% else %}{{ ziel|label }}{% endif %}
+            </button>
+          </form>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {# --- Checkliste --------------------------------------------------- #}
+        <div>
+          <h4>Teilschritte</h4>
+          {% set punkte = checklisten.get(t.id, []) %}
+          {% if punkte %}
+          <ul class="checkliste">
+            {% for p in punkte %}
+            <li>
+              <form hx-post="/dashboard/aufgaben/checkliste/{{ p.id }}/umschalten"
+                    hx-target="#tab-inhalt">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button type="submit" class="btn-still btn-klein" style="padding:.1rem .3rem;"
+                        aria-label="{{ 'Als offen markieren' if p.done else 'Als erledigt markieren' }}">
+                  {{ "Erledigt" if p.done else "Offen" }}
+                </button>
+              </form>
+              <span class="{% if p.done %}erledigt{% endif %}">{{ p.text }}</span>
+              {% if aenderbar.get(t.id) %}
+              <form hx-post="/dashboard/aufgaben/checkliste/{{ p.id }}/loeschen"
+                    hx-target="#tab-inhalt" style="margin-left:auto;">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button type="submit" class="btn-still btn-klein" style="padding:.1rem .3rem;"
+                        aria-label="Teilschritt löschen">Entfernen</button>
+              </form>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          <form hx-post="/dashboard/aufgaben/{{ t.id }}/checkliste" hx-target="#tab-inhalt"
+                style="flex-direction:row;gap:var(--r2);margin-top:var(--r2);">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="text" name="text" maxlength="200" placeholder="Teilschritt hinzufügen">
+            <button type="submit" class="btn-zweit btn-klein">+</button>
+          </form>
+        </div>
+
+        {# --- Verlauf ------------------------------------------------------ #}
+        <div>
+          <h4>Verlauf</h4>
+          {% set anmerkungen = kommentare.get(t.id, []) %}
+          {% if anmerkungen %}
+          <div class="verlauf">
+            {% for k in anmerkungen %}
+            <div class="verlauf-eintrag">
+              <span class="verlauf-wer">{{ k.user.vorname if k.user else "?" }}</span>
+              <span>{{ k.message }}<br><span class="meta">{{ k.created_at|relativ }}</span></span>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="meta">Noch nichts besprochen.</p>
+          {% endif %}
+          <form hx-post="/dashboard/aufgaben/{{ t.id }}/kommentar" hx-target="#tab-inhalt"
+                style="flex-direction:row;gap:var(--r2);margin-top:var(--r2);">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="text" name="text" maxlength="2000" placeholder="Etwas anmerken …">
+            <button type="submit" class="btn-zweit btn-klein">Senden</button>
+          </form>
+        </div>
+
+        {# --- Bearbeiten ---------------------------------------------------- #}
+        {% if aenderbar.get(t.id) %}
+        <details>
+          <summary class="meta" style="cursor:pointer;">Bearbeiten oder löschen</summary>
+          <form hx-post="/dashboard/aufgaben/{{ t.id }}/aendern" hx-target="#tab-inhalt"
+                class="formular" style="margin-top:var(--r3);">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <label class="voll">Titel
+              <input type="text" name="titel" maxlength="160" value="{{ t.titel }}">
+            </label>
+            <label class="voll">Beschreibung
+              <textarea name="beschreibung" maxlength="4000">{{ t.beschreibung or "" }}</textarea>
+            </label>
+            <label>Zuständig
+              {{ m.zustaendig_auswahl("zustaendig", personen, abteilungen_wahl,
+                                      t.assignee_id, t.assignee_department,
+                                      "– niemand –") }}
+            </label>
+            <label>Frist
+              <input type="date" name="frist" value="{{ t.deadline.isoformat() if t.deadline else '' }}">
+            </label>
+            <label>Priorität
+              <select name="rang">
+                {% for r in ["niedrig", "mittel", "hoch"] %}
+                <option value="{{ r }}" {% if t.priority == r %}selected{% endif %}>{{ r|label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <div class="formular-fuss">
+              <button type="submit">Speichern</button>
+              {{ m.loeschen("/dashboard/aufgaben/" ~ t.id ~ "/loeschen",
+                            "Diese Aufgabe in den Papierkorb legen? Eine bereits "
+                            "erledigte Aufgabe zählt weiter für den Leadership-Wert.",
+                            csrf, "In den Papierkorb") }}
+            </div>
+          </form>
+        </details>
+        {% endif %}
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+</div>

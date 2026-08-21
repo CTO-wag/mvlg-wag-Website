@@ -1,0 +1,17 @@
+{
+  "name": "wag-whatsapp-dienst",
+  "version": "2.0.0",
+  "description": "WhatsApp-Beiwagen der AG-Plattform auf Basis von whatsapp-web.js",
+  "private": true,
+  "main": "dienst.js",
+  "scripts": {
+    "start": "node dienst.js"
+  },
+  "dependencies": {
+    "whatsapp-web.js": "^1.26.0",
+    "qrcode": "^1.5.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

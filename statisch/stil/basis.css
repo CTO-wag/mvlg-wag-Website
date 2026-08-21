@@ -1,0 +1,868 @@
+/* ===========================================================================
+   Wirtschafts- & Investment-AG - Grundgestaltung
+   ===========================================================================
+   Dieselbe Markenwelt wie in V1: Navy als Traeger, Amber als Akzent, Space
+   Grotesk fuer Ueberschriften, IBM Plex fuer Text und Zahlen. Neu ist die
+   Ordnung dahinter.
+
+   In V1 standen die Werte verstreut im Stylesheet: sieben verschiedene
+   Abstaende zwischen Bloecken, drei Schriftgroessen fuer dieselbe Art
+   Ueberschrift, Knopfhoehen, die sich um zwei Pixel unterschieden. Jetzt gibt
+   es je eine Skala fuer Abstand, Schriftgroesse, Rundung und Schatten - und
+   nichts ausserhalb davon.
+   ========================================================================= */
+
+/* --- 1. Werte ----------------------------------------------------------- */
+:root{
+  /* Farben - hell */
+  --bg:#F6F7F4;
+  --bg-tief:#EEF2EF;
+  --flaeche:#FFFFFF;
+  --flaeche-2:#EEF2EF;
+  --flaeche-3:#E4EAE6;
+  --text:#18211F;
+  --text-stark:#101917;
+  --gedaempft:#66726D;
+  --gedaempft-2:#8A9691;
+  --linie:rgba(24,33,31,0.12);
+  --linie-stark:rgba(24,33,31,0.22);
+
+  --navy:#0E2647;
+  --navy-tief:#081A33;
+  --navy-weich:#1E3F6E;
+  --navy-hauch:rgba(14,38,71,0.08);
+  --navy-schrift:#FFFFFF;
+
+  --amber:#B7791F;
+  --amber-hell:#D9A441;
+  --amber-hauch:rgba(183,121,31,0.10);
+  --gruen:#2F855A;
+  --rot:#C53030;
+  --blau:#2B6CB0;
+  --lila:#805AD5;
+  --kontrast:#FFFFFF;
+
+  /* Abstaende - eine Skala, sonst nichts */
+  --r1:.25rem; --r2:.5rem; --r3:.75rem; --r4:1rem;
+  --r5:1.5rem; --r6:2rem; --r7:3rem; --r8:4.5rem;
+
+  /* Rundungen und Schatten */
+  --rund:10px; --rund-klein:7px; --rund-voll:999px;
+  --schatten:0 1px 2px rgba(24,33,31,.05), 0 14px 34px -26px rgba(24,33,31,.32);
+  --schatten-hoch:0 2px 6px rgba(24,33,31,.07), 0 24px 48px -28px rgba(24,33,31,.40);
+
+  /* Schrift */
+  --schrift:'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --schrift-titel:'Space Grotesk', system-ui, sans-serif;
+  --schrift-mono:'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Seitenrand: waechst mit dem Fenster mit. Ein gemeinsamer Wert fuer
+     Kopfzeile, Ticker und Inhalt - sonst stehen Logo und Text auf zwei
+     verschiedenen Kanten. */
+  --seitenrand:clamp(1.5rem, 3.2vw, 4.5rem);
+
+  --pfeil:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%2366726D' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5 6 6.5l5-5'/%3E%3C/svg%3E");
+  --tempo:.18s;
+}
+@media (max-width:1100px){ :root{ --seitenrand:1.4rem; } }
+@media (max-width:720px){ :root{ --seitenrand:1rem; } }
+
+/* Dunkelmodus: kein Invertieren, sondern eine eigene Nachtpalette. Gedaempftes
+   Mitternachtsblau statt Schwarz, damit Amber weiter als warmer Akzent wirkt. */
+html[data-theme="dark"]{
+  /* Gemessen lag der alte Grund bei einer Helligkeit von 4 von 100 - das ist
+     praktisch Schwarz, und eine Marke, die auf Marineblau gebaut ist, sieht
+     darauf aus wie ausgeschaltet. Etwas angehoben und blaeulich: dunkel
+     bleibt dunkel, aber die Seite hat wieder eine Farbe. */
+  --bg:#0D1526;
+  --bg-tief:#080D18;
+  /* Die Stufen liegen bewusst weiter auseinander als vorher: Auf dunklem
+     Grund braucht ein Unterschied mehr Abstand, um ueberhaupt als
+     Unterschied gelesen zu werden. Vorher lagen Grund und Flaeche neun
+     Helligkeitsstufen auseinander - zu wenig, um eine Karte als Karte zu
+     erkennen. */
+  --flaeche:#161F33;
+  --flaeche-2:#1F2942;
+  --flaeche-3:#2A3752;
+  --text:#EDF0F7;
+  --text-stark:#F6F8FC;
+  --gedaempft:#9AA7C2;
+  --gedaempft-2:#6C7791;
+  --linie:rgba(237,240,247,0.10);
+  --linie-stark:rgba(237,240,247,0.20);
+
+  --navy:#82A6F2;
+  --navy-tief:#05080F;
+  --navy-weich:#3A4A6B;
+  --navy-hauch:rgba(130,166,242,0.14);
+  --navy-schrift:#081222;
+
+  /* Etwas heller und weniger gesaettigt als im Hellmodus: Reines Orange auf
+     Marineblau wirkt billig und ist als Schrift schlechter zu lesen. */
+  --amber:#EFB95C;
+  --amber-hell:#F5D08C;
+  --amber-hauch:rgba(232,168,61,0.13);
+  --gruen:#5FC28A;
+  --rot:#E2726B;
+  --blau:#6FA3E0;
+  --lila:#B794F4;
+  --kontrast:#0A0F1A;
+
+  --schatten:inset 0 1px 0 rgba(255,255,255,.04), 0 16px 36px -26px rgba(0,0,0,.7);
+  --schatten-hoch:inset 0 1px 0 rgba(255,255,255,.06), 0 26px 54px -28px rgba(0,0,0,.8);
+  --pfeil:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%239AA7C2' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5 6 6.5l5-5'/%3E%3C/svg%3E");
+}
+
+/* --- 2. Grundgeruest ---------------------------------------------------- */
+*, *::before, *::after{ box-sizing:border-box; }
+/* Muss staerker sein als jede display-Regel weiter unten: der Browser bringt
+   zwar [hidden]{display:none} mit, aber schon "label{display:flex}" schlaegt
+   sie. In V1 standen deshalb Formularfelder da, die versteckt sein sollten. */
+[hidden]{ display:none !important; }
+
+html{ min-height:100%; background:var(--bg); -webkit-text-size-adjust:100%; }
+body{
+  margin:0; min-height:100vh; min-height:100dvh;
+  display:flex; flex-direction:column;
+  background:linear-gradient(180deg, #FFFFFF 0%, var(--bg) 30%, var(--bg-tief) 100%);
+  color:var(--text);
+  font-family:var(--schrift); font-size:16px; line-height:1.6;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+html[data-theme="dark"] body{
+  /* Vorher lief der Grund von #111c33 oben nach fast Schwarz unten. Oben war
+     er damit HELLER als die Kaesten, die darauf liegen - die sahen aus wie
+     Loecher statt wie Karten, und die halbe Seite wirkte verwaschen. Jetzt
+     eine ruhige Flaeche mit einem kaum sichtbaren Schimmer im Kopfbereich:
+     genug Tiefe, um nicht flach zu sein, aber nirgends heller als das, was
+     darauf liegt. */
+  background:var(--bg);
+  background-image:radial-gradient(120% 70% at 50% -10%,
+                   rgba(130,166,242,.10) 0%, transparent 60%);
+  background-attachment:fixed;
+}
+body > main{ flex:1 0 auto; }
+body > footer.seite{ flex-shrink:0; }
+
+h1,h2,h3,h4{
+  font-family:var(--schrift-titel); font-weight:600; color:var(--text-stark);
+  margin:0 0 var(--r2); letter-spacing:-.01em; line-height:1.22;
+  text-wrap:balance;
+}
+h1{ font-size:clamp(1.75rem, 1.2rem + 2.2vw, 2.5rem); }
+h2{ font-size:clamp(1.35rem, 1.1rem + 1.1vw, 1.75rem); }
+h3{ font-size:1.15rem; }
+h4{ font-size:1rem; }
+p{ margin:0 0 var(--r3); }
+p:last-child{ margin-bottom:0; }
+
+a{ color:var(--amber); text-decoration:none; }
+a:hover{ text-decoration:underline; }
+code, kbd, samp{ font-family:var(--schrift-mono); font-size:.88em; }
+
+hr{ border:0; border-top:1px solid var(--linie); margin:var(--r5) 0; }
+
+::selection{ background:var(--amber-hauch); color:var(--text-stark); }
+
+/* Ein sichtbarer, einheitlicher Fokusring. In V1 hatte jedes Element seinen
+   eigenen - Tastaturbedienung war dadurch stellenweise nicht nachvollziehbar. */
+:focus-visible{
+  outline:3px solid color-mix(in srgb, var(--blau) 45%, transparent);
+  outline-offset:2px; border-radius:var(--rund-klein);
+}
+:focus:not(:focus-visible){ outline:none; }
+
+.nur-lesehilfe{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+/* Sprungmarke fuer die Tastatur - der erste Tabstopp jeder Seite. */
+.sprung{
+  position:absolute; left:var(--r3); top:-4rem; z-index:200;
+  background:var(--navy); color:var(--navy-schrift);
+  padding:var(--r2) var(--r4); border-radius:var(--rund-klein);
+  transition:top var(--tempo) ease;
+}
+.sprung:focus{ top:var(--r3); text-decoration:none; }
+
+.hut{
+  font-family:var(--schrift-mono); text-transform:uppercase;
+  letter-spacing:.12em; font-size:.72rem; color:var(--amber);
+  display:block; margin-bottom:var(--r2);
+}
+.meta{ color:var(--gedaempft); font-size:.86rem; }
+.gedaempft{ color:var(--gedaempft); }
+.mono{ font-family:var(--schrift-mono); }
+.zentriert{ text-align:center; }
+.nowrap{ white-space:nowrap; }
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:.01ms !important; animation-iteration-count:1 !important;
+    transition-duration:.01ms !important; scroll-behavior:auto !important;
+  }
+}
+
+/* --- 3. Kopf- und Fusszeile --------------------------------------------- */
+header.seite{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:var(--r3); flex-wrap:wrap;
+  /* Im App-Modus (Startbildschirm) reicht die Seite unter die Statusleiste
+     des Geraets - so ist es gewollt, sonst laege ueber der Kopfleiste ein
+     grauer Balken. Nur muss der Inhalt dann auch darunter anfangen: ohne
+     diesen Abstand lagen Logo und Menue hinter Uhrzeit und Akku, oben
+     abgeschnitten. env() ist im normalen Browser 0 - dort aendert sich
+     nichts. Die Seitenwerte sind fuer Querformat: dort frisst die Kerbe
+     links oder rechts einen Streifen. */
+  padding-top:calc(var(--r3) + env(safe-area-inset-top, 0px));
+  padding-bottom:var(--r3);
+  padding-left:calc(var(--seitenrand) + env(safe-area-inset-left, 0px));
+  padding-right:calc(var(--seitenrand) + env(safe-area-inset-right, 0px));
+  border-bottom:3px solid var(--navy);
+  /* Erst der schlichte Wert, dann der durchscheinende. Kennt ein Browser
+     color-mix() nicht (Safari vor 16.2), verwirft er nur die zweite Zeile -
+     und die Kopfleiste hat trotzdem einen Hintergrund. Ohne den scrollte der
+     Text sichtbar hinter ihr durch. */
+  background:var(--flaeche);
+  background:color-mix(in srgb, var(--flaeche) 92%, transparent);
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+  /* 58 und nicht 30: Die Menue-Schublade des Dashboards legt einen Schleier
+     ueber die Seite (z-index 55). Der lag bisher AUCH ueber der Kopfleiste -
+     kaum tippte man auf das Menue, waren Logo, Menueknopf und Hell/Dunkel-
+     Schalter hinter einer grauen Scheibe verschwunden. Gemeldet als "der
+     Menue-Knopf geht weg, wenn man draufklickt".
+     Unter der Schublade selbst (60) bleibt die Leiste trotzdem: Die soll sich
+     darueberschieben, sonst ragt der Kopf mitten hinein. */
+  position:sticky; top:0; z-index:58;
+  box-shadow:0 2px 8px rgba(0,0,0,.05);
+}
+/* Im App-Modus ein garantierter Mindestabstand.
+
+   Gemeldet: "ist immernoch verdeckt". env(safe-area-inset-top) allein reicht
+   nicht - manche iPhone-Fassungen melden hier 0, obwohl die Statusleiste sehr
+   wohl ueber der Seite liegt. Dann steht rechnerisch alles richtig und
+   praktisch trotzdem die Uhr im Logo.
+
+   max() nimmt, was groesser ist: den echten Wert des Geraets, wenn er kommt -
+   sonst 2,9rem, was ueber jeder Statusleiste liegt, die Apple je hatte
+   (44 px, mit Dynamic Island 54 px). Im Browser greift die Regel gar nicht,
+   dort fehlt data-app. */
+html[data-app] header.seite{
+  padding-top:calc(var(--r2) + max(env(safe-area-inset-top, 0px), 2.9rem));
+}
+html[data-theme="dark"] header.seite{
+  /* Vorher nahm die Kopfleiste im Dunkeln die Farbe des Seitengrunds - dann
+     ist sie keine Leiste mehr, sondern nur eine Stelle, an der zufaellig
+     etwas steht. Gemessen: 0,4 Helligkeitsstufen Unterschied. Jetzt liegt
+     sie eine Stufe darueber, wie im Hellmodus auch. */
+  background:var(--flaeche);
+  background:color-mix(in srgb, var(--flaeche) 86%, transparent);
+  box-shadow:0 1px 0 var(--linie), 0 6px 24px rgba(0,0,0,.45);
+}
+header.seite .marke-logo{
+  display:flex; align-items:center; gap:var(--r3);
+  font-family:var(--schrift-titel); font-weight:700; font-size:1.08rem;
+  color:var(--navy); text-decoration:none;
+}
+header.seite .marke-logo:hover{ text-decoration:none; }
+header.seite .marke-logo img{ height:42px; width:auto; display:block; }
+
+/* Das Wappen auf dunklem Grund ---------------------------------------------
+   Das Wappen ist dunkelblau mit einer hellen Kante. Auf weissem Papier traegt
+   diese Kante das Bild; auf dunklem Grund verschwindet sie, und uebrig bleibt
+   ein blauer Fleck mit Aehren daneben - genau so sah es im Dunkelmodus aus.
+   Ein schmaler weisser Saum stellt es wieder frei. Bewusst kein Leuchten:
+   zwei enge Schatten ergeben eine Kante, ein weiter Radius ergaebe Nebel.
+   Der Saum muss zur Anzeigegroesse passen; was bei 300 Pixeln eine feine
+   Linie ist, verschluckt ein 42 Pixel hohes Bild. Deshalb --saum. */
+html[data-theme="dark"] img.wappen{
+  filter:
+    drop-shadow(0 0 var(--saum, 1px) rgba(255,255,255,.88))
+    drop-shadow(0 0 var(--saum, 1px) rgba(255,255,255,.88));
+}
+.marke-text{ display:flex; flex-direction:column; line-height:1.15; }
+.marke-motto{
+  font-weight:500; font-size:.7rem; color:var(--gedaempft); margin-top:.15rem;
+}
+
+header.seite nav{ display:flex; align-items:center; gap:var(--r1); }
+header.seite nav a{
+  font-family:var(--schrift-mono); font-size:.74rem; text-transform:uppercase;
+  letter-spacing:.06em; color:var(--text);
+  padding:var(--r2) var(--r3); border-radius:var(--rund-klein);
+}
+header.seite nav a:hover{
+  color:var(--navy); background:var(--navy-hauch); text-decoration:none;
+}
+header.seite nav a.betont{
+  background:var(--navy); color:var(--navy-schrift);
+}
+header.seite nav a.betont:hover{ background:var(--amber); color:#fff; }
+
+.burger{
+  display:none; background:none; border:1px solid transparent;
+  padding:var(--r2) var(--r3); border-radius:var(--rund-klein);
+  cursor:pointer; color:var(--navy); min-height:0;
+}
+.burger-striche{ display:flex; flex-direction:column; gap:4px; width:20px; }
+.burger-striche span{
+  display:block; height:2px; background:currentColor; border-radius:2px;
+}
+.burger:hover{ background:var(--navy-hauch); }
+/* Geraete ohne Mauszeiger kennen kein Ueberfahren - dort darf das Antippen
+   keinen bleibenden Zustand hinterlassen. In V1 blieb der Knopf danach
+   dauerhaft eingefaerbt, bis man woanders hintippte. */
+@media (hover:none){ .burger:hover{ background:none; } }
+
+/* Der Hell/Dunkel-Schalter.
+   min-height:0 ist hier kein Schoenheitsfehler, sondern Pflicht: die
+   allgemeine Knopfregel weiter unten setzt min-height:2.6rem. Die schlaegt
+   height:26px, weil eine Mindesthoehe immer gewinnt. Der Schalter war
+   dadurch 42px hoch, waehrend der runde Griff bei top:2px klebte - er sass
+   sichtbar zu hoch in einer zu grossen Pille.
+   Ebenso muessen Hintergrund und Schriftfarbe beim Ueberfahren
+   zurueckgenommen werden: sonst faerbt button:hover die ganze Pille amber. */
+.thema-schalter{
+  position:relative; width:52px; height:28px; min-height:0; flex-shrink:0;
+  border-radius:var(--rund-voll); border:1px solid var(--linie);
+  background:var(--flaeche-2); padding:0; cursor:pointer;
+  display:inline-flex; align-items:center; margin-left:var(--r3);
+  transition:background var(--tempo) ease, border-color var(--tempo) ease;
+}
+.thema-schalter:hover{
+  background:var(--flaeche-3); border-color:var(--amber); color:inherit;
+}
+.thema-schalter:active{ transform:none; }
+.thema-schalter:focus-visible{
+  outline:2px solid var(--blau); outline-offset:2px;
+}
+.thema-schalter .knopf{
+  position:absolute; top:50%; left:3px; width:22px; height:22px;
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg, var(--amber-hell), var(--amber));
+  color:#fff; box-shadow:0 1px 4px rgba(0,0,0,.28);
+  transform:translate(0, -50%);
+  transition:transform .26s cubic-bezier(.4,0,.2,1), background var(--tempo) ease;
+}
+.thema-schalter svg{ width:13px; height:13px; display:block; }
+.thema-schalter .mond{ display:none; }
+html[data-theme="dark"] .thema-schalter{ background:var(--flaeche-3); }
+html[data-theme="dark"] .thema-schalter .knopf{
+  transform:translate(24px, -50%);
+  background:linear-gradient(135deg, #33507F, var(--navy-weich));
+}
+html[data-theme="dark"] .thema-schalter .sonne{ display:none; }
+html[data-theme="dark"] .thema-schalter .mond{ display:block; }
+/* Wer "weniger Bewegung" eingestellt hat, bekommt keinen gleitenden Griff. */
+@media (prefers-reduced-motion:reduce){
+  .thema-schalter .knopf{ transition:none; }
+}
+
+.ticker{
+  background:var(--navy-tief); border-bottom:1px solid var(--navy);
+  font-family:var(--schrift-mono); font-size:.68rem; letter-spacing:.06em;
+  color:#F6D48B; text-transform:uppercase;
+  padding:var(--r2) var(--seitenrand); overflow-x:auto; white-space:nowrap;
+  scrollbar-width:none;
+}
+/* Im Hellmodus ist das Band ein dunkler Streifen unter der hellen Leiste -
+   ein Akzent. Im Dunkelmodus war es DUNKLER als die ohnehin dunkle Seite
+   (Helligkeit 1,9 gegen 4,3): ein schwarzer Riegel quer ueber den Kopf.
+   Jetzt gehoert es zur Kopfleiste, abgesetzt nur durch eine Linie. */
+html[data-theme="dark"] .ticker{
+  background:color-mix(in srgb, var(--flaeche) 70%, var(--bg));
+  border-bottom-color:var(--linie);
+  color:var(--amber-hell);
+}
+.ticker::-webkit-scrollbar{ display:none; }
+.ticker span:not(:last-child)::after{
+  content:"·"; color:var(--gedaempft-2); margin:0 1.2rem;
+}
+
+main{
+  width:100%; max-width:1020px; margin:0 auto;
+  /* Im Querformat liegt die Kerbe seitlich; ohne diese Werte klebt Text
+     darunter. Unten dasselbe fuer den Strich zum Wischen. */
+  padding:var(--r7) calc(var(--r6) + env(safe-area-inset-right, 0px))
+          calc(var(--r8) + env(safe-area-inset-bottom, 0px))
+          calc(var(--r6) + env(safe-area-inset-left, 0px));
+}
+/* Auch "breit" hat eine Grenze: Auf einem 27-Zoll-Schirm liefen Tabellen
+   sonst ueber 2000 Pixel, und das Auge verliert beim Zurueckspringen die
+   Zeile. 1680 ist die Breite, ab der nichts mehr dazugewonnen wird. */
+main.breit{
+  max-width:1680px; margin-inline:auto;
+  padding-left:var(--seitenrand); padding-right:var(--seitenrand);
+}
+main.schmal{ max-width:720px; }
+
+footer.seite{
+  background:var(--navy-tief); color:#C8D6E8;
+  padding:var(--r6) calc(var(--seitenrand) + env(safe-area-inset-right, 0px))
+          calc(var(--r5) + env(safe-area-inset-bottom, 0px))
+          calc(var(--seitenrand) + env(safe-area-inset-left, 0px));
+  border-top:3px solid var(--navy);
+  font-size:.85rem; text-align:center;
+}
+footer.seite a{ color:#98B3D1; }
+footer.seite a:hover{ color:var(--amber-hell); }
+.fuss-links{
+  display:flex; justify-content:center; gap:var(--r5);
+  flex-wrap:wrap; margin-bottom:var(--r4);
+}
+.fuss-zeile{ margin:var(--r1) 0; }
+.fuss-klein{ color:#8FA6C0; font-size:.75rem; margin-top:var(--r3); }
+/* Die Urheberzeile der AG. Bewusst abgesetzt: sie ist keine
+   Kleingedrucktes-Zeile unter vielen. */
+.fuss-urheber{
+  margin-top:var(--r4); padding-top:var(--r3);
+  border-top:1px solid rgba(152,179,209,.22);
+  color:#A8BDD4; font-size:.75rem; line-height:1.7;
+}
+.fuss-urheber strong{ color:#D8E4F2; font-weight:600; }
+
+@media (max-width:820px){
+  header.seite{
+    padding:var(--r3) var(--seitenrand);
+    /* Gemessen bei 375 Pixeln: Das Logo ist mit Schriftzug 312 Pixel breit.
+       Zusammen mit dem Menue-Knopf passte das nicht in eine Zeile, also
+       rutschte der Knopf per flex-wrap in die zweite - dort steht ein
+       einzelnes Element bei space-between LINKS. Der Menue-Knopf sass also
+       unter dem Logo auf der falschen Seite, und die Kopfleiste war 113
+       statt 69 Pixel hoch. Kein Umbruch mehr: Das Logo darf schrumpfen, der
+       Knopf bleibt rechts. */
+    flex-wrap:nowrap;
+  }
+  header.seite .marke-logo{ min-width:0; flex:0 1 auto; }
+  header.seite .marke-text{ min-width:0; }
+  header.seite .marke-text,
+  header.seite .marke-motto{
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .burger{ margin-left:auto; flex-shrink:0; }
+  header.seite nav{
+    display:none; position:absolute; top:100%; left:0; right:0;
+    flex-direction:column; align-items:stretch; gap:2px;
+    background:var(--flaeche); padding:var(--r3) var(--r4) var(--r4);
+    border-top:2px solid var(--navy); box-shadow:var(--schatten-hoch);
+  }
+  header.seite.offen nav{ display:flex; }
+  header.seite nav a{ font-size:.8rem; padding:var(--r3); }
+  header.seite nav a.betont{ text-align:center; margin-top:var(--r2); }
+  .thema-schalter{ margin:var(--r3) 0 0; }
+  .burger{ display:block; }
+  .ticker{ display:none; }
+}
+
+@media (max-width:430px){
+  /* Auf dem Telefon traegt das Wappen die Marke. Der Untertitel kostet nur
+     Platz, den der Name braucht. */
+  header.seite .marke-motto{ display:none; }
+  header.seite .marke-logo{ font-size:.98rem; }
+  main{ padding:var(--r5) var(--r4) var(--r7); }
+}
+
+/* --- 4. Flaechen -------------------------------------------------------- */
+.panel{
+  background:var(--flaeche); border:1px solid var(--linie);
+  border-radius:var(--rund); padding:var(--r5) var(--r5);
+  box-shadow:var(--schatten);
+}
+.panel.schmal{ padding:var(--r4); }
+.panel.betont{ border-left:4px solid var(--amber); }
+.panel > h2:first-child, .panel > h3:first-child{ margin-top:0; }
+
+.panel-kopf{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:var(--r4); flex-wrap:wrap; margin-bottom:var(--r4);
+}
+.panel-kopf > div{ min-width:0; }
+.panel-kopf h2, .panel-kopf h3{ margin:0; }
+.panel-kopf .meta{ margin-top:.15rem; }
+.panel-werkzeuge{ display:flex; gap:var(--r2); flex-wrap:wrap; align-items:center; }
+
+.raster-2{ display:grid; grid-template-columns:1fr 1fr; gap:var(--r5); }
+.raster-3{ display:grid; grid-template-columns:repeat(3,1fr); gap:var(--r4); }
+.raster-auto{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(260px, 100%),1fr)); gap:var(--r4); }
+.raster-auto-klein{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(180px, 100%),1fr)); gap:var(--r3); }
+.raster-2 > *, .raster-3 > *, .raster-auto > *, .raster-auto-klein > *{ min-width:0; }
+@media (max-width:860px){
+  .raster-2, .raster-3{ grid-template-columns:1fr; }
+}
+
+.stapel{ display:flex; flex-direction:column; gap:var(--r4); }
+.reihe{ display:flex; align-items:center; gap:var(--r3); flex-wrap:wrap; }
+.reihe-rechts{ margin-left:auto; }
+
+ul.schlicht{ list-style:none; padding:0; margin:0; }
+ul.schlicht li{ padding:var(--r2) 0; border-bottom:1px solid var(--linie); }
+ul.schlicht li:last-child{ border-bottom:none; }
+
+.karten-seite{ max-width:480px; margin:var(--r5) auto; }
+
+/* --- 5. Knoepfe --------------------------------------------------------- */
+/* Der Rahmen ist durchsichtig statt weg: sonst ist ein Knopf mit Rahmen zwei
+   Pixel hoeher als der daneben, und beide sitzen sichtbar versetzt. */
+button, .btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:var(--r2);
+  background:var(--navy); color:var(--navy-schrift);
+  border:1px solid transparent; border-radius:var(--rund-klein);
+  padding:.62rem 1.15rem; min-height:2.6rem;
+  font-family:var(--schrift); font-size:.9rem; font-weight:600; line-height:1.3;
+  cursor:pointer; text-decoration:none; text-align:center;
+  transition:background var(--tempo) ease, border-color var(--tempo) ease,
+             color var(--tempo) ease, transform .08s ease;
+}
+button:hover, .btn:hover{ background:var(--amber); color:#fff; text-decoration:none; }
+button:active, .btn:active{ transform:translateY(1px); }
+button[disabled], .btn[disabled], button:disabled{
+  opacity:.5; cursor:not-allowed; transform:none;
+}
+button[disabled]:hover, button:disabled:hover{ background:var(--navy); }
+
+.btn-zweit{
+  background:var(--flaeche-2); color:var(--text); border-color:var(--linie);
+}
+.btn-zweit:hover{ background:var(--navy-hauch); color:var(--navy); border-color:var(--navy); }
+.btn-still{ background:transparent; color:var(--gedaempft); border-color:transparent; }
+.btn-still:hover{ background:var(--flaeche-2); color:var(--text); }
+.btn-gefahr{
+  background:color-mix(in srgb, var(--rot) 12%, transparent);
+  color:var(--rot); border-color:color-mix(in srgb, var(--rot) 38%, transparent);
+}
+.btn-gefahr:hover{ background:color-mix(in srgb, var(--rot) 24%, transparent); color:var(--rot); }
+html[data-theme="dark"] .btn-gefahr{
+  background:color-mix(in srgb, var(--rot) 14%, var(--flaeche));
+}
+html[data-theme="dark"] .btn-gefahr:hover{
+  background:color-mix(in srgb, var(--rot) 26%, var(--flaeche));
+}
+.btn-gut{
+  background:color-mix(in srgb, var(--gruen) 12%, transparent);
+  color:var(--gruen); border-color:color-mix(in srgb, var(--gruen) 38%, transparent);
+}
+.btn-gut:hover{ background:color-mix(in srgb, var(--gruen) 24%, transparent); color:var(--gruen); }
+html[data-theme="dark"] .btn-gut{
+  background:color-mix(in srgb, var(--gruen) 14%, var(--flaeche));
+}
+html[data-theme="dark"] .btn-gut:hover{
+  background:color-mix(in srgb, var(--gruen) 26%, var(--flaeche));
+}
+.btn-klein{ padding:.36rem .7rem; min-height:2.1rem; font-size:.8rem; font-weight:500; }
+.btn-breit{ width:100%; }
+.btn svg{ width:1.05em; height:1.05em; flex-shrink:0; }
+
+.knopfzeile{ display:flex; gap:var(--r3); flex-wrap:wrap; align-items:center; }
+
+/* --- 6. Formulare ------------------------------------------------------- */
+/* Ein Satz Regeln fuer alle Eingabefelder. In V1 liefen drei Rhythmen
+   nebeneinander und ein Textfeld war 43, ein Auswahlfeld 45 Pixel hoch -
+   in einer Zeile stand dadurch nichts auf einer Linie. */
+form{ display:flex; flex-direction:column; gap:var(--r4); }
+label{
+  display:flex; flex-direction:column; gap:var(--r1);
+  font-size:.82rem; font-weight:600; color:var(--text);
+}
+label > .meta{ font-weight:400; font-size:.75rem; line-height:1.45; }
+
+input, select, textarea{
+  width:100%; background:var(--flaeche-2); color:var(--text);
+  border:1px solid var(--linie); border-radius:var(--rund-klein);
+  padding:.58rem .75rem;
+  font-family:inherit; font-size:.92rem; line-height:1.45;
+  transition:border-color var(--tempo) ease, background var(--tempo) ease;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select{
+  min-height:2.6rem;
+}
+textarea{ min-height:6.5rem; resize:vertical; }
+input[type="file"]{ background:transparent; border-style:dashed; padding:.5rem .6rem; font-size:.85rem; }
+input[type="checkbox"], input[type="radio"]{
+  width:auto; min-height:0; padding:0; margin:0;
+  accent-color:var(--navy); cursor:pointer;
+}
+input[type="color"]{ padding:.2rem; min-height:2.6rem; cursor:pointer; }
+input:hover, select:hover, textarea:hover{ border-color:var(--amber); }
+input:focus, select:focus, textarea:focus{ border-color:var(--blau); background:var(--flaeche); }
+input[readonly], input[disabled], select[disabled], textarea[disabled]{
+  background:var(--flaeche-3); color:var(--gedaempft); cursor:not-allowed;
+}
+::placeholder{ color:var(--gedaempft-2); opacity:1; }
+
+select{
+  appearance:none; -webkit-appearance:none; padding-right:2rem;
+  background-image:var(--pfeil); background-repeat:no-repeat;
+  background-position:right .7rem center; background-size:.7rem;
+}
+select[multiple]{ background-image:none; padding-right:.7rem; min-height:8rem; }
+
+/* Das Raster fuer Formularfelder: ein Feld ist mindestens 250px breit, sonst
+   rueckt es in die naechste Zeile. Auf dem Handy steht damit eines unter dem
+   anderen, ohne eigene Umbruchregeln. */
+.formular{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(min(250px, 100%), 1fr));
+  gap:var(--r4); align-items:end;
+}
+.formular > *{ grid-column:1 / -1; }
+.formular > label{ grid-column:auto; }
+.formular > label:has(textarea), .formular > label.voll{ grid-column:1 / -1; }
+.formular > label:has(input[type="checkbox"]){
+  flex-direction:row; align-items:center; gap:var(--r2); font-weight:500;
+}
+/* Zwei Felder nebeneinander - aber nur, wenn zwei nebeneinander passen.
+   Mit festen "1fr 1fr" bleiben es auch auf einem 375er-Schirm zwei Spalten,
+   und weil ein Datumsfeld sich nicht beliebig schmal machen laesst, schob
+   das Paar 18 Pixel ueber den rechten Rand hinaus. minmax(min(...)) laesst
+   es umbrechen, min-width:0 erlaubt den Feldern zu schrumpfen. */
+.formular > .feldpaar{
+  grid-column:auto; display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+  gap:var(--r3); align-items:end;
+}
+.formular > .feldpaar > *{ min-width:0; }
+input, select, textarea{ max-width:100%; }
+.formular > .formular-fuss{
+  display:flex; gap:var(--r3); flex-wrap:wrap; align-items:center;
+  margin-top:var(--r1); padding-top:var(--r4); border-top:1px solid var(--linie);
+}
+
+.haken{
+  display:flex; flex-direction:row; align-items:flex-start; gap:var(--r2);
+  padding:var(--r2); border-radius:var(--rund-klein);
+  font-size:.87rem; font-weight:400; cursor:pointer; margin:0;
+}
+.haken:hover{ background:var(--flaeche-2); }
+.haken input{ margin-top:.2rem; flex-shrink:0; }
+.haken:has(input:checked){ background:var(--navy-hauch); }
+.haken:has(input:checked) > span:first-of-type{ color:var(--navy); font-weight:500; }
+
+.zeichenzahl{ align-self:flex-end; font-size:.72rem; color:var(--gedaempft); }
+.zeichen-knapp{ color:var(--amber); font-weight:600; }
+
+/* --- 7. Meldungen ------------------------------------------------------- */
+/* Rueckmeldungen standen in V1 als nackte gruene oder rote Zeile im Text und
+   liessen sich leicht uebersehen. Als abgesetzter Kasten sind sie sofort als
+   Antwort des Systems erkennbar. */
+.meldung{
+  display:flex; align-items:flex-start; gap:var(--r3);
+  padding:var(--r3) var(--r4); margin:var(--r3) 0;
+  border-radius:var(--rund-klein); border-left:3px solid currentColor;
+  font-size:.89rem; line-height:1.55;
+}
+.meldung::before{ font-weight:700; flex-shrink:0; line-height:1.55; }
+.meldung > div{ min-width:0; }
+.meldung p{ margin:0; }
+.meldung p + p{ margin-top:var(--r2); }
+.meldung-gut{ color:var(--gruen); background:color-mix(in srgb, var(--gruen) 10%, transparent); }
+.meldung-gut::before{ content:"✓"; }
+.meldung-fehler{ color:var(--rot); background:color-mix(in srgb, var(--rot) 9%, transparent); }
+.meldung-fehler::before{ content:"!"; }
+.meldung-warnung{ color:var(--amber); background:var(--amber-hauch); }
+.meldung-warnung::before{ content:"!"; }
+.meldung-info{ color:var(--blau); background:color-mix(in srgb, var(--blau) 9%, transparent); }
+.meldung-info::before{ content:"i"; }
+.meldung strong{ color:inherit; }
+
+/* Auf dunklem Grund taugt der Bauplan "Akzentfarbe mit 10 Prozent Deckkraft
+   ueber dem Seitengrund" nicht: Zehn Prozent Farbe ueber Fast-Schwarz heben
+   die Flaeche zwar an, tragen aber kaum Farbe hinein. Gemessen kam dabei
+   heraus - Warnung #24252B, Fehler #201D2C, Erfolg #152630: drei schmutzige
+   Grautoene, die alle gleich aussehen und keiner nach seiner Bedeutung.
+   Deshalb hier andersherum gemischt: eine ordentliche Portion Akzent IN die
+   Flaeche statt ein Hauch Akzent UEBER den Grund. Das Ergebnis liegt in der
+   Helligkeit der uebrigen Kaesten und hat einen erkennbaren Farbton. */
+html[data-theme="dark"] .meldung{
+  /* Nachgerechnet: Ein warmer Ton in einer blaugrauen Flaeche hebt sich
+     selbst auf. Bernstein ergab bei 15 Prozent ein reines Grau (#373639),
+     und erst bei 30 Prozent kam Farbe heraus - dann aber Oliv, also genau
+     der Matsch, um den es hier geht. Rot lief ins Graulila.
+     Deshalb im Dunkeln fuer ALLE vier dieselbe ruhige Flaeche. Die
+     Bedeutung tragen die Dinge, die Farbe auch wirklich halten koennen:
+     der Rand links, das Zeichen davor und die fette Zeile. Das ist
+     ausserdem einheitlich - vier Kaesten, die sich nur in der Kante
+     unterscheiden, liest man schneller als vier verschieden schmutzige. */
+  background:var(--flaeche-2);
+  border-left-width:4px;
+}
+/* Die Schrift im Kasten nimmt die Akzentfarbe an. Auf der nun helleren,
+   getoenten Flaeche liest sich der Fliesstext besser in der normalen
+   Textfarbe - die Farbe tragen Rand, Zeichen und Ueberschrift. */
+html[data-theme="dark"] .meldung p{ color:var(--text); }
+/* Der Text bleibt lesbar, nur das Zeichen und der Rand tragen die Farbe. */
+.meldung > div, .meldung > p{ color:var(--text); }
+
+.fehler{ color:var(--rot); }
+.gut{ color:var(--gruen); }
+.warnung{ color:var(--amber); }
+
+/* --- 8. Marken (Status, Prioritaet, Abteilung) -------------------------- */
+.marke{
+  display:inline-flex; align-items:center; gap:.3rem;
+  padding:.15rem .55rem; border-radius:var(--rund-voll);
+  border:1px solid transparent; background:var(--flaeche-2);
+  font-size:.73rem; font-weight:600; line-height:1.5;
+  white-space:nowrap; vertical-align:middle;
+  --marke:var(--gedaempft);
+}
+.marke + .marke{ margin-left:.3rem; }
+.marke[class*="zustand-"], .marke[class*="rang-"], .marke.abteilung{
+  color:color-mix(in srgb, var(--marke) 62%, #000);
+  background:color-mix(in srgb, var(--marke) 12%, transparent);
+  border-color:color-mix(in srgb, var(--marke) 32%, transparent);
+}
+/* Auf dunklem Grund waere abgedunkelte Schrift unlesbar - dort der reine
+   Akzentton. Fuer Abteilungen umgekehrt aufhellen: fuer sie ist genau EINE
+   Farbe hinterlegt, und die ist auf hellen Grund ausgelegt. */
+html[data-theme="dark"] .marke[class*="zustand-"],
+html[data-theme="dark"] .marke[class*="rang-"]{ color:var(--marke); }
+/* Auch hier: Akzent in die Flaeche, nicht ueber den Grund. Sonst sind alle
+   Abzeichen derselbe dunkle Fleck und nur die Schrift unterscheidet sie. */
+html[data-theme="dark"] .marke[class*="zustand-"],
+html[data-theme="dark"] .marke[class*="rang-"],
+html[data-theme="dark"] .marke.abteilung{
+  background:color-mix(in srgb, var(--marke) 18%, var(--flaeche));
+  border-color:color-mix(in srgb, var(--marke) 42%, transparent);
+}
+html[data-theme="dark"] .marke.abteilung{
+  color:color-mix(in srgb, var(--marke) 45%, #FFFFFF);
+}
+
+.zustand-erledigt, .zustand-angenommen, .zustand-aktiv,
+.zustand-veroeffentlicht, .zustand-abgeschlossen, .zustand-gesendet{ --marke:var(--gruen); }
+.zustand-abgelehnt, .zustand-inaktiv, .zustand-fehler,
+.zustand-ueberfaellig{ --marke:var(--rot); }
+.zustand-offen, .zustand-neu, .zustand-in_pruefung,
+.zustand-in_bearbeitung, .zustand-in_arbeit, .zustand-laufend{ --marke:var(--amber); }
+.zustand-geplant, .zustand-planung{ --marke:var(--blau); }
+.zustand-idee, .zustand-beantwortet{ --marke:var(--gedaempft); }
+.rang-hoch{ --marke:var(--rot); }
+.rang-mittel{ --marke:var(--amber); }
+.rang-niedrig{ --marke:var(--gedaempft); }
+
+/* "Ueberfaellig" ist die dringendste Meldung im System. Im Dunkelmodus ist
+   --rot ein heller Ton fuer Text; als Flaeche mit weisser Schrift kaeme er
+   nur auf 3,1:1. Die Schriftfarbe kommt deshalb aus dem Farbschema. */
+.marke-alarm{ background:var(--rot); color:var(--kontrast); border-color:var(--rot); }
+.zaehler{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:1.35rem; height:1.35rem; padding:0 .35rem;
+  border-radius:var(--rund-voll); background:var(--amber); color:#fff;
+  font-family:var(--schrift-mono); font-size:.7rem; font-weight:600;
+}
+
+/* --- 9. Tabellen -------------------------------------------------------- */
+.tabelle-rahmen{
+  overflow-x:auto; border-radius:var(--rund); border:1px solid var(--linie);
+  background:var(--flaeche);
+}
+.panel > .tabelle-rahmen{ border:none; border-radius:0; }
+table{ width:100%; border-collapse:collapse; font-size:.9rem; }
+th, td{ padding:.62rem .85rem; text-align:left; vertical-align:middle; }
+th{
+  font-family:var(--schrift-mono); font-size:.67rem; font-weight:600;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--gedaempft);
+  background:var(--flaeche-2); border-bottom:2px solid var(--linie);
+  white-space:nowrap; position:sticky; top:0; z-index:1;
+}
+td{ border-bottom:1px solid var(--linie); }
+tbody tr:last-child td{ border-bottom:none; }
+/* Zebra nur bei langen Listen - dort hilft es beim Zeilehalten. */
+tbody tr:nth-child(even){ background:color-mix(in srgb, var(--flaeche-2) 42%, transparent); }
+tbody tr:hover, tbody tr:nth-child(even):hover{ background:var(--flaeche-2); }
+td.rechts, th.rechts{ text-align:right; }
+td.zahl{ font-family:var(--schrift-mono); text-align:right; font-variant-numeric:tabular-nums; }
+
+.leer{
+  padding:var(--r6) var(--r4); text-align:center; color:var(--gedaempft);
+}
+.leer-zeichen{ font-size:2rem; display:block; margin-bottom:var(--r2); opacity:.5; }
+.leer strong{ display:block; color:var(--text); margin-bottom:var(--r1); }
+
+/* --- 10. Aufklapper ----------------------------------------------------- */
+details.block{
+  border:1px solid var(--linie); border-radius:var(--rund);
+  background:var(--flaeche); overflow:hidden;
+}
+details.block > summary{
+  list-style:none; cursor:pointer; padding:var(--r3) var(--r4);
+  font-weight:600; font-size:.9rem; color:var(--navy);
+  display:flex; align-items:center; gap:var(--r2);
+}
+details.block > summary::-webkit-details-marker{ display:none; }
+details.block > summary::before{
+  content:"▸"; font-size:.7rem; transition:transform var(--tempo) ease;
+}
+details.block[open] > summary::before{ transform:rotate(90deg); }
+details.block > summary:hover{ background:var(--flaeche-2); }
+details.block[open] > summary{ border-bottom:1px solid var(--linie); background:var(--flaeche-2); }
+.aufklapp-inhalt{ padding:var(--r4); }
+
+/* --- 11. Fortschritt ---------------------------------------------------- */
+.balken{
+  width:100%; height:.6rem; background:var(--flaeche-3);
+  border-radius:var(--rund-voll); overflow:hidden;
+}
+.balken > span{
+  display:block; height:100%; border-radius:var(--rund-voll);
+  background:var(--gruen); transition:width .3s ease;
+}
+.balken.blau > span{ background:var(--blau); }
+.balken.amber > span{ background:var(--amber); }
+.balken.rot > span{ background:var(--rot); }
+
+/* --- 12. Ladeplatzhalter ------------------------------------------------ */
+.platzhalter{
+  border-radius:var(--rund-klein);
+  background:linear-gradient(90deg, var(--flaeche-2) 25%, var(--linie) 37%, var(--flaeche-2) 63%);
+  background-size:400% 100%; animation:schimmer 1.4s ease-in-out infinite;
+}
+.platzhalter-block{ height:110px; border-radius:var(--rund); }
+@keyframes schimmer{ 0%{ background-position:100% 50%; } 100%{ background-position:0 50%; } }
+
+/* htmx: waehrend eine Anfrage laeuft, tritt der Bereich sichtbar zurueck.
+   Ohne das wirkt jeder Klick wie ohne Reaktion, bis die Antwort da ist. */
+.htmx-request, .htmx-request *{ cursor:progress; }
+#tab-inhalt.htmx-request{ opacity:.55; transition:opacity .12s ease; }
+
+/* --- 13. Kleinteile ----------------------------------------------------- */
+.kennzahlen{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(min(140px, 100%),1fr));
+  gap:var(--r3);
+}
+.kennzahl{
+  background:var(--flaeche-2); border:1px solid var(--linie);
+  border-radius:var(--rund-klein); padding:var(--r3) var(--r4);
+  display:flex; flex-direction:column; gap:.1rem; min-width:0;
+}
+.kennzahl-wert{
+  font-family:var(--schrift-titel); font-size:1.7rem; line-height:1.1;
+  color:var(--navy); font-variant-numeric:tabular-nums;
+}
+.kennzahl-name{ font-size:.76rem; color:var(--gedaempft); }
+.kennzahl-warnung{ border-color:var(--rot); }
+.kennzahl-warnung .kennzahl-wert{ color:var(--rot); }
+.kennzahl-gut .kennzahl-wert{ color:var(--gruen); }
+
+.trenner{
+  margin:var(--r6) 0 var(--r4); padding-top:var(--r5);
+  border-top:2px solid var(--linie);
+}
+.trenner h2{ margin:0 0 .15rem; font-size:1.2rem; color:var(--gedaempft); }
+
+/* --- In ein Passwortfeld hineinsehen -------------------------------------
+   Gemeldet: "richtiges Passwort, trotzdem falsch". Meist steht im Feld ein
+   alter Wert aus dem Passwortspeicher des Browsers, und man sieht nur
+   Punkte. Der Knopf sitzt im Feld, damit klar ist, wozu er gehoert. */
+.feld-mit-auge{ position:relative; display:block; }
+.feld-mit-auge input{ padding-right:5.6rem; }
+.auge{
+  position:absolute; right:.35rem; top:50%; transform:translateY(-50%);
+  min-height:0; padding:.3rem .55rem; border:1px solid var(--linie);
+  border-radius:var(--rund-klein); background:var(--flaeche-2);
+  color:var(--gedaempft); font-family:var(--schrift-mono);
+  font-size:.68rem; letter-spacing:.04em; text-transform:uppercase;
+  cursor:pointer;
+}
+.auge:hover{ color:var(--text); border-color:var(--linie-stark); }
+/* Auf dem Handy gross genug zum Treffen. */
+@media (pointer:coarse){ .auge{ padding:.45rem .6rem; } }

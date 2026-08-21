@@ -1,0 +1,844 @@
+/* ===========================================================================
+   Dashboard - die Arbeitsfläche
+   ===========================================================================
+   Ziel dieser Fassung: übersichtlicher als V1. Drei Dinge machen den
+   Unterschied.
+
+   1. Die Seitenleiste ist nach Häufigkeit sortiert und zeigt Zahlen an den
+      Stellen, wo etwas wartet. In V1 musste man jeden Bereich aufmachen, um
+      zu sehen, ob dort etwas liegt.
+   2. Jeder Bereich beginnt mit einer Kopfzeile aus Titel, Erklärung und
+      Werkzeugen - immer an derselben Stelle. Vorher fing jeder Tab anders an.
+   3. Die Übersicht ist eine echte Startseite mit Sofortbild statt einer
+      Kachelwand.
+   ========================================================================= */
+
+/* --- Rahmen -------------------------------------------------------------- */
+.dash{ display:flex; flex-direction:column; gap:var(--r4); }
+
+.dash-kopf{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:var(--r4); flex-wrap:wrap;
+  background:var(--flaeche); border:1px solid var(--linie);
+  border-radius:var(--rund); padding:var(--r4) var(--r5);
+  box-shadow:var(--schatten);
+}
+.dash-ich{
+  display:flex; align-items:center; gap:var(--r3); min-width:0;
+  padding:var(--r2) var(--r3); margin:calc(var(--r2) * -1) calc(var(--r3) * -1);
+  border:1px solid transparent; border-radius:var(--rund-klein);
+  color:inherit; text-decoration:none; cursor:pointer;
+  transition:background var(--tempo) ease, border-color var(--tempo) ease;
+}
+.dash-ich:hover{ background:var(--navy-hauch); border-color:var(--linie); text-decoration:none; }
+.dash-ich.aktiv{ background:var(--navy-hauch); border-color:var(--navy); }
+.dash-bild{
+  width:46px; height:46px; flex-shrink:0; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg, var(--navy-weich), var(--navy));
+  color:#fff; font-family:var(--schrift-titel); font-weight:700; font-size:1.05rem;
+}
+html[data-theme="dark"] .dash-bild{
+  background:linear-gradient(135deg, var(--navy), #A8C2F7); color:var(--navy-tief);
+}
+.dash-ich-text{ display:flex; flex-direction:column; gap:.15rem; min-width:0; }
+.dash-name{ font-family:var(--schrift-titel); font-size:1.1rem; line-height:1.2; }
+.dash-ich-meta{
+  display:flex; align-items:center; gap:.35rem; flex-wrap:wrap;
+  font-size:.78rem; color:var(--gedaempft);
+}
+.dash-konto-knopf{
+  display:inline-flex; align-items:center; gap:var(--r1); flex-shrink:0;
+  margin-left:var(--r2); padding:.4rem .75rem; border-radius:var(--rund-voll);
+  border:1px solid var(--linie); background:var(--flaeche-2); color:var(--navy);
+  font-family:var(--schrift-mono); font-size:.7rem; letter-spacing:.04em;
+  text-transform:uppercase; white-space:nowrap;
+}
+.dash-konto-knopf svg{ width:14px; height:14px; }
+.dash-ich:hover .dash-konto-knopf, .dash-ich.aktiv .dash-konto-knopf{
+  background:var(--navy); border-color:var(--navy); color:var(--navy-schrift);
+}
+.dash-werkzeuge{
+  display:flex; align-items:center; justify-content:flex-end;
+  gap:var(--r3); flex-wrap:wrap; flex:1 1 340px; margin-left:auto;
+}
+.dash-kanal{
+  display:inline-flex; align-items:center; gap:var(--r2); flex-shrink:0;
+  padding:.55rem .9rem; border-radius:var(--rund-voll);
+  border:1px solid var(--linie); background:var(--flaeche-2);
+  color:var(--text); text-decoration:none; font-size:.83rem; font-weight:500;
+  white-space:nowrap;
+  transition:border-color var(--tempo) ease, color var(--tempo) ease,
+             background var(--tempo) ease;
+}
+.dash-kanal svg{ width:17px; height:17px; flex-shrink:0; }
+.dash-kanal:hover{ text-decoration:none; }
+.dash-discord:hover{ border-color:#5865F2; color:#5865F2; background:rgba(88,101,242,.09); }
+.dash-whatsapp:hover{ border-color:#25D366; color:#1DA851; background:rgba(37,211,102,.1); }
+html[data-theme="dark"] .dash-whatsapp:hover{ color:#3BE07B; }
+
+@media (max-width:820px){
+  .dash-kopf{ padding:var(--r3) var(--r4); }
+  .dash-werkzeuge{ width:100%; margin-left:0; }
+  .dash-werkzeuge .suche-feld{ flex:1 1 100%; }
+  .dash-kanal{ flex:1 1 8rem; justify-content:center; }
+  .dash-konto-knopf{ margin-left:auto; }
+}
+
+/* --- Suche --------------------------------------------------------------- */
+.suche-feld{ position:relative; flex:1 1 260px; max-width:420px; }
+.suche-feld input{
+  width:100%; padding:.6rem 3.6rem .6rem .9rem;
+  border-radius:var(--rund-voll); background:var(--flaeche);
+}
+.suche-taste{
+  position:absolute; top:50%; right:.7rem; transform:translateY(-50%);
+  font-family:var(--schrift-mono); font-size:.66rem; color:var(--gedaempft);
+  background:var(--flaeche-2); border:1px solid var(--linie);
+  border-radius:4px; padding:.12rem .38rem; pointer-events:none;
+}
+.suche-feld input:focus ~ .suche-taste{ display:none; }
+.suche-treffer{
+  display:none; position:absolute; top:calc(100% + .4rem); left:0; right:0;
+  z-index:40; background:var(--flaeche); border:1px solid var(--linie);
+  border-radius:var(--rund); box-shadow:var(--schatten-hoch);
+  max-height:min(420px, 60vh); overflow-y:auto; padding:var(--r1);
+}
+.suche-treffer.offen{ display:block; }
+.suche-gruppe-titel{
+  display:block; padding:.3rem .6rem; font-family:var(--schrift-mono);
+  font-size:.66rem; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--gedaempft);
+}
+.suche-eintrag{
+  display:flex; align-items:center; justify-content:space-between; gap:var(--r2);
+  padding:.5rem .6rem; border-radius:var(--rund-klein);
+  color:var(--text); text-decoration:none; font-size:.86rem; width:100%;
+  border:0; background:none; text-align:left; cursor:pointer; min-height:0;
+}
+.suche-eintrag:hover, .suche-eintrag.aktiv{
+  background:var(--navy-hauch); color:var(--navy); text-decoration:none;
+}
+.suche-leer, .suche-laedt{ padding:var(--r3); color:var(--gedaempft); font-size:.85rem; }
+
+/* --- Raster: Leiste + Inhalt --------------------------------------------- */
+.dash-raster{
+  display:grid; grid-template-columns:232px minmax(0,1fr);
+  gap:var(--r6); align-items:start;
+}
+#tab-inhalt > * + *{ margin-top:var(--r4); }
+
+/* Die Leiste hat KEINEN eigenen Rollbalken. Zweimal rollen zu müssen - erst
+   im Menü, dann die Seite - war in V1 genau das, was störte. Solange das Menü
+   ins Fenster passt, klebt es oben fest; passt es nicht, läuft es einfach mit
+   der Seite mit (Klasse "mitlaufend", per Skript gesetzt). */
+.dash-leiste{
+  position:sticky; top:5.4rem; align-self:start;
+  display:flex; flex-direction:column; gap:var(--r5);
+}
+.dash-leiste.mitlaufend{ position:static; }
+.leisten-block{ display:flex; flex-direction:column; gap:1px; }
+.leisten-titel{
+  margin:0 0 var(--r1) .7rem; font-family:var(--schrift-mono);
+  font-size:.64rem; font-weight:500; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--gedaempft-2);
+}
+.leisten-punkt{
+  display:flex; align-items:center; gap:var(--r2);
+  padding:.5rem .7rem; border-radius:var(--rund-klein);
+  font-size:.91rem; color:var(--text); text-decoration:none;
+  border-left:3px solid transparent;
+  transition:background var(--tempo) ease, color var(--tempo) ease,
+             border-color var(--tempo) ease;
+}
+.leisten-punkt:hover{ background:var(--flaeche-2); color:var(--navy); text-decoration:none; }
+.leisten-punkt.aktiv{
+  background:var(--navy-hauch); color:var(--navy); font-weight:600;
+  border-left-color:var(--navy);
+}
+.leisten-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.leisten-punkt .zaehler{ flex-shrink:0; }
+
+.leisten-schalter{ display:none; }
+.leisten-schleier{ display:none; }
+.leisten-burger{ display:inline-flex; flex-direction:column; gap:3px; width:15px; }
+.leisten-burger span{ display:block; height:2px; background:currentColor; border-radius:2px; }
+
+@media (max-width:900px){
+  .dash-raster{ grid-template-columns:minmax(0,1fr); gap:0; }
+  .leisten-schalter{
+    display:flex; align-items:center; gap:var(--r3); width:100%;
+    margin:0 0 var(--r4); padding:.7rem 1rem;
+    border:1px solid var(--linie); border-radius:var(--rund-klein);
+    background:var(--flaeche); color:var(--text);
+    font-size:.92rem; font-weight:600; justify-content:flex-start;
+  }
+  .leisten-schalter:hover{ background:var(--flaeche-2); color:var(--text); }
+  .leisten-schalter .zaehler{ margin-left:auto; }
+  .dash-leiste{
+    position:fixed; top:0; left:0; bottom:0; width:min(280px, 84vw); z-index:60;
+    background:var(--flaeche); border-right:1px solid var(--linie);
+    /* Gleiche Rechnung wie bei der Kopfleiste: Die Schublade beginnt bei
+       top:0, also im App-Modus hinter der Uhr. */
+    padding:calc(var(--r5) + env(safe-area-inset-top, 0px)) var(--r4)
+            calc(var(--r5) + env(safe-area-inset-bottom, 0px))
+            calc(var(--r4) + env(safe-area-inset-left, 0px));
+    overflow-y:auto; overscroll-behavior:contain;
+    transform:translateX(-100%); transition:transform .22s ease;
+    box-shadow:0 0 40px rgba(8,15,26,.18);
+    /* Höhe ausdrücklich setzen, nicht über top/bottom aufspannen lassen: für
+       ein herausgelöstes Rasterkind gilt align-items:start, der Kasten
+       schrumpfte sonst auf seinen Inhalt und die unteren Einträge lägen
+       unerreichbar außerhalb des Bildschirms. dvh, weil die Adressleiste
+       mobiler Browser beim Scrollen ein- und ausfährt. */
+    align-self:stretch; height:100vh; height:100dvh;
+  }
+  /* Die Schublade beginnt bei top:0, also im App-Modus ebenfalls hinter der
+     Uhr. Gleiche Rechnung wie bei der Kopfleiste. */
+  html[data-app] .dash-leiste{
+    padding-top:calc(var(--r3) + max(env(safe-area-inset-top, 0px), 2.9rem));
+  }
+  .dash-leiste.offen{ transform:translateX(0); }
+  .leisten-schleier:not([hidden]){
+    display:block; position:fixed; inset:0; z-index:55; background:rgba(8,15,26,.45);
+  }
+  .leisten-punkt{ padding:.65rem .8rem; }
+}
+
+/* --- Bereichskopf -------------------------------------------------------- */
+/* Jeder Bereich fängt gleich an: Titel links, Werkzeuge rechts, Erklärung
+   darunter. In V1 begann jeder Tab anders und man musste jedes Mal neu
+   suchen, wo der "Neu"-Knopf steckt. */
+.bereich-kopf{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:var(--r4); flex-wrap:wrap; margin-bottom:var(--r4);
+}
+.bereich-kopf h1{ font-size:1.55rem; margin:0; }
+.bereich-kopf .meta{ margin-top:.15rem; max-width:62ch; }
+.bereich-werkzeuge{ display:flex; gap:var(--r2); flex-wrap:wrap; align-items:center; }
+
+/* Filterleiste über Listen */
+.filter{
+  display:flex; gap:var(--r2); flex-wrap:wrap; align-items:center;
+  padding:var(--r3) var(--r4); background:var(--flaeche-2);
+  border:1px solid var(--linie); border-radius:var(--rund);
+}
+.filter label{ flex-direction:row; align-items:center; gap:var(--r2); font-size:.8rem; }
+.filter select, .filter input{ min-height:2.2rem; padding:.35rem .6rem; font-size:.85rem; }
+.filter-marke{
+  display:inline-flex; align-items:center; gap:var(--r1);
+  padding:.3rem .7rem; border-radius:var(--rund-voll);
+  border:1px solid var(--linie); background:var(--flaeche);
+  font-size:.8rem; color:var(--text); cursor:pointer; text-decoration:none;
+}
+.filter-marke:hover{ border-color:var(--navy); color:var(--navy); text-decoration:none; }
+.filter-marke.aktiv{ background:var(--navy); border-color:var(--navy); color:var(--navy-schrift); }
+
+/* --- Suchleiste über einer Liste ----------------------------------------- */
+.suchleiste{
+  display:flex; align-items:center; gap:var(--r2);
+  background:var(--flaeche); border:1px solid var(--linie);
+  border-radius:var(--rund-voll); padding:.2rem .3rem .2rem .9rem;
+  margin-bottom:var(--r4);
+}
+.suchleiste:focus-within{ border-color:var(--blau); }
+.such-zeichen{ display:flex; color:var(--gedaempft-2); flex-shrink:0; }
+.suchleiste input{
+  flex:1 1 auto; min-width:0; border:none; background:none; padding:.5rem 0;
+  min-height:2.2rem; font-size:.9rem;
+}
+.suchleiste input:hover, .suchleiste input:focus{ border:none; background:none; }
+.suchleiste input:focus{ outline:none; }
+/* Das Kreuzchen, das manche Browser selbst einbauen, würde neben unserem
+   stehen. */
+.suchleiste input::-webkit-search-cancel-button{ display:none; }
+.such-zahl{ flex-shrink:0; font-size:.75rem; white-space:nowrap; }
+.such-leeren{
+  flex-shrink:0; width:1.9rem; height:1.9rem; min-height:0; padding:0;
+  border-radius:50%; background:var(--flaeche-2); color:var(--gedaempft);
+  border:1px solid var(--linie); font-size:1.1rem; line-height:1;
+}
+.such-leeren:hover{ background:var(--gefahr); color:#fff; border-color:transparent; }
+.such-nichts{ text-align:center; color:var(--gedaempft); }
+@media (max-width:560px){
+  .such-zahl{ display:none; }
+}
+
+/* --- Übersicht ----------------------------------------------------------- */
+.uebersicht-aufmacher{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:var(--r4); flex-wrap:wrap;
+}
+.uebersicht-naechstes{
+  display:flex; flex-direction:column; gap:.1rem; flex-shrink:0;
+  padding:var(--r3) var(--r4); border-left:3px solid var(--amber);
+  background:var(--flaeche-2); border-radius:var(--rund-klein);
+}
+@media (max-width:720px){ .uebersicht-naechstes{ width:100%; } }
+
+.liste{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+.liste li{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:var(--r3); padding:var(--r3) 0; border-bottom:1px dashed var(--linie);
+  font-size:.89rem;
+}
+.liste li:last-child{ border-bottom:none; }
+.liste-links{ display:flex; flex-direction:column; gap:.1rem; min-width:0; }
+.liste-links strong{ font-weight:600; overflow-wrap:anywhere; }
+.liste-rechts{ display:flex; align-items:center; gap:var(--r2); flex-shrink:0; }
+
+/* --- Aufgabenkarten ------------------------------------------------------ */
+.aufgabe{
+  border:1px solid var(--linie); border-radius:var(--rund);
+  background:var(--flaeche); overflow:hidden;
+  border-left:4px solid var(--rang, var(--gedaempft));
+}
+.aufgabe.rang-hoch{ --rang:var(--rot); }
+.aufgabe.rang-mittel{ --rang:var(--amber); }
+.aufgabe.rang-niedrig{ --rang:var(--gedaempft); }
+.aufgabe.ist-erledigt{ opacity:.72; }
+.aufgabe-kopf{
+  display:flex; align-items:flex-start; gap:var(--r3);
+  padding:var(--r3) var(--r4); cursor:pointer; list-style:none;
+}
+.aufgabe-kopf::-webkit-details-marker{ display:none; }
+.aufgabe-kopf:hover{ background:var(--flaeche-2); }
+.aufgabe-titel{ flex:1; min-width:0; display:flex; flex-direction:column; gap:.2rem; }
+.aufgabe-titel strong{ font-size:.96rem; overflow-wrap:anywhere; }
+.aufgabe.ist-erledigt .aufgabe-titel strong{ text-decoration:line-through; }
+.aufgabe-marken{ display:flex; gap:.3rem; flex-wrap:wrap; align-items:center; }
+.aufgabe-koerper{ padding:0 var(--r4) var(--r4); border-top:1px dashed var(--linie); }
+.aufgabe-koerper > * + *{ margin-top:var(--r3); }
+.aufgabe-beschreibung{ white-space:pre-wrap; font-size:.9rem; margin-top:var(--r3); }
+
+.checkliste{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:2px; }
+.checkliste li{ display:flex; align-items:center; gap:var(--r2); font-size:.87rem; }
+.checkliste form{ display:inline; flex-direction:row; gap:0; }
+.checkliste .erledigt{ text-decoration:line-through; color:var(--gedaempft); }
+
+.verlauf{ display:flex; flex-direction:column; gap:var(--r2); }
+.verlauf-eintrag{
+  display:flex; gap:var(--r3); padding:var(--r2) 0;
+  border-bottom:1px solid var(--linie); font-size:.87rem;
+}
+.verlauf-eintrag:last-child{ border-bottom:none; }
+.verlauf-wer{ font-weight:600; flex-shrink:0; }
+
+/* --- Leadership ---------------------------------------------------------- */
+.leistung-zeile{
+  display:grid; grid-template-columns:2rem minmax(0,1.6fr) repeat(5, minmax(0,1fr)) auto;
+  gap:var(--r3); align-items:center; padding:var(--r3) var(--r4);
+  border-bottom:1px solid var(--linie);
+}
+.leistung-zeile:last-child{ border-bottom:none; }
+.leistung-kopf{
+  font-family:var(--schrift-mono); font-size:.64rem; text-transform:uppercase;
+  letter-spacing:.07em; color:var(--gedaempft); background:var(--flaeche-2);
+}
+.leistung-platz{
+  font-family:var(--schrift-titel); font-size:1.05rem; color:var(--gedaempft-2);
+  text-align:center;
+}
+.leistung-platz.oben{ color:var(--amber); }
+.leistung-person{ display:flex; flex-direction:column; gap:.1rem; min-width:0; }
+.leistung-wert{ display:flex; flex-direction:column; gap:.2rem; min-width:0; }
+.leistung-wert b{ font-family:var(--schrift-mono); font-size:.82rem; font-variant-numeric:tabular-nums; }
+.leistung-gesamt{
+  font-family:var(--schrift-titel); font-size:1.35rem; color:var(--navy);
+  text-align:right; font-variant-numeric:tabular-nums;
+}
+@media (max-width:1000px){
+  .leistung-zeile{ grid-template-columns:2rem minmax(0,1fr) auto; }
+  .leistung-kopf{ display:none; }
+  .leistung-wert{
+    grid-column:2 / -1; flex-direction:row; align-items:center; gap:var(--r2);
+  }
+  .leistung-wert .balken{ flex:1; }
+}
+
+/* --- Rollenverwaltung ---------------------------------------------------- */
+.rollen-karte{
+  background:var(--flaeche); border:1px solid var(--linie);
+  border-radius:var(--rund); box-shadow:var(--schatten); overflow:hidden;
+}
+.rollen-kopf{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:var(--r4); flex-wrap:wrap; padding:var(--r4);
+}
+.rollen-titel{ display:flex; align-items:center; gap:var(--r2); flex-wrap:wrap; min-width:0; }
+.rollen-titel strong{ font-family:var(--schrift-titel); font-size:1.05rem; }
+.rollen-titel code{
+  font-size:.72rem; color:var(--gedaempft-2); background:var(--flaeche-2);
+  padding:.14rem .4rem; border-radius:4px;
+}
+.rollen-stand{ display:flex; align-items:center; gap:var(--r2); flex-shrink:0; }
+.rollen-stand .balken{ width:96px; height:5px; }
+.rollen-gruppen{
+  display:flex; flex-wrap:wrap; gap:var(--r2);
+  padding:0 var(--r4) var(--r4); border-bottom:1px solid var(--linie);
+}
+.rollen-gruppe{
+  display:flex; align-items:baseline; gap:var(--r1);
+  background:var(--navy-hauch); border-radius:var(--rund-klein);
+  padding:.28rem .6rem; font-size:.78rem; color:var(--navy);
+}
+.rollen-gruppe b{ font-family:var(--schrift-mono); font-size:.72rem; }
+.rollen-gruppe.leer{ background:var(--flaeche-2); color:var(--gedaempft-2); }
+
+.rechte-spalten{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(min(240px, 100%),1fr)); gap:var(--r3);
+}
+.rechte-gruppe{
+  border:1px solid var(--linie); border-radius:var(--rund-klein);
+  padding:var(--r2) var(--r3) var(--r3); margin:0; min-width:0;
+}
+.rechte-gruppe legend{
+  padding:0 var(--r1); font-family:var(--schrift-mono); font-size:.64rem;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--gedaempft);
+}
+.vorlagen-reihe{ display:flex; align-items:center; gap:var(--r1); flex-wrap:wrap; }
+.vorlagen-titel{
+  font-family:var(--schrift-mono); font-size:.64rem; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--gedaempft-2); margin-right:var(--r1);
+}
+.vorlagen-reihe button{
+  padding:.3rem .7rem; min-height:0; font-size:.75rem; font-weight:500;
+  background:var(--flaeche-2); color:var(--text); border-color:var(--linie);
+  border-radius:var(--rund-voll);
+}
+.vorlagen-reihe button:hover{
+  border-color:var(--navy); color:var(--navy); background:var(--navy-hauch);
+}
+
+/* --- Empfängerauswahl ---------------------------------------------------- */
+.empfaenger-kasten{
+  border:1px solid var(--linie); border-radius:var(--rund);
+  background:var(--flaeche-2); padding:var(--r3) var(--r4);
+}
+.empfaenger-kopf{
+  display:flex; align-items:center; gap:var(--r3); flex-wrap:wrap;
+  padding-bottom:var(--r3); margin-bottom:var(--r3);
+  border-bottom:1px solid var(--linie);
+}
+.empfaenger-kopf input[type="search"]{ flex:1 1 12rem; min-width:0; }
+.empfaenger-liste{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(min(230px, 100%),1fr)); gap:1px;
+  max-height:320px; overflow-y:auto; overscroll-behavior:contain;
+}
+.empfaenger-wege{ display:flex; gap:.2rem; flex-shrink:0; margin-left:auto; }
+.weg-marke{
+  font-family:var(--schrift-mono); font-size:.6rem; letter-spacing:.03em;
+  padding:.08rem .3rem; border-radius:3px;
+  background:var(--flaeche); border:1px solid var(--linie); color:var(--gedaempft);
+}
+.weg-nur-mail{ border-color:var(--amber); color:var(--amber); }
+
+/* --- Datenbank ----------------------------------------------------------- */
+.db-kacheln{ display:grid; grid-template-columns:repeat(auto-fill,minmax(min(165px, 100%),1fr)); gap:var(--r2); }
+.db-kachel{
+  display:flex; flex-direction:column; gap:.1rem; min-width:0;
+  background:var(--flaeche-2); border:1px solid var(--linie);
+  border-radius:var(--rund-klein); padding:var(--r3);
+  color:var(--text); text-decoration:none;
+}
+.db-kachel:hover{ border-color:var(--navy); background:var(--navy-hauch); text-decoration:none; }
+.db-kachel b{ font-family:var(--schrift-titel); font-size:1.4rem; line-height:1.1; color:var(--navy); }
+.db-kachel span{ font-size:.84rem; font-weight:600; overflow-wrap:anywhere; }
+.db-kachel small{ font-family:var(--schrift-mono); font-size:.66rem; color:var(--gedaempft-2); }
+.db-kachel.leer-kachel{ opacity:.6; }
+.db-kachel.leer-kachel b{ color:var(--gedaempft-2); }
+.db-roh{ font-size:.8rem; }
+.db-roh td{ white-space:nowrap; max-width:22rem; overflow:hidden; text-overflow:ellipsis; }
+.db-roh th{ white-space:nowrap; font-size:.64rem; }
+
+/* --- WhatsApp-Korb ------------------------------------------------------- */
+.wa-eintrag{
+  display:flex; align-items:flex-start; gap:var(--r3);
+  padding:var(--r3) 0; border-bottom:1px solid var(--linie);
+}
+.wa-eintrag:last-child{ border-bottom:none; }
+.wa-text{
+  flex:1; min-width:0; font-size:.86rem; white-space:pre-wrap;
+  max-height:5.5rem; overflow:hidden; position:relative;
+}
+.wa-text.offen{ max-height:none; }
+.wa-vorschau{
+  background:var(--flaeche-2); border:1px solid var(--linie);
+  border-left:3px solid #25D366; border-radius:var(--rund-klein);
+  padding:var(--r3) var(--r4); white-space:pre-wrap; font-size:.88rem;
+  line-height:1.6; max-height:22rem; overflow-y:auto;
+}
+.platzhalter-marke{
+  display:inline-block; margin:.12rem .22rem .12rem 0; padding:.1rem .4rem;
+  border-radius:4px; background:var(--flaeche-2); border:1px solid var(--linie);
+  font-family:var(--schrift-mono); font-size:.74rem; color:var(--navy);
+  cursor:pointer;
+}
+.platzhalter-marke:hover{ border-color:var(--navy); background:var(--navy-hauch); }
+
+/* --- Startseiten-Blöcke bearbeiten --------------------------------------- */
+.block-zeile{
+  display:grid; grid-template-columns:auto minmax(0,1fr) auto;
+  gap:var(--r3); align-items:start;
+  padding:var(--r3); border:1px solid var(--linie);
+  border-radius:var(--rund-klein); background:var(--flaeche);
+  border-left:4px solid var(--block, var(--linie));
+}
+.block-griff{ display:flex; flex-direction:column; gap:2px; }
+.block-griff button{ padding:.15rem .45rem; min-height:0; font-size:.7rem; }
+/* Mit dem Finger: die Pfeile zum Verschieben waren 26x21 Pixel gross - das
+   trifft niemand zuverlaessig. Auf Geraeten ohne Mauszeiger werden sie zu
+   einer richtigen Flaeche. */
+@media (pointer:coarse){
+  .block-griff button{ min-height:36px; min-width:36px; font-size:.85rem; }
+  .filter-marke{ min-height:34px; }
+  .btn-klein{ min-height:2.4rem; }
+  .vorlagen-reihe button{ min-height:34px; }
+}
+.block-inhalt{ min-width:0; display:flex; flex-direction:column; gap:var(--r1); }
+.block-inaktiv{ opacity:.55; }
+
+/* --- Systemzustand ------------------------------------------------------- */
+.zustand-liste{ display:flex; flex-direction:column; gap:var(--r2); }
+.zustand-punkt{
+  display:flex; align-items:flex-start; gap:var(--r3);
+  padding:var(--r3); border-radius:var(--rund-klein); background:var(--flaeche-2);
+  font-size:.87rem;
+}
+.zustand-lampe{
+  width:.6rem; height:.6rem; border-radius:50%; flex-shrink:0; margin-top:.45rem;
+  background:var(--gedaempft);
+}
+.zustand-gut .zustand-lampe{ background:var(--gruen); }
+.zustand-warnung .zustand-lampe{ background:var(--amber); }
+.zustand-schlecht .zustand-lampe{ background:var(--rot); }
+.zustand-punkt > div{ min-width:0; }
+.zustand-punkt strong{ display:block; }
+.zustand-punkt span{ color:var(--gedaempft); overflow-wrap:anywhere; }
+
+/* --- Diagramme ----------------------------------------------------------- */
+.diagramm{ width:100%; height:auto; overflow:visible; }
+.diagramm text{ font-family:var(--schrift-mono); font-size:11px; fill:var(--gedaempft); }
+.diagramm .wert{ fill:var(--text); font-weight:600; }
+.diagramm-legende{ display:flex; flex-wrap:wrap; gap:var(--r3); margin-top:var(--r3); font-size:.82rem; }
+.diagramm-legende span{ display:inline-flex; align-items:center; gap:var(--r1); }
+.legende-punkt{ width:.7rem; height:.7rem; border-radius:3px; flex-shrink:0; }
+
+/* --- Balkendiagramm ------------------------------------------------------ */
+.balken-diagramm{ display:flex; flex-direction:column; gap:var(--r2); }
+.balken-zeile{
+  display:grid; grid-template-columns:minmax(5rem,9rem) 1fr auto;
+  gap:var(--r3); align-items:center;
+}
+.balken-name{ font-size:.83rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.balken-zahl{
+  font-family:var(--schrift-mono); font-size:.8rem; font-variant-numeric:tabular-nums;
+  min-width:2.5rem; text-align:right;
+}
+@media (max-width:560px){
+  .balken-zeile{ grid-template-columns:1fr auto; }
+  .balken-zeile .balken{ grid-column:1 / -1; }
+}
+
+/* --- WhatsApp-Kopplung --------------------------------------------------- */
+.wa-kopplung-kasten{
+  display:flex; gap:var(--r5); flex-wrap:wrap; align-items:flex-start;
+  padding:var(--r4); background:var(--flaeche-2);
+  border:1px solid var(--linie); border-radius:var(--rund);
+}
+.wa-qr{
+  flex-shrink:0; background:#fff; padding:var(--r3);
+  border-radius:var(--rund-klein); border:1px solid var(--linie);
+  line-height:0;
+}
+.wa-qr img{ display:block; width:320px; height:320px; max-width:100%; }
+.wa-kopplung-text{ flex:1 1 16rem; min-width:0; }
+.wa-kopplung-text strong{ display:block; margin-bottom:var(--r2); font-size:1.02rem; }
+.wa-kopplung-text ol{ margin:0 0 var(--r3) 1.1rem; line-height:1.8; font-size:.92rem; }
+
+.wa-zustand{
+  display:flex; align-items:flex-start; gap:var(--r3);
+  padding:var(--r4); background:var(--flaeche-2);
+  border:1px solid var(--linie); border-radius:var(--rund);
+}
+.wa-zustand > div{ min-width:0; }
+.wa-zustand p{ margin:.2rem 0 0; }
+.wa-lampe{
+  width:.65rem; height:.65rem; border-radius:50%; flex-shrink:0;
+  margin-top:.45rem; background:var(--gedaempft);
+}
+.wa-bereit{ border-color:color-mix(in srgb, var(--gruen) 40%, transparent); }
+.wa-bereit .wa-lampe{ background:var(--gruen); }
+.wa-warnung .wa-lampe{ background:var(--amber); }
+.wa-schlecht{ border-color:color-mix(in srgb, var(--rot) 40%, transparent); }
+.wa-schlecht .wa-lampe{ background:var(--rot); }
+@media (max-width:640px){
+  .wa-qr img{ width:100%; height:auto; }
+  .wa-qr{ width:100%; }
+}
+
+/* --- Übersicht ----------------------------------------------------------- */
+.uebersicht-kopf{
+  display:flex; align-items:flex-end; justify-content:space-between;
+  gap:var(--r5); flex-wrap:wrap; padding:var(--r2) 0 var(--r1);
+}
+.uebersicht-gruss{ min-width:0; }
+.uebersicht-gruss h1{ font-size:clamp(1.6rem, 1.2rem + 1.4vw, 2.1rem); margin:0; }
+.uebersicht-lage{
+  margin:var(--r2) 0 0; color:var(--gedaempft); font-size:1rem;
+}
+.uebersicht-lage strong{ color:var(--text); }
+/* Der nächste Termin ist ein Knopf, kein Kasten: man will ihn anklicken. */
+.uebersicht-naechstes{
+  display:flex; flex-direction:column; align-items:flex-start; gap:.1rem;
+  flex-shrink:0; text-align:left; min-height:0;
+  padding:var(--r3) var(--r4); border-radius:var(--rund-klein);
+  border:1px solid var(--linie); border-left:3px solid var(--amber);
+  background:var(--flaeche); color:var(--text); font-weight:400;
+}
+.uebersicht-naechstes:hover{
+  background:var(--flaeche-2); color:var(--text); border-left-color:var(--amber);
+}
+.uebersicht-naechstes strong{ font-size:.98rem; }
+@media (max-width:720px){ .uebersicht-naechstes{ width:100%; } }
+
+/* --- Wochenleiste -------------------------------------------------------- */
+.woche-leiste{
+  display:grid; grid-template-columns:repeat(7, 1fr); gap:var(--r2);
+  list-style:none; margin:0; padding:0;
+}
+.woche-tag{
+  display:flex; flex-direction:column; align-items:center; gap:.15rem;
+  padding:var(--r3) var(--r1); border-radius:var(--rund-klein);
+  background:var(--flaeche-2); border:1px solid transparent;
+}
+.woche-tag.wochenende{ background:transparent; }
+.woche-tag.ist-heute{
+  border-color:var(--navy); background:var(--navy-hauch);
+}
+.woche-kurz{
+  font-family:var(--schrift-mono); font-size:.66rem; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--gedaempft);
+}
+.woche-zahl{
+  font-family:var(--schrift-titel); font-size:1.25rem; line-height:1.1;
+  color:var(--text);
+}
+.woche-tag.ist-heute .woche-zahl,
+.woche-tag.ist-heute .woche-kurz{ color:var(--navy); font-weight:600; }
+/* Punkte statt Zahlen: drei Punkte liest man schneller als eine "3", und
+   bei null bleibt die Zeile ruhig statt eine Null zu zeigen. */
+.woche-punkte{ display:flex; gap:2px; min-height:.45rem; margin-top:.15rem; }
+.woche-punkte i{
+  width:.3rem; height:.3rem; border-radius:50%; background:var(--amber);
+}
+.woche-tag.ist-heute .woche-punkte i{ background:var(--navy); }
+
+/* --- Wartet auf dich ----------------------------------------------------- */
+.wartet-liste{ list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column; gap:var(--r2); }
+.wartet-knopf{
+  display:flex; align-items:center; gap:var(--r3); width:100%;
+  justify-content:flex-start; text-align:left;
+  padding:var(--r3) var(--r4); border-radius:var(--rund-klein);
+  background:var(--flaeche-2); color:var(--text); border:1px solid var(--linie);
+  font-weight:400;
+}
+.wartet-knopf:hover{
+  background:var(--navy-hauch); color:var(--navy); border-color:var(--navy);
+}
+.wartet-knopf.dringend{
+  background:color-mix(in srgb, var(--rot) 8%, transparent);
+  border-color:color-mix(in srgb, var(--rot) 32%, transparent);
+}
+.wartet-knopf.dringend:hover{
+  background:color-mix(in srgb, var(--rot) 16%, transparent); color:var(--text);
+}
+/* Siehe die Meldungen in basis.css: im Dunkeln in die Flaeche mischen. */
+html[data-theme="dark"] .wartet-knopf.dringend{
+  background:color-mix(in srgb, var(--rot) 14%, var(--flaeche));
+}
+html[data-theme="dark"] .wartet-knopf.dringend:hover{
+  background:color-mix(in srgb, var(--rot) 26%, var(--flaeche));
+}
+.wartet-zahl{
+  font-family:var(--schrift-titel); font-size:1.35rem; line-height:1;
+  min-width:2rem; text-align:right; color:var(--navy);
+}
+.wartet-knopf.dringend .wartet-zahl{ color:var(--rot); }
+.wartet-text{ flex:1; min-width:0; }
+.wartet-pfeil{ flex-shrink:0; color:var(--gedaempft); display:flex; }
+.wartet-knopf:hover .wartet-pfeil{ color:inherit; }
+
+/* --- Dein Stand ---------------------------------------------------------- */
+.stand-zahl{ display:flex; flex-direction:column; gap:.1rem; }
+.stand-zahl b{
+  font-family:var(--schrift-titel); font-size:2.6rem; line-height:1;
+  color:var(--navy); font-variant-numeric:tabular-nums;
+}
+.stand-zahl > span{ font-size:.86rem; color:var(--gedaempft); }
+.stand-trend{ font-size:.8rem !important; margin-top:.2rem; }
+.stand-trend.hoch{ color:var(--gruen); }
+.stand-trend.runter{ color:var(--amber); }
+
+/* --- Symbole ------------------------------------------------------------- */
+.zeichen{ display:inline-block; vertical-align:-.15em; }
+.leer-zeichen .zeichen{ opacity:.45; }
+
+/* --- Was nach dem Umzug offen ist ---------------------------------------
+   Auffaellig, aber keine Fehlermeldung: Es ist nichts kaputt, es fehlt nur
+   ein Handgriff. Deshalb der bernsteinfarbene Rand statt eines roten. */
+.umzug-liste{ border-top:3px solid var(--amber); }
+.umzug-punkte{ list-style:none; margin:0; padding:0; }
+.umzug-punkte li{
+  display:flex; align-items:center; gap:var(--r3); flex-wrap:wrap;
+  padding:var(--r3) 0; border-top:1px solid var(--rand);
+}
+.umzug-punkte li:first-child{ border-top:0; }
+/* 320 statt 280: Darunter bleiben vom Satz drei Woerter je Zeile uebrig,
+   waehrend der Knopf daneben Platz frisst. Dann lieber umbrechen. */
+.umzug-punkte li > div{ flex:1 1 min(320px, 100%); }
+.umzug-punkte strong{ display:block; }
+.umzug-punkte .meta{ margin:.2rem 0 0; }
+/* Zwei Knoepfe nebeneinander - unter der Umzugsliste wie unter dem
+   Hinweis auf das Startpasswort. */
+.knopfpaar{ display:flex; gap:var(--r2); flex-wrap:wrap; align-items:center; }
+@media (max-width:520px){
+  /* Auf dem Handy ueber die ganze Breite - ein Knopf, den man nicht trifft,
+     ist kein Knopf. */
+  .knopfpaar{ width:100%; }
+  .knopfpaar button{ flex:1 1 100%; }
+}
+
+/* --- Ersatzcodes fuer den zweiten Faktor --------------------------------
+   Zum Abschreiben gedacht: gross genug, in zwei Spalten, mit Nummern. Wer
+   sie abtippt, soll die Zeile nicht verlieren. */
+.ersatzcodes{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(min(160px,100%), 1fr));
+  gap:.4rem 1.2rem; margin:0 0 var(--r3); padding:var(--r3) var(--r3) var(--r3) 2.4rem;
+  border:1px solid var(--linie); border-radius:var(--rund);
+  background:var(--flaeche-2);
+}
+.ersatzcodes li{
+  font-family:var(--schrift-mono); font-size:1rem; letter-spacing:.06em;
+  padding:.15rem 0;
+}
+
+/* --- Treffen: Zu- und Absage, Tagesordnung ------------------------------- */
+.treffen-antwort{
+  display:flex; align-items:center; gap:var(--r3); flex-wrap:wrap;
+  padding:var(--r3); margin-bottom:var(--r3);
+  border:1px solid var(--linie); border-radius:var(--rund);
+  background:var(--flaeche-2);
+}
+.treffen-antwort > div:first-child{ flex:1 1 min(240px, 100%); }
+.treffen-antwort .meta{ margin:.15rem 0 0; }
+.treffen-absage summary{ list-style:none; cursor:pointer; }
+.treffen-absage summary::-webkit-details-marker{ display:none; }
+.treffen-absage[open]{ flex:1 1 100%; margin-top:var(--r2); }
+
+.tagesordnung{ list-style:none; margin:0 0 var(--r3); padding:0; }
+.tagesordnung li{
+  display:flex; align-items:center; gap:var(--r2); flex-wrap:wrap;
+  padding:.45rem 0; border-top:1px solid var(--rand);
+}
+.tagesordnung li:first-child{ border-top:0; }
+.tagesordnung .tagesordnung-text{ flex:1 1 min(200px, 100%); }
+.tagesordnung li.abgehakt .tagesordnung-text{
+  text-decoration:line-through; color:var(--gedaempft);
+}
+/* Der Abhak-Knopf ist rund und gross genug zum Treffen - er wird auf dem
+   Handy mitten im Treffen bedient. */
+.haken-knopf{
+  width:2rem; height:2rem; min-height:0; padding:0; border-radius:50%;
+  background:transparent; border:1px solid var(--linie);
+  color:var(--gedaempft); font-size:1rem; line-height:1;
+}
+.haken-knopf:hover{ border-color:var(--navy); color:var(--text); }
+
+/* Derselbe Kreis fuer die, die nur zusehen. Gleiche Groesse und Stelle wie
+   der Knopf, damit die Liste nicht verrutscht, je nachdem wer sie ansieht -
+   aber ohne Rahmen und ohne Zeigefinger: Was nicht klickbar ist, soll auch
+   nicht danach aussehen. */
+.haken-stand{
+  width:2rem; height:2rem; flex:0 0 auto; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  color:var(--gedaempft); font-size:1rem; line-height:1;
+}
+
+/* Das Einspielen einer Sicherung klappt erst auf - ein Knopf allein waere zu
+   nah am Herunterladen. */
+.einspielen{ display:inline-block; margin-left:var(--r2); }
+.einspielen summary{ list-style:none; cursor:pointer; display:inline-flex; }
+.einspielen summary::-webkit-details-marker{ display:none; }
+.einspielen[open]{ display:block; margin:var(--r2) 0 0; text-align:left; }
+.einspielen .formular{ margin-top:var(--r2); }
+
+/* --- Mein Konto: Gliederung ---------------------------------------------
+   Die Seite war eine Reihe gleich aussehender Kästen ohne Ordnung. Die
+   Abschnittsüberschriften trennen sie in vier Gruppen; die feine Linie
+   darüber macht den Schnitt sichtbar, ohne laut zu sein. */
+.konto-abschnitt{
+  margin:var(--r7) 0 var(--r3);
+  padding-top:var(--r3);
+  border-top:1px solid var(--linie);
+  font-family:var(--schrift-mono); font-size:.72rem; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--gedaempft); font-weight:600;
+}
+.konto-abschnitt:first-of-type{ margin-top:var(--r5); }
+
+/* Der Steckbrief ganz oben: wer bin ich hier. */
+.steckbrief{
+  display:flex; align-items:center; gap:var(--r3); flex-wrap:wrap;
+  padding:var(--r4); margin-bottom:var(--r3);
+  background:var(--flaeche); border:1px solid var(--linie);
+  border-radius:var(--rund);
+}
+.steckbrief-kreis{
+  display:flex; align-items:center; justify-content:center;
+  width:2.9rem; height:2.9rem; border-radius:50%; flex-shrink:0;
+  background:var(--navy-hauch); color:var(--navy);
+  font-family:var(--schrift-titel); font-weight:700; font-size:1rem;
+}
+.steckbrief-text{ display:flex; flex-direction:column; min-width:0; flex:1 1 12rem; }
+.steckbrief-text strong{ font-size:1.05rem; }
+.steckbrief-text .meta{ overflow-wrap:anywhere; }
+.steckbrief-marken{
+  display:flex; align-items:center; gap:var(--r2); flex-wrap:wrap;
+  margin-left:auto;
+}
+@media (max-width:520px){
+  .steckbrief-marken{ margin-left:0; }
+}
+
+/* Das Löschen des eigenen Kontos - abgesetzt, ganz unten. */
+.gefahr-block{ border-left:4px solid var(--rot); margin-top:var(--r4); }
+.gefahr-block > summary{ color:var(--rot); }
+
+/* --- Der schwebende Meldungsplatz ---------------------------------------
+   Die Antwort des Servers stand vorher immer ganz oben im Bereich. Wer
+   unten in einem Formular etwas abschickte, sah sie nicht und wurde
+   zusaetzlich nach oben geworfen. Jetzt haengt sie unten im Bild - die
+   Seite bewegt sich nicht mehr. */
+#meldungsplatz{
+  position:fixed; z-index:9000; left:50%; transform:translateX(-50%);
+  bottom:max(1rem, env(safe-area-inset-bottom, 0));
+  width:min(560px, calc(100vw - 2rem));
+  pointer-events:none;
+}
+#meldungsplatz .meldung{
+  pointer-events:auto; margin:0; cursor:pointer;
+  box-shadow:0 16px 40px rgba(8,15,26,.28);
+  border:1px solid var(--linie);
+  animation:meldung-herein .18s ease-out;
+}
+html[data-theme="dark"] #meldungsplatz .meldung{
+  box-shadow:0 16px 44px rgba(0,0,0,.6);
+}
+@keyframes meldung-herein{
+  from{ opacity:0; transform:translateY(8px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+@media (prefers-reduced-motion:reduce){
+  #meldungsplatz .meldung{ animation:none; }
+}

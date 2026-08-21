@@ -1,0 +1,63 @@
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      # Nur fuer tests/auffangnetz.mjs, das Labor fuer den Cloudflare-Worker.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: pip install -r requirements.txt
+
+      - run: python -m unittest discover -s tests
+
+  pruefungen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Syntax
+        run: |
+          python -m compileall -q kern dashboard website tests werkzeuge
+          node --check cloudflare/worker.js
+
+      - name: Keine Zugangsdaten im Repository
+        run: |
+          set -e
+          if git ls-files | grep -E '(^|/)(config\.cmd|.*\.db|.*\.db-wal|.*\.db-shm|.*\.pem|.*\.key)$'; then
+            echo "Zugangsdaten oder Datenbank im Repository."
+            exit 1
+          fi
+          if git grep -nIE "SECRET_KEY *= *[\"'][A-Za-z0-9+/=_-]{16}|xkeysib-|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY" \
+               -- . ':!config.example.cmd' ':!.github/'; then
+            echo "Sieht nach einem Schluessel aus."
+            exit 1
+          fi

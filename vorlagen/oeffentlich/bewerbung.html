@@ -1,0 +1,104 @@
+{% extends "oeffentlich/basis_web.html" %}
+{% block hauptklasse %}schmal{% endblock %}
+{% block inhalt %}
+<section class="abschnitt">
+  <span class="hut">Bewerbung</span>
+  <h1>Mitmachen</h1>
+  <p class="meta">Fünf Minuten, dann melden wir uns. Vorkenntnisse brauchst du
+    keine – wir wollen wissen, was dich interessiert.</p>
+</section>
+
+{% if erfolg %}
+<section class="panel" style="border-top:4px solid var(--gruen);">
+  <span class="hut">Angekommen</span>
+  <h2>Danke, {{ erfolg }}!</h2>
+  <p>Deine Bewerbung liegt bei uns. Der Vorstand sieht sich jede in Ruhe an –
+    du bekommst in der Regel innerhalb von zwei Wochen eine Rückmeldung, in
+    jedem Fall aber eine.</p>
+  {% if mail_versandt %}
+  <p class="meta">Eine Bestätigung ist an deine E-Mail-Adresse unterwegs.</p>
+  {% endif %}
+  <div class="knopfzeile" style="margin-top:var(--r4);">
+    <a class="btn" href="/">Zur Startseite</a>
+    <a class="btn btn-zweit" href="/quiz">Quiz ausprobieren</a>
+  </div>
+</section>
+
+{% else %}
+{% if fehler %}<div class="meldung meldung-fehler"><div>{{ fehler }}</div></div>{% endif %}
+<section class="panel">
+  <form method="post" action="/bewerbung" class="formular">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Vorname
+      <input type="text" name="vorname" maxlength="80" required
+             value="{{ werte.vorname or '' }}" autocomplete="given-name">
+    </label>
+    <label>Nachname
+      <input type="text" name="nachname" maxlength="80" required
+             value="{{ werte.nachname or '' }}" autocomplete="family-name">
+    </label>
+    {# Nur die Stufe: Klassen wie "11b" gibt es an dieser Schule nicht, und
+       das Beispiel im Feld hat genau danach gefragt. #}
+    <label>Stufe
+      <select name="klasse" required>
+        <option value="" disabled {% if not werte.klasse %}selected{% endif %}>
+          Bitte auswählen</option>
+        {% for stufe in stufen_wahl %}
+        <option value="{{ stufe }}" {% if werte.klasse == stufe %}selected{% endif %}>{{ stufe }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>E-Mail
+      <span class="meta">Bitte privat – keine Schuladresse. Die fällt mit dem
+        Abschluss weg, und unsere Post bleibt dort oft im Filter hängen.</span>
+      <input type="email" name="email" maxlength="160" required
+             value="{{ werte.email or '' }}" autocomplete="email">
+    </label>
+    <label>Telefonnummer
+      <span class="meta">Für die WhatsApp-Gruppe, wenn es klappt.</span>
+      {# inputmode=tel holt auf dem Handy die Zifferntastatur. Das Beispiel im
+         Platzhalter ist wichtiger, als es aussieht: Die meisten tippen sonst
+         "1516 1234567" ohne alles. Angenommen wird das trotzdem - der Server
+         setzt die Vorwahl davor -, aber ein Beispiel erspart die Rückfrage. #}
+      <input type="tel" name="telefonnummer" maxlength="40" required
+             inputmode="tel" placeholder="0163 1234567"
+             value="{{ werte.telefonnummer or '' }}" autocomplete="tel">
+    </label>
+    <label>Wunsch-Abteilung
+      <span class="meta">Bitte eine auswählen. Nicht bindend – wir sprechen
+        darüber.</span>
+      <select name="abteilung" required>
+        <option value="" disabled {% if not werte.abteilung %}selected{% endif %}>
+          Bitte auswählen</option>
+        {% for a in abteilungen_wahl %}
+        <option value="{{ a.key }}" {% if werte.abteilung == a.key %}selected{% endif %}>{{ a.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="voll">Warum willst du mitmachen?
+      <textarea name="motivation" maxlength="3000" required
+                placeholder="Ein paar Sätze reichen.">{{ werte.motivation or '' }}</textarea>
+    </label>
+    <label class="voll">Was interessiert dich besonders?
+      <textarea name="interessen" maxlength="3000" required
+                placeholder="Börse, Gründen, Marketing, Technik …">{{ werte.interessen or '' }}</textarea>
+    </label>
+    <label class="voll">Vorwissen <span class="meta">Optional. „Keines“ ist eine völlig normale Antwort.</span>
+      <textarea name="vorwissen" maxlength="3000">{{ werte.vorwissen or '' }}</textarea>
+    </label>
+
+    <div class="nur-lesehilfe" aria-hidden="true">
+      <label>Bitte leer lassen<input type="text" name="webseite" tabindex="-1" autocomplete="off"></label>
+    </div>
+
+    <div class="formular-fuss">
+      <button type="submit">Bewerbung abschicken</button>
+      <span class="meta">Mit dem Absenden stimmst du zu, dass wir deine Angaben
+        zur Bearbeitung speichern. Näheres in der
+        <a href="/datenschutz">Datenschutzerklärung</a>.</span>
+    </div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,183 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("AG-Treffen", "Termine und Protokolle. Was hier steht, kann später jeder nachlesen.") }}
+{{ m.rueckmeldung(meldung) }}
+
+{% if darf_verwalten %}
+<details class="block">
+  <summary>Neues Treffen</summary>
+  <div class="aufklapp-inhalt">
+    <form hx-post="/dashboard/treffen" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Titel<input type="text" name="titel" maxlength="200" required
+                         placeholder="z. B. AG-Treffen KW 34"></label>
+      <label>Datum<input type="date" name="wann" value="{{ heute().isoformat() }}"></label>
+      <label class="voll">Protokoll <span class="meta">Kann auch später nachgetragen werden.</span>
+        <textarea name="protokoll_text" maxlength="20000" rows="6"></textarea></label>
+      <div class="formular-fuss"><button type="submit">Anlegen</button></div>
+    </form>
+  </div>
+</details>
+{% endif %}
+
+{% if not treffen %}
+<div class="panel">{{ m.leer("Noch keine Treffen erfasst", "", "kalender") }}</div>
+{% endif %}
+
+{% for t in treffen %}
+<details class="block">
+  <summary>
+    <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
+      <strong>{{ t.title }}</strong>
+      <span class="meta">{{ t.date|datum_lang }}</span>
+      {% if t.date >= heute() %}<span class="marke zustand-geplant">kommt noch</span>
+      {% if zusagen.get(t.id) %}<span class="marke zustand-erledigt">{{ zusagen[t.id]|length }} zugesagt</span>{% endif %}
+      {% if absagen.get(t.id) %}<span class="marke zustand-offen">{{ absagen[t.id]|length }} abgesagt</span>{% endif %}
+      {% if punkte.get(t.id) %}<span class="marke">{{ punkte[t.id]|length }} Punkte</span>{% endif %}
+      {% endif %}
+      {% if anwesend.get(t.id) %}
+      <span class="marke">{{ anwesend[t.id]|length }} anwesend</span>
+      {% endif %}
+      {% if not t.protocol %}<span class="marke zustand-offen">kein Protokoll</span>{% endif %}
+    </span>
+  </summary>
+  <div class="aufklapp-inhalt">
+    {% if t.date >= heute() %}
+    {# --- Kommst du? ---------------------------------------------------
+       Vor dem Treffen die einzige Frage, die zaehlt. Die eigene Antwort
+       steht als Erstes, damit man auf einen Blick sieht, ob man schon
+       geantwortet hat - und sie laesst sich jederzeit umstellen. #}
+    <div class="treffen-antwort">
+      <div>
+        <strong>Kommst du?</strong>
+        <p class="meta">
+          {% set meine = eigene_antwort.get(t.id) %}
+          {% if meine and meine.antwort == "ja" %}Du hast zugesagt.
+          {% elif meine %}Du hast abgesagt{% if meine.grund %} – „{{ meine.grund }}“{% endif %}.
+          {% else %}Noch nicht beantwortet.{% endif %}
+        </p>
+      </div>
+      <form hx-post="/dashboard/treffen/{{ t.id }}/antwort" hx-target="#tab-inhalt"
+            class="knopfpaar">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="antwort" value="ja">
+        <button type="submit" class="btn-zweit btn-klein"
+                {% if meine and meine.antwort == "ja" %}disabled{% endif %}>
+          Ich komme</button>
+      </form>
+      <details class="treffen-absage">
+        <summary class="btn-still btn-klein">Ich kann nicht</summary>
+        <form hx-post="/dashboard/treffen/{{ t.id }}/antwort" hx-target="#tab-inhalt"
+              class="formular">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="antwort" value="nein">
+          <label class="voll">Grund <span class="meta">Freiwillig.</span>
+            <input type="text" name="grund" maxlength="200"
+                   placeholder="z. B. Klausur"></label>
+          <div class="formular-fuss">
+            <button type="submit" class="btn-zweit">Absagen</button>
+          </div>
+        </form>
+      </details>
+    </div>
+
+    {% if zusagen.get(t.id) or absagen.get(t.id) %}
+    <div class="reihe" style="margin-bottom:var(--r3);">
+      {% for p, grund in zusagen.get(t.id, []) %}
+      <span class="marke zustand-erledigt">{{ p.vorname }}</span>
+      {% endfor %}
+      {% for p, grund in absagen.get(t.id, []) %}
+      <span class="marke zustand-offen"
+            {% if grund %}title="{{ grund }}"{% endif %}>{{ p.vorname }}
+        {%- if grund %} ({{ grund }}){% endif %}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {# --- Tagesordnung -------------------------------------------------
+       Vorher eintragen, im Treffen abhaken. Steht auch bei vergangenen
+       Treffen noch da - dann als Liste dessen, was besprochen wurde. #}
+    <h4 style="margin-top:var(--r4);">Tagesordnung</h4>
+    {% if punkte.get(t.id) %}
+    <ul class="tagesordnung">
+      {% for punkt, wer in punkte[t.id] %}
+      <li{% if punkt.erledigt %} class="abgehakt"{% endif %}>
+        {# Abhaken heißt „das haben wir besprochen“ - eine Aussage über das
+           Treffen, nicht über den eigenen Punkt. Deshalb nur für die, die
+           Treffen führen. Alle anderen sehen den Stand, können ihn aber
+           nicht ändern: Ein Knopf, der beim Drücken „darfst du nicht“ sagt,
+           ist schlechter als kein Knopf. #}
+        {% if darf_verwalten %}
+        <form hx-post="/dashboard/treffen/punkt/{{ punkt.id }}/abhaken"
+              hx-target="#tab-inhalt">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="haken-knopf"
+                  aria-label="{{ "Wieder öffnen" if punkt.erledigt else "Als besprochen abhaken" }}">
+            {{ "×" if punkt.erledigt else "○" }}</button>
+        </form>
+        {% else %}
+        <span class="haken-stand" aria-label="{{ "besprochen" if punkt.erledigt else "offen" }}"
+              title="{{ "Besprochen" if punkt.erledigt else "Noch offen" }}"
+              >{{ "×" if punkt.erledigt else "○" }}</span>
+        {% endif %}
+        <span class="tagesordnung-text">{{ punkt.text }}</span>
+        <span class="meta">{{ wer.vorname if wer else "gelöschtes Konto" }}</span>
+        {% if wer and wer.id == user.id or darf_verwalten %}
+        <form hx-post="/dashboard/treffen/punkt/{{ punkt.id }}/loeschen"
+              hx-target="#tab-inhalt">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="btn-still btn-klein">Weg</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="meta">Noch nichts eingetragen.</p>
+    {% endif %}
+    <form hx-post="/dashboard/treffen/{{ t.id }}/punkt" hx-target="#tab-inhalt"
+          class="reihe" style="margin-bottom:var(--r4);">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="text" name="text" maxlength="300" required
+             placeholder="Was soll besprochen werden?">
+      <button type="submit" class="btn-zweit btn-klein">Eintragen</button>
+    </form>
+
+    {% if t.protocol %}
+    <p style="white-space:pre-wrap;">{{ t.protocol }}</p>
+    {% else %}
+    <p class="meta">Für dieses Treffen gibt es noch kein Protokoll.</p>
+    {% endif %}
+
+    {% if anwesend.get(t.id) %}
+    <h4 style="margin-top:var(--r4);">Anwesend</h4>
+    <div class="reihe">
+      {% for p in anwesend[t.id] %}
+      <span class="marke">{{ p.vorname }} {{ p.nachname }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if darf_verwalten %}
+    <details style="margin-top:var(--r4);">
+      <summary class="meta" style="cursor:pointer;">Bearbeiten oder löschen</summary>
+      <form hx-post="/dashboard/treffen/{{ t.id }}/aendern" hx-target="#tab-inhalt"
+            class="formular" style="margin-top:var(--r3);">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Titel<input type="text" name="titel" value="{{ t.title }}" maxlength="200"></label>
+        <label>Datum<input type="date" name="wann" value="{{ t.date.isoformat() if t.date else '' }}"></label>
+        <label class="voll">Protokoll
+          <textarea name="protokoll_text" maxlength="20000" rows="10">{{ t.protocol or "" }}</textarea></label>
+        <div class="formular-fuss">
+          <button type="submit">Speichern</button>
+          {{ m.loeschen("/dashboard/treffen/" ~ t.id ~ "/loeschen",
+                        "Treffen „" ~ t.title ~ "“ in den Papierkorb legen?", csrf,
+                        "In den Papierkorb") }}
+        </div>
+      </form>
+    </details>
+    {% endif %}
+  </div>
+</details>
+{% endfor %}

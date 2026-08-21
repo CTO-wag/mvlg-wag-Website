@@ -1,0 +1,156 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("Bewerbungen", "Hier wartet jemand auf eine Antwort. Jede Einschätzung wird festgehalten – so lässt sich später nachlesen, warum entschieden wurde.") }}
+{{ m.rueckmeldung(meldung) }}
+
+{% if startpasswort %}
+<div class="panel" style="border-left:4px solid var(--amber);">
+  <h3 style="margin-top:0;">Startpasswort für {{ passwort_fuer }}</h3>
+  <p class="meta">Jetzt weitergeben – es lässt sich später nicht mehr anzeigen.</p>
+  <div class="reihe">
+    <input type="text" id="startpasswort" value="{{ startpasswort }}" readonly
+           style="font-family:var(--schrift-mono);font-size:1.05rem;max-width:22rem;">
+    <button type="button" class="btn-zweit" data-kopieren="#startpasswort">Kopieren</button>
+  </div>
+</div>
+{% endif %}
+
+<div class="filter">
+  <span class="meta">Filter:</span>
+  <a href="#" class="filter-marke {% if not filter_status %}aktiv{% endif %}"
+     hx-get="/dashboard/bewerbungen" hx-target="#tab-inhalt">Alle ({{ gesamt }})</a>
+  {% for s in ["neu", "in_pruefung", "angenommen", "abgelehnt"] %}
+  <a href="#" class="filter-marke {% if filter_status == s %}aktiv{% endif %}"
+     hx-get="/dashboard/bewerbungen?status={{ s }}" hx-target="#tab-inhalt">
+    {{ s|label }} ({{ zaehler.get(s, 0) }})</a>
+  {% endfor %}
+</div>
+
+{% if not bewerbungen %}
+<div class="panel">{{ m.leer("Keine Bewerbungen",
+    "Über das Formular auf der Website kommen sie hier an.", "nachricht") }}</div>
+{% endif %}
+
+{% if bewerbungen %}
+{{ m.suche("#bewerbungen-liste", "Name, Klasse oder Abteilung suchen …", "Bewerbungen") }}
+{% endif %}
+
+<div id="bewerbungen-liste">
+{% for b in bewerbungen %}
+<details class="block" data-suchbar>
+  <summary>
+    <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
+      <strong>{{ b.vorname }} {{ b.nachname }}</strong>
+      <span class="meta">{{ b.klasse }}</span>
+      {% if b.department %}{{ b.department|abt_marke }}{% endif %}
+      {{ m.zustand(b.status) }}
+      {% set meine = urteile.get(b.id, []) %}
+      {% if meine %}
+        {% set schnitt = (meine|map(attribute="0")|map(attribute="bewertung")|sum / meine|length)|round(1) %}
+        <span class="marke" title="{{ meine|length }} Einschätzung(en)">
+          {{ schnitt }} von 5</span>
+      {% endif %}
+      <span class="meta">{{ b.created_at|relativ }}</span>
+    </span>
+  </summary>
+  <div class="aufklapp-inhalt">
+    <div class="raster-2">
+      <div>
+        <h4>Motivation</h4>
+        <p style="white-space:pre-wrap;">{{ b.motivation }}</p>
+        <h4 style="margin-top:var(--r4);">Interessen</h4>
+        <p style="white-space:pre-wrap;">{{ b.interessen }}</p>
+        {% if b.vorwissen %}
+        <h4 style="margin-top:var(--r4);">Vorwissen</h4>
+        <p style="white-space:pre-wrap;">{{ b.vorwissen }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <h4>Kontakt</h4>
+        <ul class="liste">
+          <li><span class="liste-links"><span class="meta">E-Mail</span></span>
+              <span class="liste-rechts"><a href="mailto:{{ b.email }}">{{ b.email }}</a></span></li>
+          <li><span class="liste-links"><span class="meta">Telefon</span></span>
+              <span class="liste-rechts"><a href="{{ b.telefonnummer|telefon_link }}">
+                {{ b.telefonnummer|telefon }}</a></span></li>
+          <li><span class="liste-links"><span class="meta">Eingegangen</span></span>
+              <span class="liste-rechts">{{ b.created_at|berlin }}</span></li>
+          <li><span class="liste-links"><span class="meta">Bestätigung</span></span>
+              <span class="liste-rechts">{{ "verschickt" if b.email_sent else "nicht verschickt" }}</span></li>
+        </ul>
+
+        <h4 style="margin-top:var(--r4);">Einschätzungen</h4>
+        {% set alle = urteile.get(b.id, []) %}
+        {% if alle %}
+        <div class="verlauf">
+          {% for urteil, person in alle %}
+          <div class="verlauf-eintrag">
+            <span class="verlauf-wer">{{ person.vorname }}</span>
+            <span>
+              <strong>{{ m.sterne(urteil.bewertung) }}</strong>
+              {% if urteil.notiz %}<br>{{ urteil.notiz }}{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="meta">Noch niemand hat sich geäußert.</p>
+        {% endif %}
+
+        <form hx-post="/dashboard/bewerbungen/{{ b.id }}/urteil" hx-target="#tab-inhalt"
+              class="formular" style="margin-top:var(--r3);">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% set meins = meine_urteile.get(b.id) %}
+          <label class="voll">Deine Einschätzung
+            <select name="bewertung">
+              {% for n in [5, 4, 3, 2, 1] %}
+              <option value="{{ n }}" {% if meins and meins.bewertung == n %}selected{% elif not meins and n == 3 %}selected{% endif %}>
+                {{ "★︎" * n }}{{ "☆︎" * (5 - n) }} – {{ ["gar nicht", "eher nicht", "unentschieden", "ja", "unbedingt"][n-1] }}
+              </option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="voll">Begründung <span class="meta">Optional, hilft aber später sehr.</span>
+            <textarea name="notiz" maxlength="2000" rows="2">{{ meins.notiz if meins else "" }}</textarea>
+          </label>
+          <div class="formular-fuss">
+            <button type="submit" class="btn-zweit btn-klein">
+              {{ "Einschätzung ändern" if meins else "Einschätzung abgeben" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% if darf_entscheiden %}
+    <div class="trenner">
+      <h2>Entscheiden</h2>
+      <p class="meta">Bei „angenommen“ kann direkt ein Konto angelegt werden –
+        dann bekommt die Person Zugangsdaten und die Willkommensnachricht.</p>
+    </div>
+    <form hx-post="/dashboard/bewerbungen/{{ b.id }}/status" hx-target="#tab-inhalt"
+          class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Stand
+        <select name="status">
+          {% for s in ["neu", "in_pruefung", "angenommen", "abgelehnt"] %}
+          <option value="{{ s }}" {% if b.status == s %}selected{% endif %}>{{ s|label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="haken">
+        <input type="checkbox" name="konto_anlegen" value="1" checked>
+        <span>Bei „angenommen“: Konto anlegen und begrüßen</span>
+      </label>
+      <div class="formular-fuss">
+        <button type="submit">Übernehmen</button>
+        {{ m.loeschen("/dashboard/bewerbungen/" ~ b.id ~ "/loeschen",
+                      "Bewerbung von " ~ b.vorname ~ " löschen?", csrf,
+                      "In den Papierkorb") }}
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</details>
+{% endfor %}
+</div>

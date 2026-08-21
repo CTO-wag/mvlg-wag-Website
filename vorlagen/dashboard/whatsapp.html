@@ -1,0 +1,287 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{% call m.kopf("WhatsApp-Bot", "Begrüßt neue Mitglieder automatisch. Der Text ist frei anpassbar.") %}
+  {% if modus in ("cloud", "web") %}
+  <form hx-post="/dashboard/whatsapp/verbindung" hx-target="#tab-inhalt">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn-zweit btn-klein">Verbindung prüfen</button>
+  </form>
+  {% endif %}
+  {% if modus != "manuell" %}
+  <form hx-post="/dashboard/whatsapp/senden" hx-target="#tab-inhalt">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn-zweit btn-klein">Wartende jetzt verschicken</button>
+  </form>
+  {% endif %}
+{% endcall %}
+
+{{ m.rueckmeldung(meldung) }}
+
+{% if verbindung %}
+<div class="meldung meldung-{{ 'gut' if verbindung.gut else 'fehler' }}">
+  <div><strong>Verbindung:</strong> {{ verbindung.text }}</div>
+</div>
+{% endif %}
+
+<div class="meldung meldung-{{ 'info' if bereit else 'warnung' }}">
+  <div>
+    <strong>Betriebsart: {{ {"manuell": "Manuell (ein Klick je Nachricht)",
+                             "web": "WhatsApp Web (vollautomatisch)",
+                             "callmebot": "CallMeBot",
+                             "cloud": "WhatsApp Cloud API"}[modus] }}</strong>
+    <p>{{ hinweis }}</p>
+    <p class="meta">Umstellen in <code>config.cmd</code> über
+      <code>WHATSAPP_MODUS</code>. Der manuelle Betrieb braucht kein Konto und
+      funktioniert immer – der Server bereitet die Nachricht vor, abgeschickt
+      wird sie mit einem Tipp.</p>
+  </div>
+</div>
+
+{% if modus == "web" %}
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>WhatsApp-Verknüpfung</h2>
+      <p class="meta">Der Bot hängt an einer echten WhatsApp-Sitzung – wie
+        WhatsApp Web im Browser, nur dauerhaft. Einmal koppeln, dann läuft
+        alles von selbst.</p></div>
+    {% if web and web.zustand == "bereit" %}
+    <form hx-post="/dashboard/whatsapp/abmelden" hx-target="#tab-inhalt">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn-still btn-klein"
+              data-frage="Verknüpfung trennen? Danach muss neu gekoppelt werden und es geht nichts mehr raus.">
+        Verknüpfung trennen</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% include "dashboard/teile/whatsapp_kopplung.html" %}
+
+  <div class="meldung meldung-warnung" style="margin-top:var(--r4);"><div>
+    <strong>Was du wissen solltest.</strong>
+    <p>Das ist nicht die offizielle Schnittstelle von Meta, sondern eine
+      Fernsteuerung von WhatsApp Web. Dafür braucht es kein Business-Konto und
+      keine genehmigten Vorlagen – der Text unten geht genau so raus, wie er
+      dasteht.</p>
+    <p>Der Preis: Automatisierung verstößt gegen die Nutzungsbedingungen von
+      WhatsApp. Bei ein paar Willkommensnachrichten im Monat ist das Risiko
+      gering, aber die Nummer <em>kann</em> gesperrt werden. Nimm besser eine
+      Zweitnummer der AG als eine private.</p>
+  </div></div>
+</div>
+{% endif %}
+
+{% if modus == "cloud" %}
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Meta-Vorlage</h2>
+    <p class="meta">Eine Begrüßung geht an jemanden, der noch nie geschrieben
+      hat. Das lässt WhatsApp nur mit einer vorab genehmigten Vorlage zu – der
+      freie Text unten wird dann <strong>nicht</strong> verschickt, sondern der
+      Text der Vorlage. Hier stellst du nur ein, welche Werte in ihre
+      Platzhalter eingesetzt werden.</p></div>
+    {% if vorlage_name %}<span class="marke zustand-erledigt">{{ vorlage_name }}</span>
+    {% else %}<span class="marke zustand-abgelehnt">keine gesetzt</span>{% endif %}
+  </div>
+
+  {% if not vorlage_name %}
+  <div class="meldung meldung-warnung"><div>
+    <p>In <code>config.cmd</code> fehlt <code>WHATSAPP_VORLAGE_NAME</code>.
+      Solange der leer ist, versucht der Bot den freien Text – und Meta lehnt
+      ihn bei neuen Mitgliedern ab.</p>
+  </div></div>
+  {% endif %}
+
+  <form hx-post="/dashboard/whatsapp/vorlage-einstellungen" hx-target="#tab-inhalt"
+        class="formular">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="voll">Platzhalter der Vorlage, in ihrer Reihenfolge
+      <span class="meta">Kommagetrennt. Der erste Wert landet in
+        <code>&#123;&#123;1&#125;&#125;</code>, der zweite in
+        <code>&#123;&#123;2&#125;&#125;</code> und so weiter. Erlaubt sind:
+        vorname, nachname, name, abteilung, rolle, dashboard, gruppe, discord.</span>
+      <input type="text" name="parameter" value="{{ vorlage_parameter }}"
+             maxlength="200" placeholder="vorname,dashboard">
+    </label>
+    <label>Sprache der Vorlage <span class="meta">wie in Meta angelegt</span>
+      <input type="text" name="sprache" value="{{ vorlage_sprache }}" maxlength="10">
+    </label>
+    <div class="formular-fuss"><button type="submit">Speichern</button></div>
+  </form>
+
+  <h4 style="margin-top:var(--r4);">Womit die Vorlage gerade gefüllt würde</h4>
+  {% if beispiel_parameter %}
+  <ol style="margin:var(--r2) 0 0 1.2rem;">
+    {% for wert in beispiel_parameter %}
+    <li><code>&#123;&#123;{{ loop.index }}&#125;&#125;</code> &rarr; {{ wert }}</li>
+    {% endfor %}
+  </ol>
+  <p class="meta" style="margin-top:var(--r2);">Die Vorlage muss also genau
+    {{ beispiel_parameter|length }} Platzhalter haben – sonst weist Meta sie
+    mit Fehler 132000 zurück.</p>
+  {% else %}
+  <p class="meta">Keine Platzhalter – die Vorlage muss dann ohne auskommen.</p>
+  {% endif %}
+
+  <details style="margin-top:var(--r4);">
+    <summary class="meta" style="cursor:pointer;">Wie lege ich die Vorlage bei Meta an?</summary>
+    <ol style="margin:var(--r3) 0 0 1.2rem;line-height:1.7;">
+      <li>Im <strong>Meta Business Manager</strong> &rarr; WhatsApp Manager &rarr;
+        Nachrichtenvorlagen &rarr; <em>Vorlage erstellen</em>.</li>
+      <li>Kategorie <strong>Utility</strong> (nicht Marketing – Utility wird
+        schneller genehmigt und darf jederzeit zugestellt werden).</li>
+      <li>Sprache <strong>Deutsch</strong>, Name z. B. <code>willkommen_ag</code>.</li>
+      <li>Im Textkörper die Zeilenumbrüche schreiben und dort
+        <code>&#123;&#123;1&#125;&#125;</code> einsetzen, wo der Vorname stehen
+        soll. Beispiel:<br>
+        <code style="display:block;white-space:pre-wrap;margin-top:.3rem;">Hey &#123;&#123;1&#125;&#125;! Willkommen in der Wirtschafts- &amp; Investment-AG am MvLG.
+
+Dein Zugang zum Dashboard ist eingerichtet: &#123;&#123;2&#125;&#125;
+
+Bei Fragen einfach hier melden.</code></li>
+      <li>Nach der Genehmigung (meist wenige Minuten bis Stunden) den Namen in
+        <code>config.cmd</code> unter <code>WHATSAPP_VORLAGE_NAME</code>
+        eintragen und die Server neu starten.</li>
+      <li>Oben „Verbindung prüfen“ drücken, dann ein Testkonto anlegen.</li>
+    </ol>
+    <p class="meta" style="margin-top:var(--r3);">Wichtig: In einen Platzhalter
+      darf <strong>kein Zeilenumbruch</strong>. Deshalb gehören die Umbrüche in
+      die Vorlage, nicht in die Werte – darum kümmert sich das System hier
+      automatisch.</p>
+  </details>
+</div>
+{% endif %}
+
+<div class="kennzahlen">
+  {{ m.kennzahl(zahlen.offen, "wartet", "kennzahl-warnung" if zahlen.offen else "") }}
+  {{ m.kennzahl(zahlen.gesendet, "verschickt", "kennzahl-gut") }}
+  {{ m.kennzahl(zahlen.fehler, "fehlgeschlagen", "kennzahl-warnung" if zahlen.fehler else "") }}
+  {{ m.kennzahl(zahlen.ohne_nummer, "ohne Nummer") }}
+</div>
+
+{% if ohne_nummer %}
+<div class="meldung meldung-warnung"><div>
+  Bei {{ ohne_nummer }} aktiven Konten fehlt die Telefonnummer – die können
+  nicht begrüßt werden. Nachtragen unter „Konten“.
+</div></div>
+{% endif %}
+
+<div class="raster-2">
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Willkommenstext</h2>
+      <p class="meta">Die Platzhalter unten werden beim Verschicken ersetzt.
+        Anklicken fügt sie an der Cursorposition ein.
+        {% if modus == "cloud" and vorlage_name %}
+        <br><strong>Achtung:</strong> Im Cloud-Betrieb mit Vorlage verschickt
+        WhatsApp den Text der Meta-Vorlage. Dieser hier gilt dann nur noch für
+        den Link „In WhatsApp öffnen“ und für die Vorschau.
+        {% endif %}</p></div></div>
+
+    <div style="margin-bottom:var(--r3);">
+      {% for zeichen, erklaerung in platzhalter.items() %}
+      <button type="button" class="platzhalter-marke" data-einfuegen="{{ zeichen }}"
+              title="{{ erklaerung }}">{{ zeichen }}</button>
+      {% endfor %}
+    </div>
+
+    <form hx-post="/dashboard/whatsapp/vorlage" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">
+        <textarea name="text" id="wa-vorlage" maxlength="4000" rows="14"
+                  style="font-family:var(--schrift-mono);font-size:.86rem;">{{ vorlage }}</textarea>
+      </label>
+      <div class="formular-fuss">
+        <button type="submit">Speichern</button>
+      </div>
+    </form>
+    <div class="knopfzeile" style="margin-top:var(--r3);">
+      <form hx-post="/dashboard/whatsapp/vorlage-zuruecksetzen" hx-target="#tab-inhalt">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="btn-still btn-klein"
+                data-frage="Auf den Standardtext zurücksetzen? Deine Änderungen gehen verloren.">
+          Standardtext wiederherstellen</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>So sieht es aus</h2>
+      <p class="meta">Mit deinen eigenen Daten eingesetzt.</p></div></div>
+    <div class="wa-vorschau">{{ beispiel }}</div>
+
+    <div class="trenner"><h2>Einstellungen</h2></div>
+    <div class="stapel">
+      <div class="reihe">
+        <span style="flex:1;">
+          <strong>Automatisch begrüßen</strong><br>
+          <span class="meta">Neue Konten bekommen die Nachricht von selbst.</span>
+        </span>
+        <form hx-post="/dashboard/whatsapp/automatik" hx-target="#tab-inhalt">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="{{ 'btn-gut' if automatik else 'btn-zweit' }} btn-klein">
+            {{ "An" if automatik else "Aus" }}</button>
+        </form>
+      </div>
+      <div class="reihe">
+        <span style="flex:1;">
+          <strong>Testmodus</strong><br>
+          <span class="meta">Nachrichten werden vorbereitet, aber nichts verschickt.</span>
+        </span>
+        <form hx-post="/dashboard/whatsapp/testmodus" hx-target="#tab-inhalt">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="{{ 'btn-gut' if testmodus else 'btn-zweit' }} btn-klein">
+            {{ "An" if testmodus else "Aus" }}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Ausgangskorb</h2>
+      <p class="meta">Was wartet, was raus ist und was nicht geklappt hat.</p></div>
+  </div>
+
+  {% if korb %}
+  <div class="stapel">
+    {% for e in korb %}
+    <div class="wa-eintrag">
+      <div style="flex:1;min-width:0;">
+        <div class="reihe" style="gap:var(--r2);">
+          <strong>{{ e.name or e.nummer }}</strong>
+          <span class="marke zustand-{{ {'gesendet':'erledigt','fehler':'abgelehnt',
+                                          'bereit':'in_bearbeitung','offen':'offen',
+                                          'keine_nummer':'abgelehnt','test':'idee'}[e.status] }}">
+            {{ {"gesendet": "verschickt", "fehler": "fehlgeschlagen",
+                "bereit": "bereit", "offen": "wartet",
+                "keine_nummer": "keine Nummer", "test": "Testmodus"}[e.status] }}
+          </span>
+          <span class="meta">{{ e.created_at|relativ }}</span>
+          {% if e.versuche %}<span class="meta">{{ e.versuche }} Versuch(e)</span>{% endif %}
+        </div>
+        {% if e.fehler %}<p class="meta" style="color:var(--rot);">{{ e.fehler }}</p>{% endif %}
+        <details style="margin-top:var(--r2);">
+          <summary class="meta" style="cursor:pointer;">Text ansehen</summary>
+          <div class="wa-vorschau" style="margin-top:var(--r2);">{{ e.text }}</div>
+        </details>
+      </div>
+      <div class="knopfzeile" style="flex-shrink:0;">
+        {% if e.nummer and e.status != "gesendet" %}
+        <a class="btn btn-klein" style="background:#25D366;color:#fff;"
+           href="{{ wa_link(e.nummer, e.text) }}" target="_blank" rel="noopener noreferrer">
+          In WhatsApp öffnen</a>
+        <form hx-post="/dashboard/whatsapp/{{ e.id }}/erledigt" hx-target="#tab-inhalt">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="btn-zweit btn-klein">Abhaken</button>
+        </form>
+        {% endif %}
+        {{ m.loeschen("/dashboard/whatsapp/" ~ e.id ~ "/loeschen",
+                      "Eintrag entfernen?", csrf, "Entfernen", "btn-still btn-klein") }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  {{ m.leer("Der Ausgangskorb ist leer",
+            "Sobald ein neues Konto angelegt wird, landet die Begrüßung hier.", "") }}
+  {% endif %}
+</div>

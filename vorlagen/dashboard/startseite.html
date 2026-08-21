@@ -1,0 +1,128 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{% call m.kopf("Startseite", "Die anpassbaren Blöcke der öffentlichen Seite. Änderungen sind sofort live.") %}
+  <a class="btn-zweit btn-klein" href="{{ WEBSITE_URL }}/" target="_blank" rel="noopener">
+    Startseite ansehen</a>
+{% endcall %}
+
+{{ m.rueckmeldung(meldung) }}
+
+{% for bereich, (name, erklaerung) in bereiche.items() %}
+{% set liste = bloecke.get(bereich, []) %}
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>{{ name }}</h2><p class="meta">{{ erklaerung }}</p></div>
+    <span class="marke">{{ liste|length }}</span>
+  </div>
+
+  {% if bereich == "portfolio" and not liste %}
+  <div class="meldung meldung-info"><div>
+    <strong>Noch leer – und deshalb auf der Startseite unsichtbar.</strong>
+    <p>Eine leere Erfolgsliste wirbt gegen die AG, darum blendet die Seite den
+      ganzen Abschnitt aus, solange hier nichts steht. Sobald du den ersten
+      Eintrag anlegst, erscheint er.</p>
+    <p class="meta">Gute Einträge sind konkret: <em>„Planspiel Börse 2025“</em>
+      mit Zeitraum <em>„Herbst 2025“</em> und Ergebnis
+      <em>„2. Platz im Landesfinale“</em>. Ohne Ergebnis geht es auch – dann
+      steht nur, dass ihr dabei wart.</p>
+  </div></div>
+  {% endif %}
+
+  {% if liste %}
+  <div class="stapel">
+    {% for b in liste %}
+    <div class="block-zeile {% if not b.aktiv %}block-inaktiv{% endif %}"
+         style="--block:{{ b.farbe or 'var(--linie)' }};">
+      <div class="block-griff">
+        <form hx-post="/dashboard/startseite/{{ b.id }}/verschieben" hx-target="#tab-inhalt">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="richtung" value="-1">
+          <button type="submit" class="btn-still" aria-label="Nach oben"
+                  {% if loop.first %}disabled{% endif %}>&#9650;</button>
+        </form>
+        <form hx-post="/dashboard/startseite/{{ b.id }}/verschieben" hx-target="#tab-inhalt">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="richtung" value="1">
+          <button type="submit" class="btn-still" aria-label="Nach unten"
+                  {% if loop.last %}disabled{% endif %}>&#9660;</button>
+        </form>
+      </div>
+
+      <div class="block-inhalt">
+        <details>
+          <summary style="cursor:pointer;">
+            <strong>{{ b.titel }}</strong>
+            {% if b.zeitraum %}<span class="marke">{{ b.zeitraum }}</span>{% endif %}
+            {% if b.ergebnis %}<span class="marke zustand-erledigt">{{ b.ergebnis }}</span>{% endif %}
+            {% if not b.aktiv %}<span class="marke zustand-abgelehnt">versteckt</span>{% endif %}
+            {% if b.text %}<br><span class="meta">{{ b.text|truncate(110) }}</span>{% endif %}
+          </summary>
+          <form hx-post="/dashboard/startseite/{{ b.id }}/aendern" hx-target="#tab-inhalt"
+                class="formular" style="margin-top:var(--r3);">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <label class="voll">Titel
+              <input type="text" name="titel" value="{{ b.titel }}" maxlength="160" required></label>
+            {% if bereich in mit_zeitraum %}
+            <label>Zeitraum <span class="meta">z. B. „Herbst 2025“</span>
+              <input type="text" name="zeitraum" value="{{ b.zeitraum or '' }}" maxlength="60"></label>
+            <label>Ergebnis <span class="meta">optional</span>
+              <input type="text" name="ergebnis" value="{{ b.ergebnis or '' }}" maxlength="120"
+                     placeholder="2. Platz im Landesfinale"></label>
+            {% endif %}
+            {% if bereich in mit_text %}
+            <label class="voll">Text
+              <textarea name="text" maxlength="2000" rows="3">{{ b.text or "" }}</textarea></label>
+            {% endif %}
+            {% if bereich in mit_farbe %}
+            <label>Farbe
+              <input type="color" name="farbe" value="{{ b.farbe or '#0E2647' }}"></label>
+            {% endif %}
+            <label class="haken voll">
+              <input type="checkbox" name="aktiv" value="1" {% if b.aktiv %}checked{% endif %}>
+              <span>Auf der Startseite anzeigen</span>
+            </label>
+            <div class="formular-fuss">
+              <button type="submit">Speichern</button>
+              {{ m.loeschen("/dashboard/startseite/" ~ b.id ~ "/loeschen",
+                            "Eintrag „" ~ b.titel ~ "“ löschen?", csrf, "Löschen") }}
+            </div>
+          </form>
+        </details>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% elif bereich != "portfolio" %}
+  {{ m.leer("Noch nichts hier", "Leg unten einen Eintrag an.") }}
+  {% endif %}
+
+  <details style="margin-top:var(--r4);" {% if bereich == "portfolio" and not liste %}open{% endif %}>
+    <summary class="meta" style="cursor:pointer;">Eintrag hinzufügen</summary>
+    <form hx-post="/dashboard/startseite" hx-target="#tab-inhalt" class="formular"
+          style="margin-top:var(--r3);">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="bereich" value="{{ bereich }}">
+      <label class="voll">Titel<input type="text" name="titel" maxlength="160" required
+        placeholder="{% if bereich == 'portfolio' %}z. B. Planspiel Börse 2025{% endif %}"></label>
+      {% if bereich in mit_zeitraum %}
+      <label>Zeitraum<input type="text" name="zeitraum" maxlength="60"
+                            placeholder="Herbst 2025"></label>
+      <label>Ergebnis<input type="text" name="ergebnis" maxlength="120"
+                            placeholder="2. Platz im Landesfinale"></label>
+      {% endif %}
+      {% if bereich in mit_text %}
+      <label class="voll">Text<textarea name="text" maxlength="2000" rows="3"
+        placeholder="{% if bereich == 'portfolio' %}Was habt ihr gemacht? Zwei, drei Sätze.{% endif %}"></textarea></label>
+      {% endif %}
+      {% if bereich in mit_farbe %}
+      <label>Farbe
+        <select name="farbe">
+          {% for f in farben %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      <div class="formular-fuss"><button type="submit">Hinzufügen</button></div>
+    </form>
+  </details>
+</div>
+{% endfor %}

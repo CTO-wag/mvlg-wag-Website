@@ -1,0 +1,126 @@
+{% extends "oeffentlich/basis_web.html" %}
+{% block hauptklasse %}schmal{% endblock %}
+{% block inhalt %}
+<section class="abschnitt">
+  <span class="hut">Rechtliches</span>
+  <h1>Datenschutzerklärung</h1>
+  <p class="meta">Stand: {{ stand }}</p>
+</section>
+
+<section class="panel rechtstext">
+  <h2>1. Verantwortlicher</h2>
+  <p>Verantwortlich für die Verarbeitung personenbezogener Daten ist die
+    Wirtschafts- &amp; Investment-AG des Max-von-Laue-Gymnasiums Koblenz,
+    Südallee 2, 56070 Koblenz.</p>
+
+  <h2>2. Erhobene Daten und deren Zweck</h2>
+  <h3>Kontaktformular</h3>
+  <p>Wenn du das Kontaktformular auf unserer Website nutzt, werden deine
+    angegebenen Daten (Name, E-Mail, Nachricht) erfasst und gespeichert. Diese
+    Daten werden ausschließlich zur Beantwortung deiner Anfrage verwendet.</p>
+
+  <h3>Bewerbungsformular</h3>
+  <p>Bei der Bewerbung zur AG werden die folgenden Daten erfasst: Vorname,
+    Nachname, E-Mail, Telefonnummer, Klasse/Jahrgangsstufe, Abteilungswunsch,
+    Motivation, Interessen und optional dein Vorwissen. Diese Daten werden zur
+    Verarbeitung und Entscheidung deiner Bewerbung verwendet.</p>
+
+  <h3>Dashboard-Login</h3>
+  <p>Für Mitglieder, die sich ins interne Dashboard einloggen, werden folgende
+    Daten verarbeitet:</p>
+  <ul>
+    <li>E-Mail-Adresse und Passwort (zur Anmeldung; das Passwort wird nur als
+      nicht rückrechenbarer Prüfwert gespeichert)</li>
+    <li>Name, Telefonnummer, Abteilung, Rolle</li>
+    <li>Sitzungsdaten: Sitzungskennung, Zeitpunkt, IP-Adresse und Angaben zum
+      verwendeten Browser – damit du deine aktiven Anmeldungen selbst einsehen
+      und beenden kannst</li>
+    <li>Anmeldeprotokoll: gelungene und fehlgeschlagene Anmeldeversuche, um
+      unbefugte Zugriffe zu erkennen</li>
+    <li>Aufgaben, Termine und Tätigkeitsprotokolle zur internen Organisation</li>
+  </ul>
+
+  <h3>Benachrichtigungen</h3>
+  <p>Wer Benachrichtigungen einschaltet, hinterlegt dafür je nach gewähltem Weg
+    eine Push-Anmeldung des Browsers, ein persönliches ntfy-Thema oder seine
+    E-Mail-Adresse. Diese Angaben werden ausschließlich für die Zustellung
+    verwendet und lassen sich im Dashboard jederzeit wieder entfernen.</p>
+
+  <h3>WhatsApp-Begrüßung</h3>
+  <p>Neue Mitglieder erhalten auf Wunsch eine Willkommensnachricht per WhatsApp
+    an die im Konto hinterlegte Telefonnummer. Die Funktion lässt sich vom
+    Vorstand abschalten und im Einzelfall überspringen; es werden keine Daten
+    an Dritte übermittelt, die über die Zustellung der Nachricht hinausgehen.</p>
+
+  <h2>3. Cookies und Sitzungsverwaltung</h2>
+  <p>Wir nutzen Cookies ausschließlich für die Verwaltung deiner Sitzung
+    (Anmeldung). Diese Cookies sind notwendig, damit du im Dashboard angemeldet
+    bleibst. Sie enthalten keine Tracking- oder Werbedaten. Es findet keine
+    Analyse des Nutzungsverhaltens statt.</p>
+
+  <h2>4. Externe Dienste</h2>
+  {# Dieser Abschnitt muss zur Wirklichkeit passen. Vorher stand hier, die
+     Schriften kämen von Google - das stimmt nicht: sie liegen unter
+     /statisch/schrift auf unserem eigenen Server, und die Seite ruft
+     überhaupt keine fremde Adresse auf. Dafür fehlten Cloudflare und der
+     Mailanbieter, die beide tatsächlich Daten sehen. #}
+  <p><strong>Schriften und Bilder</strong> liegen auf unserem eigenen Server.
+    Die Seite lädt keine Schriftarten, Skripte oder Bilder von fremden
+    Anbietern nach – auch keine Google Fonts. Beim bloßen Aufruf der Seite
+    wird deine IP-Adresse also an niemanden weitergegeben, der nicht hier
+    genannt ist.</p>
+  <p><strong>Cloudflare.</strong> Die Website ist über einen Tunnel von
+    Cloudflare erreichbar (Cloudflare, Inc., USA). Cloudflare vermittelt
+    jeden Aufruf und verschlüsselt die Verbindung; dabei verarbeitet das
+    Unternehmen technisch notwendige Verbindungsdaten wie deine IP-Adresse.
+    Ohne diesen Dienst wäre die Seite von außen nicht erreichbar.</p>
+  <p><strong>E-Mail-Versand.</strong> Für Bestätigungen und
+    Benachrichtigungen per E-Mail nutzen wir den Versanddienst Brevo.
+    Übermittelt werden dabei die Empfängeradresse und der Inhalt der
+    jeweiligen Nachricht.</p>
+  <p><strong>Benachrichtigungen.</strong> Für Push kommen je nach Einstellung
+    der Push-Dienst deines Browserherstellers und/oder ntfy.sh zum Einsatz.
+    Beides schaltest du selbst ein und im Dashboard jederzeit wieder aus.</p>
+  <p>Weitere externe Dienste binden wir nicht ein. Es findet keine Analyse,
+    kein Tracking und keine Werbung statt.</p>
+
+  <h2>5. Speicherdauer</h2>
+  <ul>
+    <li>Kontaktnachrichten: bis zur Löschung durch den Vorstand</li>
+    <li>Bewerbungen: für die laufende Bewerbungsrunde, danach auf Anfrage löschbar</li>
+    <li>Sitzungsdaten: bis zur Abmeldung bzw. zum Ablauf der Sitzung</li>
+    <li>Anmeldeprotokoll: 90 Tage</li>
+    <li>Zustellprotokoll für Benachrichtigungen: 30 Tage</li>
+    <li>Mitgliederdaten: während der AG-Mitgliedschaft</li>
+    <li>Gelöschte Einträge liegen bis zu 30 Tage im Papierkorb und werden dann
+      endgültig entfernt</li>
+  </ul>
+
+  <h2>6. Sicherheit</h2>
+  <p>Wir schützen deine Daten mit angemessenen technischen und organisatorischen
+    Maßnahmen: verschlüsselte Übertragung, nicht rückrechenbare Speicherung von
+    Passwörtern, ein abgestuftes Rechtesystem, eine Bremse gegen automatisiertes
+    Durchprobieren und – auf Wunsch – ein zweiter Faktor bei der Anmeldung. Der
+    Zugriff auf personenbezogene Daten ist auf die Personen begrenzt, die ihn
+    für ihre Aufgabe brauchen.</p>
+
+  <h2>7. Deine Rechte</h2>
+  <p>Du hast das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung
+    der Verarbeitung sowie auf Datenübertragbarkeit. Mitglieder können ihre
+    eigenen Daten im Dashboard unter „Mein Konto“ jederzeit als Datei
+    herunterladen und ihr Konto dort auch selbst löschen. Für alles Weitere
+    wende dich an den Vorstand.</p>
+  <p>Außerdem hast du das Recht, der Verarbeitung zu widersprechen, und das
+    Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren –
+    zuständig ist der Landesbeauftragte für den Datenschutz und die
+    Informationsfreiheit Rheinland-Pfalz.</p>
+
+  <h2>8. Änderungen dieser Datenschutzerklärung</h2>
+  <p>Wir können diese Erklärung anpassen. Die jeweils aktuelle Fassung steht
+    immer auf dieser Seite.</p>
+
+  <h2>9. Kontakt</h2>
+  <p>Fragen zum Datenschutz?
+    <a href="/#kontakt">Schreib uns über das Kontaktformular.</a></p>
+</section>
+{% endblock %}

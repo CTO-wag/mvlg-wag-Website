@@ -1,0 +1,296 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("Nachrichten", "Dein Postfach, deine Zustellwege – und, wenn du darfst, der Versand an alle.") }}
+{{ m.rueckmeldung(meldung) }}
+
+{% if versand %}
+<div class="meldung meldung-{{ 'gut' if not versand.fehler else 'warnung' }}">
+  <div>
+    <strong>Zustellung:</strong>
+    {{ versand.webpush }}× Push, {{ versand.ntfy }}× ntfy, {{ versand.email }}× E-Mail.
+    {% if versand.fehler %}
+    <p>Nicht geklappt:</p>
+    <ul style="margin:.3rem 0 0 1.1rem;">
+      {% for f in versand.fehler %}<li>{{ f }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Postfach</h2></div>
+    <span class="marke">{{ eingang|length }}</span></div>
+  {% if eingang %}
+  {{ m.suche("#postfach-liste", "Betreff oder Absender suchen …", "Nachrichten") }}
+  <div class="stapel" id="postfach-liste">
+    {% for empfang, nachricht in eingang %}
+    <details class="block" data-suchbar>
+      <summary>
+        <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
+          <strong>{{ nachricht.subject }}</strong>
+          <span class="meta">{{ nachricht.sender.vorname if nachricht.sender }}
+            {{ nachricht.sender.nachname if nachricht.sender }} ·
+            {{ nachricht.created_at|relativ }}</span>
+        </span>
+      </summary>
+      <div class="aufklapp-inhalt">
+        <p style="white-space:pre-wrap;">{{ nachricht.body }}</p>
+        <div class="knopfzeile" style="margin-top:var(--r3);">
+          {{ m.loeschen("/dashboard/nachrichten/" ~ empfang.id ~ "/loeschen",
+                        "Aus deinem Postfach entfernen?", csrf, "Entfernen",
+                        "btn-still btn-klein") }}
+        </div>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}{{ m.leer("Postfach leer", "Hier stehen Nachrichten aus der AG.", "nachricht") }}{% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Deine Zustellwege</h2>
+    <p class="meta">Wie du erreicht wirst. Alles hier gilt nur für dich.</p></div></div>
+
+  <form hx-post="/dashboard/nachrichten/einstellungen" hx-target="#tab-inhalt"
+        class="formular">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="haken voll">
+      <input type="checkbox" name="enabled" value="1" {% if pref.enabled %}checked{% endif %}>
+      <span><strong>Benachrichtigungen bekommen</strong><br>
+        <span class="meta">Aus heißt: gar nichts, auf keinem Weg.</span></span>
+    </label>
+
+    <div class="raster-auto" style="grid-column:1 / -1;">
+      <div class="panel schmal">
+        <h4>Web Push</h4>
+        <p class="meta">Direkt aufs Handy, ohne weitere App – wenn die Seite auf
+          dem Startbildschirm liegt.</p>
+        <label class="haken">
+          <input type="checkbox" name="webpush" value="1" {% if pref.webpush %}checked{% endif %}>
+          <span>eingeschaltet</span>
+        </label>
+        <p class="meta" style="margin-top:var(--r2);">
+          {{ geraete|length }} Gerät{{ "e" if geraete|length != 1 }} angemeldet
+        </p>
+      </div>
+      <div class="panel schmal">
+        <h4>ntfy</h4>
+        <p class="meta">Über die ntfy-App. Funktioniert auch dort, wo Web Push nicht geht.</p>
+        <label class="haken">
+          <input type="checkbox" name="ntfy" value="1" {% if pref.ntfy %}checked{% endif %}>
+          <span>eingeschaltet</span>
+        </label>
+        <div class="reihe" style="margin-top:var(--r2);">
+          <input type="text" id="ntfy-thema" value="{{ pref.topic }}" readonly
+                 aria-label="Dein ntfy-Thema"
+                 style="font-family:var(--schrift-mono);font-size:.76rem;">
+          <button type="button" class="btn-zweit btn-klein" data-kopieren="#ntfy-thema">Kopieren</button>
+        </div>
+        <p class="meta">Dieses Thema in der ntfy-App abonnieren. Nicht weitergeben –
+          wer es kennt, liest mit.</p>
+      </div>
+      <div class="panel schmal">
+        <h4>E-Mail</h4>
+        <p class="meta">Als dritter Weg – kommt nur, wenn sonst nichts greift
+          oder es dringend ist.</p>
+        <label class="haken">
+          <input type="checkbox" name="email" value="1" {% if pref.email %}checked{% endif %}
+                 {% if not mail_moeglich %}disabled{% endif %}>
+          <span>eingeschaltet
+            {% if not mail_moeglich %}<span class="meta">(kein Versand eingerichtet)</span>{% endif %}
+          </span>
+        </label>
+      </div>
+    </div>
+
+    <div style="grid-column:1 / -1;">
+      <h4>Worüber?</h4>
+      <div class="raster-auto-klein">
+        {% for schluessel, name in kategorien.items() %}
+        {% if erlaubt.get(schluessel) %}
+        <label class="haken">
+          <input type="checkbox" name="kategorien" value="{{ schluessel }}"
+                 {% if pref[schluessel] %}checked{% endif %}>
+          <span>{{ name }}</span>
+        </label>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="formular-fuss">
+      <button type="submit">Speichern</button>
+    </div>
+  </form>
+
+  <div class="knopfzeile" style="margin-top:var(--r3);">
+    <button type="button" class="btn-zweit btn-klein" id="push-anmelden">
+      Dieses Gerät für Push anmelden</button>
+    <form hx-post="/dashboard/nachrichten/test" hx-target="#tab-inhalt">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn-zweit btn-klein">Probemeldung schicken</button>
+    </form>
+  </div>
+  <p class="meta" id="push-hinweis" style="margin-top:var(--r2);"></p>
+
+
+  {% if geraete %}
+  <h4 style="margin-top:var(--r4);">Angemeldete Geräte</h4>
+  <ul class="liste">
+    {% for g in geraete %}
+    <li>
+      <span class="liste-links"><strong>{{ g.geraet or "Unbekanntes Gerät" }}</strong>
+        <span class="meta">seit {{ g.created_at|berlin("%d.%m.%Y") }}
+          {% if g.ursprung %}· über die {{ "Startseite" if g.ursprung == "website" else "Dashboard-Adresse" }}{% endif %}
+          {% if g.last_ok_at %}· zuletzt erreicht {{ g.last_ok_at|relativ }}{% endif %}</span>
+      </span>
+      <span class="liste-rechts">
+        {{ m.loeschen("/dashboard/nachrichten/geraet/" ~ g.id ~ "/entfernen",
+                      "Gerät abmelden?", csrf, "Abmelden", "btn-still btn-klein") }}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+
+{% if rechte.nachrichten %}
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Anfragen über die Website</h2></div>
+    <span class="marke">{{ kontakt|length }}</span></div>
+  {% if kontakt %}
+  <div class="stapel">
+    {% for k in kontakt %}
+    <details class="block">
+      <summary>
+        <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
+          <strong>{{ k.name }}</strong>
+          <span class="meta">{{ k.email }} · {{ k.created_at|relativ }}</span>
+          {% if k.reply %}<span class="marke zustand-erledigt">beantwortet</span>
+          {% else %}<span class="marke zustand-offen">offen</span>{% endif %}
+        </span>
+      </summary>
+      <div class="aufklapp-inhalt">
+        <p style="white-space:pre-wrap;">{{ k.message }}</p>
+        {% if k.reply %}
+        <div class="meldung meldung-gut"><div><strong>Antwort:</strong>
+          <p style="white-space:pre-wrap;">{{ k.reply }}</p>
+          <span class="meta">{{ k.replied_at|berlin }}</span></div></div>
+        {% else %}
+        <form hx-post="/dashboard/nachrichten/kontakt/{{ k.id }}/antwort"
+              hx-target="#tab-inhalt" class="formular">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="voll">Antwort
+            <textarea name="antwort" maxlength="4000" rows="4" required></textarea></label>
+          <div class="formular-fuss">
+            <button type="submit">Antworten{% if mail_moeglich %} und per E-Mail schicken{% endif %}</button>
+          </div>
+        </form>
+        {% endif %}
+        <div class="knopfzeile" style="margin-top:var(--r3);">
+          {{ m.loeschen("/dashboard/nachrichten/kontakt/" ~ k.id ~ "/loeschen",
+                        "Anfrage löschen?", csrf, "In den Papierkorb",
+                        "btn-still btn-klein") }}
+        </div>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}{{ m.leer("Keine offenen Anfragen", "", "nachricht") }}{% endif %}
+</div>
+{% endif %}
+
+{% if rechte.benachrichtigungen_admin %}
+<div class="trenner">
+  <h2>An alle</h2>
+  <p class="meta">Diese Werkzeuge betreffen die ganze AG, nicht nur dich.</p>
+</div>
+
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Nachricht verschicken</h2>
+      <p class="meta">Landet immer im Postfach. Zusätzlich kannst du wählen,
+        worüber sofort benachrichtigt wird.</p></div>
+    <form hx-post="/dashboard/nachrichten/push-testmodus" hx-target="#tab-inhalt">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="{{ 'btn-gut' if push_testmodus else 'btn-zweit' }} btn-klein">
+        Testmodus {{ "an" if push_testmodus else "aus" }}</button>
+    </form>
+  </div>
+
+  <form hx-post="/dashboard/nachrichten/senden" hx-target="#tab-inhalt" class="formular">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="voll">Betreff<input type="text" name="betreff" maxlength="160" required></label>
+    <label class="voll">Text
+      <textarea name="text" maxlength="4000" rows="5" required
+                data-zaehler="#nachricht-zaehler"></textarea>
+      <span class="zeichenzahl" id="nachricht-zaehler"></span></label>
+
+    <div class="empfaenger-kasten" style="grid-column:1 / -1;">
+      <div class="empfaenger-kopf">
+        <strong>Empfänger</strong>
+        <button type="button" class="btn-still btn-klein" data-empfaenger="alle">Alle</button>
+        <button type="button" class="btn-still btn-klein" data-empfaenger="keine">Keine</button>
+        <input type="search" id="empfaenger-suche" class="empfaenger-suche"
+               placeholder="Filtern …" aria-label="Empfänger filtern">
+        <span class="meta" data-empfaenger-zahl></span>
+      </div>
+      <div class="empfaenger-liste" id="empfaenger-liste">
+        {% for e in empfaenger %}
+        <label class="haken" data-name="{{ e.person.vorname }} {{ e.person.nachname }}">
+          <input type="checkbox" name="empfaenger" value="{{ e.person.id }}">
+          <span>{{ e.person.vorname }} {{ e.person.nachname }}</span>
+          <span class="empfaenger-wege">
+            {% for weg in e.wege %}
+            <span class="weg-marke {% if e.nur_mail %}weg-nur-mail{% endif %}">{{ weg }}</span>
+            {% endfor %}
+            {% if not e.wege %}<span class="weg-marke weg-nur-mail">nichts</span>{% endif %}
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div style="grid-column:1 / -1;">
+      <h4>Sofort benachrichtigen über</h4>
+      <div class="reihe">
+        <label class="haken"><input type="checkbox" name="kanaele" value="webpush" checked><span>Push</span></label>
+        <label class="haken"><input type="checkbox" name="kanaele" value="ntfy" checked><span>ntfy</span></label>
+        <label class="haken"><input type="checkbox" name="kanaele" value="email"
+               {% if not mail_moeglich %}disabled{% endif %}><span>E-Mail</span></label>
+      </div>
+    </div>
+
+    <div class="formular-fuss"><button type="submit">Absenden</button></div>
+  </form>
+</div>
+
+{% if zustellprotokoll %}
+<details class="block">
+  <summary>Zustellprotokoll ({{ zustellprotokoll|length }} letzte)</summary>
+  <div class="aufklapp-inhalt">
+    <p class="meta">Was wirklich rausging – und was nicht. Wird nach 30 Tagen
+      automatisch aufgeräumt.</p>
+    <div class="tabelle-rahmen">
+      <table>
+        <thead><tr><th>Wann</th><th>Weg</th><th>An</th><th>Betreff</th><th>Ergebnis</th></tr></thead>
+        <tbody>
+          {% for z in zustellprotokoll %}
+          <tr>
+            <td class="meta">{{ z.created_at|berlin("%d.%m. %H:%M") }}</td>
+            <td>{{ z.kanal }}</td>
+            <td>{{ z.ziel }}</td>
+            <td class="meta">{{ z.betreff or "" }}</td>
+            <td>{% if z.erfolg %}<span class="marke zustand-erledigt">ok</span>
+                {% else %}<span class="marke zustand-abgelehnt" title="{{ z.fehler }}">
+                  {{ z.fehler|truncate(40) if z.fehler else "fehlgeschlagen" }}</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</details>
+{% endif %}
+{% endif %}

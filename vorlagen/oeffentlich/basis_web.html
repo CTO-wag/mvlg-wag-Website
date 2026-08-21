@@ -1,0 +1,105 @@
+{% extends "basis.html" %}
+
+{#
+  Kopfangaben der öffentlichen Seiten.
+
+  Das Vorschaubild: Wer die Adresse in WhatsApp, Discord oder Signal einfügt,
+  sieht zuerst dieses Bild. Es liegt unter einer Adresse mit Prüfsumme
+  (statisch(...) hängt ?v=… an) - das ist wichtig, weil die Chat-Apps ein
+  einmal geholtes Vorschaubild sehr lange behalten. Ohne die Prüfsumme würde
+  nach einer Änderung wochenlang das alte Bild verschickt.
+
+  `vorschaubild` lässt sich pro Seite setzen (siehe /bewerbung).
+#}
+{% set og_bild = SITE_URL ~ statisch('bilder/' ~ (vorschaubild or 'vorschaubild.png')) %}
+{% set og_titel = seitentitel or "Wirtschafts- & Investment-AG (WAG) am MvLG Koblenz" %}
+{% set og_text = seitenbeschreibung or "Schüler-AG am Max-von-Laue-Gymnasium Koblenz: Börse, Finanzen und eigene Gründungsprojekte. Für Klasse 9 bis 13, ohne Vorwissen." %}
+
+{% block kopf_extra %}
+{# --- Warum hier zwischen zwei Sorten Seiten unterschieden wird ------------
+
+   Chrome hat mvlg-wag.de und app.mvlg-wag.de als möglichen Spam gemeldet.
+   Beide Adressen führen auf dieselbe Seite: die Anmeldung. Und die hatte
+   genau die Form, die ein Phishing-Filter sucht -
+
+     * ein Passwortfeld,
+     * auf einer Domain, die das Kürzel einer FREMDEN Einrichtung enthält
+       (die Schule liegt unter mvlg-ko.de, nicht hier),
+     * und 26 Nennungen dieser Einrichtung im Kopf der Seite, aus Titel,
+       Beschreibung, Schlüsselwörtern, Open Graph, Twitter und zweimal
+       strukturierten Daten.
+
+   Nichts davon war böse gemeint. Für einen Klassifikator sieht es trotzdem
+   aus wie ein Nachbau einer Schulanmeldung. Deshalb gilt ab jetzt: Auf einer
+   Seite mit Passwortfeld steht kein Werbe-Kopf und keine fremde Marke - nur
+   das Nötigste plus noindex. Zu teilen gibt es an einer Anmeldung ohnehin
+   nichts.
+
+   `anmeldeseite` setzen die Routen in website/routen/anmeldung.py. #}
+{% if not anmeldeseite %}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Wirtschafts- &amp; Investment-AG">
+<meta property="og:locale" content="de_DE">
+<meta property="og:title" content="{{ og_titel }}">
+<meta property="og:description" content="{{ og_text }}">
+<meta property="og:url" content="{{ SITE_URL }}{{ pfad or '/' }}">
+{# 1200x630, deckend und klein. Ein freigestelltes Logo legen die Chat-Apps
+   je nach Gerät auf Schwarz oder Weiß, und über rund 300 KB lädt WhatsApp
+   gar nicht erst. Breite und Höhe stehen ausdrücklich dabei: ohne sie
+   verzichten manche Clients aufs Nachladen und zeigen nur Text. #}
+<meta property="og:image" content="{{ og_bild }}">
+<meta property="og:image:secure_url" content="{{ og_bild }}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{ vorschaubild_alt or 'Wirtschafts- & Investment-AG, Schüler-AG in Koblenz' }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{ og_bild }}">
+<meta name="twitter:image:alt" content="{{ vorschaubild_alt or 'Wirtschafts- & Investment-AG, Schüler-AG in Koblenz' }}">
+<meta name="twitter:title" content="{{ og_titel }}">
+<meta name="twitter:description" content="{{ og_text }}">
+
+{# --- Strukturierte Daten -------------------------------------------------
+   EIN Block, nicht zwei. Vorher standen hier zwei Organisationen mit
+   verschiedenen Namen, Logos und einer erfundenen Schuladresse
+   untereinander - für eine Suchmaschine zwei Aussagen über dieselbe Sache,
+   die sich widersprechen.
+
+   `parentOrganization` ist der ehrliche Teil und der Grund, warum das hier
+   überhaupt steht: Wir sind eine AG DER Schule, nicht die Schule. Genau
+   diese Unterscheidung soll eine Maschine sehen können.
+
+   Die Adresse der Schule steht ausdrücklich dabei. Sie ist nachgeprüft
+   (mvlg.de und mvlg-ko.de führen auf dieselbe Seite) und sie ist der
+   stärkste Hinweis, den eine Maschine bekommen kann: Diese AG gehört zu
+   GENAU dieser Einrichtung - und ist nicht deren Nachbau.
+
+   Der Nonce muss dran: Die Richtlinie erlaubt keine Skript-Elemente ohne
+   ihn, auch keine, die nur Daten enthalten. #}
+<script type="application/ld+json" nonce="{{ nonce }}">
+{{ {
+  "@context": "https://schema.org",
+  "@type": "EducationalOrganization",
+  "@id": SITE_URL ~ "/#ag",
+  "name": "Wirtschafts- & Investment-AG",
+  "alternateName": ["WAG", "Wirtschafts-AG", "Investment-AG"],
+  "description": "Schüler-AG für Wirtschaft, Finanzen und Unternehmertum am "
+                 "Max-von-Laue-Gymnasium Koblenz. Für die Klassenstufen 9 "
+                 "bis 13, ohne Vorkenntnisse.",
+  "url": SITE_URL ~ "/",
+  "logo": SITE_URL ~ statisch("bilder/logo-klein.webp"),
+  "email": "cto@tech.mvlg-wag.de",
+  "parentOrganization": {
+    "@type": "HighSchool",
+    "name": "Max-von-Laue-Gymnasium Koblenz",
+    "url": "https://www.mvlg.de"
+  },
+  "address": {"@type": "PostalAddress", "addressLocality": "Koblenz",
+              "addressRegion": "Rheinland-Pfalz", "addressCountry": "DE"},
+  "areaServed": "Koblenz"
+} | tojson }}
+</script>
+{% endif %}
+{% endblock %}
+
+{% block stil %}<link rel="stylesheet" href="{{ statisch('stil/website.css') }}">{% endblock %}

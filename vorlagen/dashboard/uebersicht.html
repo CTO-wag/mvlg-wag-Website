@@ -1,0 +1,289 @@
+{% import "dashboard/teile/makros.html" as m %}
+{% import "dashboard/teile/symbole.html" as sym %}
+{#
+  Die Startseite des Dashboards.
+
+  Sie beantwortet eine einzige Frage: Was steht für mich an? Deshalb steht
+  oben das Persönliche und erst darunter das, was die Rolle betrifft. In V1
+  war das eine Kachelwand mit Gesamtzahlen - "48 Konten" hilft beim Arbeiten
+  nicht weiter.
+#}
+
+<div class="uebersicht-kopf">
+  <div class="uebersicht-gruss">
+    <span class="hut">{{ heute()|datum_lang }}</span>
+    <h1>{{ gruss }}, {{ user.vorname }}.</h1>
+    <p class="uebersicht-lage">
+      {% if zahlen.ueberfaellig %}
+        <strong>{{ zahlen.ueberfaellig }}</strong>
+        Aufgabe{{ "n" if zahlen.ueberfaellig != 1 }} überfällig{% if zahlen.heute %},
+        {{ zahlen.heute }} heute fällig{% endif %}.
+      {% elif zahlen.heute %}
+        <strong>{{ zahlen.heute }}</strong> Aufgabe{{ "n" if zahlen.heute != 1 }}
+        heute fällig.
+      {% elif meine_gesamt %}
+        {{ meine_gesamt }} offene Aufgabe{{ "n" if meine_gesamt != 1 }}, nichts
+        Dringendes.
+      {% else %}
+        Für dich ist gerade nichts offen.
+      {% endif %}
+    </p>
+  </div>
+
+  {% if naechster %}
+  <button type="button" class="uebersicht-naechstes" data-springe="kalender">
+    <span class="hut" style="margin:0;">Als Nächstes</span>
+    <strong>{{ naechster.title }}</strong>
+    <span class="meta">
+      {{ (naechster.start_date if naechster.start_date is defined else naechster.date)|datum_lang }}
+      {% if naechster.start_time is defined and naechster.start_time %} · {{ naechster.start_time }} Uhr{% endif %}
+    </span>
+  </button>
+  {% endif %}
+</div>
+
+{# --- Was noch fehlt ----------------------------------------------------
+   Startbildschirm, Kalender-Abo und Push haengen alle drei am Geraet und
+   lassen sich fuer niemanden von aussen erledigen. Diese Liste steht so
+   lange hier, bis nichts mehr offen ist - dann verschwindet sie ohne Zutun.
+   Kein Wegklicken: Wer sie wegklickt, merkt erst in vier Wochen, dass er
+   keine Termine mehr bekommt. #}
+{% if umzug_offen %}
+<div class="panel umzug-liste">
+  <div class="panel-kopf">
+    <div>
+      <span class="hut">Einmal einrichten</span>
+      <h2>Das fehlt noch bei dir</h2>
+      <p class="meta">{{ umzug_offen|length }} Sache{{ "n" if umzug_offen|length != 1 }},
+        die nur du an deinem Gerät erledigen kannst. Zusammen keine zwei
+        Minuten.</p>
+    </div>
+    <button type="button" class="btn-zweit btn-klein" data-neuerungen-start>
+      Schritt für Schritt</button>
+  </div>
+  <ul class="umzug-punkte">
+    {% for punkt in umzug_offen %}
+    <li>
+      <div>
+        <strong>{{ punkt.titel }}</strong>
+        <p class="meta">{{ punkt.text }}</p>
+      </div>
+      <div class="knopfpaar">
+        {% if punkt.rundgang %}
+        <button type="button" class="btn-zweit btn-klein"
+                data-neuerungen-start>{{ punkt.knopf }}</button>
+        {% else %}
+        <button type="button" class="btn-zweit btn-klein"
+                data-springe="{{ punkt.bereich }}">{{ punkt.knopf }}</button>
+        {% endif %}
+        {% if punkt.abwahl %}
+        <button type="button" class="btn-still btn-klein"
+                hx-post="/dashboard/neuerungen/ohne-kalender"
+                hx-vals='{"csrf": "{{ csrf }}"}'
+                hx-target="#tab-inhalt">{{ punkt.abwahl }}</button>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{# --- Noch das Startpasswort? -------------------------------------------
+   Steht genau einmal und verschwindet von selbst, sobald es geändert wurde.
+   Kein Zwang: wer gerade etwas anderes vorhat, soll weiterarbeiten können. #}
+{% if startpasswort_hinweis %}
+<div class="meldung meldung-warnung"><div>
+  <strong>Du benutzt noch dein Startpasswort.</strong>
+  <p>Das steht in der E-Mail oder WhatsApp-Nachricht, mit der du deinen Zugang
+    bekommen hast – und die liest im Zweifel jemand mit. Ändere es einmal,
+    dann ist Ruhe.</p>
+  <p class="knopfpaar" style="margin-top:var(--r2);">
+    <button type="button" class="btn-zweit btn-klein"
+            hx-get="/dashboard/mein-konto" hx-target="#tab-inhalt">
+      Passwort jetzt ändern</button>
+    {# Der Hinweis ist ein Rat. Wer ihn beantwortet hat, soll ihn nicht bei
+       jedem Anmelden wieder lesen. #}
+    <button type="button" class="btn-still btn-klein"
+            hx-post="/dashboard/hinweis/passwort-behalten"
+            hx-vals='{"csrf": "{{ csrf }}"}'
+            hx-target="#tab-inhalt">Ich behalte meins</button></p>
+</div></div>
+{% endif %}
+
+{# --- Die Woche auf einen Blick ----------------------------------------- #}
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Deine Woche</h2>
+      <p class="meta">Wann sich etwas häuft – und wann Luft ist.</p></div>
+    <button type="button" class="btn-zweit btn-klein" data-springe="aufgaben">
+      Aufgaben öffnen</button>
+  </div>
+  <ol class="woche-leiste">
+    {% for tag in woche %}
+    <li class="woche-tag{% if tag.heute %} ist-heute{% endif %}{% if tag.wochenende %} wochenende{% endif %}{% if tag.anzahl %} hat-was{% endif %}">
+      <span class="woche-kurz">{{ tag.kurz }}</span>
+      <span class="woche-zahl">{{ tag.zahl }}</span>
+      <span class="woche-punkte"
+            {% if tag.anzahl %}aria-label="{{ tag.anzahl }} fällig"{% else %}aria-hidden="true"{% endif %}>
+        {% for _ in range([tag.anzahl, 4]|min) %}<i></i>{% endfor %}
+      </span>
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+
+{% if wartet %}
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Wartet auf dich</h2></div></div>
+  <ul class="wartet-liste">
+    {% for punkt in wartet %}
+    <li>
+      <button type="button" class="wartet-knopf{% if punkt.dringend %} dringend{% endif %}"
+              data-springe="{{ punkt.bereich }}">
+        <span class="wartet-zahl">{{ punkt.anzahl }}</span>
+        <span class="wartet-text">{{ punkt.text }}</span>
+        <span class="wartet-pfeil" aria-hidden="true">{{ sym.zeichen("weiter", 18) }}</span>
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="raster-auto">
+  {# --- Meine Aufgaben ------------------------------------------------- #}
+  <div class="panel">
+    <div class="panel-kopf">
+      <div><h2>Meine Aufgaben</h2>
+        <p class="meta">Was dir persönlich zugeteilt ist.</p></div>
+      {% if meine_gesamt > meine|length %}
+      <span class="marke">{{ meine_gesamt }} gesamt</span>
+      {% endif %}
+    </div>
+    {% if meine %}
+    <ul class="liste">
+      {% for t in meine %}
+      <li>
+        <span class="liste-links">
+          <strong>{{ t.titel }}</strong>
+          <span class="meta">
+            {% if t.deadline %}
+              {% if t.deadline < heute() %}
+                <span class="marke marke-alarm">{{ (heute() - t.deadline).days }} Tag{{ "e" if (heute() - t.deadline).days != 1 }} überfällig</span>
+              {% elif t.deadline == heute() %}
+                <span class="marke zustand-in_bearbeitung">Heute fällig</span>
+              {% else %}
+                bis {{ t.deadline|berlin }}
+              {% endif %}
+            {% else %}ohne Frist{% endif %}
+          </span>
+        </span>
+        <span class="liste-rechts">{{ m.rang(t.priority) }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    <div class="knopfzeile" style="margin-top:var(--r4);">
+      <button type="button" class="btn-zweit btn-klein" data-springe="aufgaben">
+        {% if meine_gesamt > meine|length %}Alle {{ meine_gesamt }} ansehen
+        {% else %}Zu den Aufgaben{% endif %}</button>
+    </div>
+    {% else %}
+      {{ m.leer("Nichts offen",
+                "Sobald dir jemand eine Aufgabe zuteilt, steht sie hier.", "aufgabe") }}
+    {% endif %}
+  </div>
+
+  {# --- Mein Stand ------------------------------------------------------ #}
+  <div class="panel">
+    <div class="panel-kopf">
+      <div><h2>Dein Stand</h2>
+        <p class="meta">Erledigtes zählt dauerhaft – auch gelöschte Aufgaben.</p></div>
+    </div>
+
+    <div class="stand-zahl">
+      <b>{{ erledigt_30 }}</b>
+      <span>erledigt in 30 Tagen</span>
+      {% if erledigt_vormonat %}
+        {% set diff = erledigt_30 - erledigt_vormonat %}
+        <span class="stand-trend {{ 'hoch' if diff > 0 else ('runter' if diff < 0 else '') }}">
+          {% if diff > 0 %}+{{ diff }} gegenüber dem Monat davor
+          {% elif diff < 0 %}{{ diff }} gegenüber dem Monat davor
+          {% else %}genauso viel wie im Monat davor{% endif %}
+        </span>
+      {% endif %}
+    </div>
+
+    <ul class="liste" style="margin-top:var(--r4);">
+      <li><span class="liste-links"><span class="meta">Insgesamt erledigt</span></span>
+          <span class="liste-rechts"><strong>{{ erledigt_gesamt }}</strong></span></li>
+      <li><span class="liste-links"><span class="meta">Offen im Blick</span></span>
+          <span class="liste-rechts"><strong>{{ zahlen.offen }}</strong></span></li>
+      <li><span class="liste-links"><span class="meta">Diese Woche fällig</span></span>
+          <span class="liste-rechts"><strong>{{ zahlen.diese_woche }}</strong></span></li>
+    </ul>
+
+    {% if rechte.leadership %}
+    <div class="knopfzeile" style="margin-top:var(--r4);">
+      <button type="button" class="btn-zweit btn-klein" data-springe="leistung">
+        Leadership-Werte</button>
+    </div>
+    {% endif %}
+  </div>
+
+  {# --- Nachrichten ----------------------------------------------------- #}
+  <div class="panel">
+    <div class="panel-kopf">
+      <div><h2>Nachrichten</h2></div>
+      {% if ungelesen %}<span class="zaehler">{{ ungelesen|length }}</span>{% endif %}
+    </div>
+    {% if ungelesen %}
+    <ul class="liste">
+      {% for empfang, nachricht in ungelesen %}
+      <li>
+        <span class="liste-links">
+          <strong>{{ nachricht.subject }}</strong>
+          <span class="meta">{{ nachricht.sender.vorname if nachricht.sender }} ·
+            {{ nachricht.created_at|relativ }}</span>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    <div class="knopfzeile" style="margin-top:var(--r4);">
+      <button type="button" class="btn-zweit btn-klein" data-springe="nachrichten">
+        Postfach öffnen</button>
+    </div>
+    {% else %}
+      {{ m.leer("Alles gelesen", "", "nachricht") }}
+    {% endif %}
+  </div>
+</div>
+
+{% if puls %}
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>In der AG diese Woche</h2>
+      <p class="meta">{{ puls.anzahl }} Aufgabe{{ "n" if puls.anzahl != 1 }} erledigt{% if puls.neue_mitglieder %},
+        {{ puls.neue_mitglieder }} neue{{ "s" if puls.neue_mitglieder == 1 }}
+        Mitglied{{ "er" if puls.neue_mitglieder != 1 }}{% endif %}.</p></div>
+  </div>
+  {% if puls.erledigt %}
+  <ul class="liste">
+    {% for eintrag, person in puls.erledigt %}
+    <li>
+      <span class="liste-links">
+        <strong>{{ eintrag.titel or "Aufgabe" }}</strong>
+        <span class="meta">{{ person.vorname }} {{ person.nachname }} ·
+          {{ eintrag.zeitpunkt|relativ }}</span>
+      </span>
+      <span class="liste-rechts">
+        {% if eintrag.abteilung %}{{ eintrag.abteilung|abt_marke }}{% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+    {{ m.leer("Diese Woche noch nichts abgehakt", "", "aufgabe") }}
+  {% endif %}
+</div>
+{% endif %}

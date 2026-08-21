@@ -1,0 +1,336 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{#
+  Mein Konto.
+
+  Vorher standen hier neun Kästen ohne erkennbare Ordnung untereinander: die
+  Leistungszahlen ganz oben, das Kalender-Abo zweimal, zwei verschiedene
+  Kästen mit demselben Titel "Deine Daten" (einmal das Profil, einmal der
+  Datenexport). Wer sein Passwort ändern wollte, musste erst suchen.
+
+  Jetzt vier Abschnitte in der Reihenfolge, in der man sie braucht:
+
+    1. Du            - wer du hier bist, Name, Kontakt, E-Mail
+    2. Anmeldung     - Passwort, zweiter Faktor, wo du angemeldet bist
+    3. Auf deinen Geräten - was man einmal einrichtet und dann vergisst
+    4. Dein Stand    - Zahlen; interessant, aber kein Grund, die Seite zu öffnen
+    5. Deine Daten   - herunterladen, und ganz unten das Löschen
+
+  Die Abschnittsüberschriften sind h2, die Kästen darunter h3 - so liest ein
+  Vorleseprogramm dieselbe Gliederung wie das Auge.
+#}
+
+{{ m.kopf("Mein Konto", "Deine Angaben, deine Anmeldung, deine Daten.") }}
+{{ m.rueckmeldung(meldung) }}
+
+{# --- Steckbrief -------------------------------------------------------
+   Wer bin ich hier, und seit wann? Stand vorher unten in den Zahlen. #}
+<div class="steckbrief">
+  <span class="steckbrief-kreis" aria-hidden="true">{{ user|initialen }}</span>
+  <div class="steckbrief-text">
+    <strong>{{ user.vorname }} {{ user.nachname }}</strong>
+    <span class="meta">{{ user.email }}</span>
+  </div>
+  <div class="steckbrief-marken">
+    <span class="marke">{{ user.role|label }}</span>
+    {% for key in meine_abteilungen %}{{ key|abt_marke }}{% endfor %}
+    {% if user.eintrittsdatum %}
+    <span class="meta">dabei seit {{ user.eintrittsdatum|berlin }}</span>
+    {% endif %}
+  </div>
+</div>
+
+<h2 class="konto-abschnitt">Deine Angaben</h2>
+<div class="raster-2">
+  <div class="panel">
+    <div class="panel-kopf"><div><h3>Name und Kontakt</h3></div></div>
+    <form hx-post="/dashboard/mein-konto/profil" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Vorname<input type="text" name="vorname" value="{{ user.vorname }}" maxlength="80"></label>
+      <label>Nachname<input type="text" name="nachname" value="{{ user.nachname }}" maxlength="80"></label>
+      <label class="voll">Telefonnummer
+        <span class="meta">Für die WhatsApp-Gruppe und Rückfragen.</span>
+        <input type="tel" name="telefon" value="{{ user.telefonnummer or '' }}" maxlength="40"></label>
+      <div class="formular-fuss"><button type="submit">Speichern</button></div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <div class="panel-kopf"><div><h3>E-Mail-Adresse</h3>
+      <p class="meta">Damit meldest du dich an. Eine Änderung gilt erst, wenn
+        du sie über die neue Adresse bestätigst.</p></div></div>
+    {% if offener_wechsel %}
+    <div class="meldung meldung-warnung"><div>
+      <strong>Wechsel angefangen.</strong>
+      <p>Eine Bestätigung liegt bei <strong>{{ offener_wechsel.new_email }}</strong>.
+        Bis zum Klick auf den Link bleibt die alte Adresse gültig.</p>
+    </div></div>
+    <form hx-post="/dashboard/mein-konto/email/abbrechen" hx-target="#tab-inhalt">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn-still btn-klein">Wechsel abbrechen</button>
+    </form>
+    {% else %}
+    <form hx-post="/dashboard/mein-konto/email" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Neue Adresse<input type="email" name="neue" maxlength="160" required></label>
+      <label>Dein Passwort<input type="password" name="passwort" required
+                                 autocomplete="current-password"></label>
+      <div class="formular-fuss">
+        <button type="submit" class="btn-zweit" {% if not mail_moeglich %}disabled{% endif %}>
+          Bestätigung anfordern</button>
+        {% if not mail_moeglich %}
+        <span class="meta">Ohne Mailversand nicht möglich – bitte den Vorstand fragen.</span>
+        {% endif %}
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<h2 class="konto-abschnitt">Anmeldung und Sicherheit</h2>
+<div class="raster-2">
+  <div class="panel">
+    <div class="panel-kopf"><div><h3>Passwort</h3>
+      <p class="meta">{{ passwort_regel }}</p></div></div>
+    <form hx-post="/dashboard/mein-konto/passwort" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Bisheriges Passwort
+        <input type="password" name="alt" required autocomplete="current-password"></label>
+      <label>Neues Passwort
+        <input type="password" name="neu" required autocomplete="new-password" minlength="12"></label>
+      <label>Noch einmal
+        <input type="password" name="neu2" required autocomplete="new-password" minlength="12"></label>
+      <div class="formular-fuss">
+        <button type="submit">Passwort ändern</button>
+        <span class="meta">Alle anderen Anmeldungen werden dabei beendet.</span>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <div class="panel-kopf">
+      <div><h3>Zweiter Faktor</h3>
+        <p class="meta">Ein Code aus einer App zusätzlich zum Passwort. Wer dein
+          Passwort kennt, kommt damit trotzdem nicht hinein.</p></div>
+      {% if user.totp_aktiv %}<span class="marke zustand-erledigt">an</span>
+      {% else %}<span class="marke zustand-offen">aus</span>{% endif %}
+    </div>
+
+    {% if ersatzcodes %}
+    {# Der einzige Augenblick, in dem die Codes lesbar sind. Danach stehen in
+       der Datenbank nur noch Prüfwerte. #}
+    <div class="meldung meldung-warnung"><div>
+      <strong>Diese acht Ersatzcodes jetzt aufschreiben.</strong>
+      <p>Jeder gilt einmal und ersetzt den Code aus der App – für den Fall,
+        dass dein Handy weg, kaputt oder neu ist. Nach dem Verlassen dieser
+        Seite kannst du sie nicht mehr ansehen.</p>
+    </div></div>
+    <ol class="ersatzcodes" id="ersatzcodes">
+      {% for c in ersatzcodes %}<li>{{ c }}</li>{% endfor %}
+    </ol>
+    <div class="reihe" style="margin-bottom:var(--r4);">
+      <button type="button" class="btn-zweit btn-klein"
+              data-kopieren="#ersatzcodes">Alle kopieren</button>
+    </div>
+    {% endif %}
+
+    {% if totp_start %}
+    <div class="meldung meldung-info"><div>
+      <strong>Fast fertig.</strong>
+      <p>Öffne deine Authenticator-App (Google Authenticator, Aegis, 1Password …)
+        und trage dieses Geheimnis ein:</p>
+    </div></div>
+    <div class="reihe" style="margin-bottom:var(--r3);">
+      <input type="text" id="totp-geheimnis" value="{{ totp_start.geheimnis }}" readonly
+             style="font-family:var(--schrift-mono);letter-spacing:.08em;">
+      <button type="button" class="btn-zweit btn-klein" data-kopieren="#totp-geheimnis">Kopieren</button>
+    </div>
+    <p class="meta">Oder diese Adresse in der App öffnen:<br>
+      <code style="overflow-wrap:anywhere;font-size:.72rem;">{{ totp_start.url }}</code></p>
+    <form hx-post="/dashboard/mein-konto/2fa/bestaetigen" hx-target="#tab-inhalt"
+          class="formular" style="margin-top:var(--r3);">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Code aus der App
+        <input type="text" name="code" class="code-feld" inputmode="numeric"
+               pattern="[0-9]*" maxlength="6" required autocomplete="one-time-code"></label>
+      <div class="formular-fuss"><button type="submit">Einschalten</button></div>
+    </form>
+
+    {% elif user.totp_aktiv %}
+    <p>Bei jeder Anmeldung wird nach dem Code gefragt.</p>
+    <p class="meta">Ersatzcodes übrig: <strong>{{ ersatzcodes_offen }}</strong>
+      von 8.
+      {% if ersatzcodes_offen == 0 %}
+      Keiner mehr – ohne Handy kommst du nur noch über den Vorstand hinein.
+      {% elif ersatzcodes_offen <= 2 %}
+      Es wird knapp. Lieber neue erzeugen.
+      {% endif %}
+    </p>
+    <details class="block" style="margin-bottom:var(--r3);">
+      <summary>Neue Ersatzcodes erzeugen</summary>
+      <div class="aufklapp-inhalt">
+        <p class="meta">Die alten gelten danach nicht mehr.</p>
+        <form hx-post="/dashboard/mein-konto/2fa/ersatzcodes"
+              hx-target="#tab-inhalt" class="formular">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="voll">Passwort zum Bestätigen
+            <input type="password" name="passwort" required
+                   autocomplete="current-password"></label>
+          <div class="formular-fuss">
+            <button type="submit" class="btn-zweit">Neue Codes</button>
+          </div>
+        </form>
+      </div>
+    </details>
+    <details class="block">
+      <summary>Zweiten Faktor abschalten</summary>
+      <div class="aufklapp-inhalt">
+        <form hx-post="/dashboard/mein-konto/2fa/aus" hx-target="#tab-inhalt" class="formular">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="voll">Passwort zum Bestätigen
+            <input type="password" name="passwort" required autocomplete="current-password"></label>
+          <div class="formular-fuss">
+            <button type="submit" class="btn-gefahr"
+                    data-frage="Zweiten Faktor wirklich abschalten?">Abschalten</button>
+          </div>
+        </form>
+      </div>
+    </details>
+
+    {% else %}
+    <p class="meta">Empfohlen für alle, die viel dürfen – Vorstand, Kasse,
+      Kontenverwaltung. Du brauchst nur eine kostenlose Authenticator-App.
+      Zum Schluss bekommst du acht Ersatzcodes für den Fall, dass das Handy
+      einmal nicht zur Hand ist.</p>
+    <form hx-post="/dashboard/mein-konto/2fa/start" hx-target="#tab-inhalt">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit">Einrichten</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h3>Aktive Anmeldungen</h3>
+      <p class="meta">Wo du gerade angemeldet bist. Etwas dabei, das du nicht
+        kennst? Dann beenden und Passwort ändern.</p></div>
+    {% if sitzungen|length > 1 %}
+    <form hx-post="/dashboard/mein-konto/sitzungen/andere-beenden" hx-target="#tab-inhalt">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn-zweit btn-klein"
+              data-frage="Alle anderen Anmeldungen beenden?">Alle anderen beenden</button>
+    </form>
+    {% endif %}
+  </div>
+  <ul class="liste">
+    {% for s in sitzungen %}
+    <li>
+      <span class="liste-links">
+        <strong>{{ geraet_name(s.user_agent) }}
+          {% if s.id == aktuelle_sid %}<span class="marke zustand-erledigt">dieses Gerät</span>{% endif %}
+        </strong>
+        <span class="meta">{{ s.ip_address or "unbekannte Adresse" }} ·
+          angemeldet {{ s.created_at|relativ }} ·
+          zuletzt aktiv {{ s.last_active|relativ }}</span>
+      </span>
+      <span class="liste-rechts">
+        {% if s.id != aktuelle_sid %}
+        {{ m.loeschen("/dashboard/mein-konto/sitzung/" ~ s.id ~ "/beenden",
+                      "Diese Anmeldung beenden?", csrf, "Beenden", "btn-still btn-klein") }}
+        {% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+
+<h2 class="konto-abschnitt">Auf deinen Geräten</h2>
+{# Einmal einrichten, dann läuft es. Deshalb zusammen und nicht verstreut -
+   und nur EINMAL: Diese Kachel gab es hier versehentlich zweimal. #}
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h3>Kalender-Abo</h3>
+      <p class="meta">Diese Adresse in deine Kalender-App eintragen – dann
+        stehen alle Termine dort, die dich betreffen, und aktualisieren sich
+        von selbst. Sie ist persönlich, also nicht weitergeben.</p></div>
+  </div>
+  <div class="reihe">
+    <input type="text" id="konto-abo" value="{{ abo_adresse }}" readonly
+           aria-label="Adresse deines Kalender-Abos"
+           style="flex:1 1 14rem;min-width:0;font-family:var(--schrift-mono);font-size:.8rem;">
+    <button type="button" class="btn-zweit" data-kopieren="#konto-abo">Kopieren</button>
+  </div>
+  <p class="meta" style="margin-top:var(--r3);">
+    Anleitung je Gerät, Adresse prüfen oder neu erzeugen:
+    <button type="button" class="btn-still btn-klein" data-springe="kalender">Kalender</button>
+    · Benachrichtigungen aufs Handy:
+    <button type="button" class="btn-still btn-klein" data-springe="nachrichten">Nachrichten</button>
+  </p>
+</div>
+
+<h2 class="konto-abschnitt">Dein Stand</h2>
+<div class="panel">
+  <div class="panel-kopf"><div><h3>Auf einen Blick</h3>
+    <p class="meta">Rechnet sich von selbst aus Aufgaben, Anwesenheit,
+      Projekten und Wettbewerben.</p></div></div>
+  <div class="kennzahlen">
+    {{ m.kennzahl(offene_aufgaben, "offene Aufgaben",
+                  "kennzahl-warnung" if werte.ueberfaellig else "") }}
+    {{ m.kennzahl(erledigt, "erledigt insgesamt", "kennzahl-gut") }}
+    {{ m.kennzahl(werte.gesamt, "Leadership-Wert") }}
+    {{ m.kennzahl(werte.zuverlaessigkeit, "Zuverlässigkeit") }}
+  </div>
+  {% if werte.ueberfaellig %}
+  <div class="meldung meldung-warnung" style="margin-top:var(--r3);"><div>
+    {{ werte.ueberfaellig }} Aufgabe{{ "n" if werte.ueberfaellig != 1 }} ist
+    überfällig – das drückt die Zuverlässigkeit spürbar.
+  </div></div>
+  {% endif %}
+
+  <h4 style="margin-top:var(--r4);">Erledigt je Monat</h4>
+  <div class="stapel">
+    {% for name, wert in verlauf %}
+    <div class="balken-zeile">
+      <span class="balken-name">{{ name }}</span>
+      <span class="balken"><span style="width:{{ (wert * 8) if wert < 12 else 100 }}%"></span></span>
+      <b class="balken-zahl">{{ wert }}</b>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<h2 class="konto-abschnitt">Deine Daten</h2>
+<div class="panel">
+  <div class="panel-kopf"><div><h3>Herunterladen</h3></div></div>
+  <p class="meta">Alles, was über dich gespeichert ist, als Datei –
+    Konto, Aufgaben, Anwesenheit, Nachrichten, Protokolle.</p>
+  <div class="knopfzeile" style="margin-top:var(--r3);">
+    <a class="btn btn-zweit" href="/dashboard/mein-konto/meine-daten.json">
+      Meine Daten herunterladen</a>
+  </div>
+</div>
+
+<details class="block gefahr-block">
+  <summary>Konto löschen</summary>
+  <div class="aufklapp-inhalt">
+    <div class="meldung meldung-warnung"><div>
+      <strong>Das lässt sich nicht rückgängig machen.</strong>
+      <p>Dein Zugang verschwindet sofort. Was du erstellt hast – Aufgaben,
+        Buchungen, Protokolle – bleibt bestehen, verliert aber deinen Namen.
+        Der Datensatz liegt {{ 30 }} Tage im Papierkorb, danach ist er endgültig weg.</p>
+    </div></div>
+    <form hx-post="/dashboard/mein-konto/loeschen" hx-target="#tab-inhalt" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Dein Passwort
+        <input type="password" name="passwort" required autocomplete="current-password"></label>
+      <label>Zum Bestätigen „LÖSCHEN“ eintippen
+        <input type="text" name="bestaetigung" required autocomplete="off"></label>
+      <div class="formular-fuss">
+        <button type="submit" class="btn-gefahr"
+                data-frage="Konto endgültig löschen? Das lässt sich nicht rückgängig machen.">
+          Konto löschen</button>
+      </div>
+    </form>
+  </div>
+</details>

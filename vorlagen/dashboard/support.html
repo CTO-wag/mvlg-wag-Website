@@ -1,0 +1,128 @@
+{% import "dashboard/teile/makros.html" as m %}
+
+{{ m.kopf("Support", "Etwas funktioniert nicht oder ist unklar? Hier fragen.") }}
+{{ m.rueckmeldung(meldung) }}
+
+<div class="tour-start">
+  <div>
+    <strong>Rundgang durch das Dashboard</strong>
+    <span>Drei Minuten, danach weißt du, wo alles liegt – und die
+      Benachrichtigungen sind gleich mit eingerichtet.</span>
+  </div>
+  <button type="button" data-rundgang-start>Rundgang starten</button>
+</div>
+
+{# Zweiter Rundgang: nur die Aenderungen seit dem Umzug. Steht hier, damit er
+   erreichbar bleibt, nachdem die Einladung weggeklickt wurde. #}
+<div class="tour-start">
+  <div>
+    <strong>Was hat sich geändert?</strong>
+    <span>Die neuen Adressen und die zwei Handgriffe, die jeder selbst
+      machen muss – Kalender-Abo und Benachrichtigungen.</span>
+  </div>
+  <button type="button" class="btn-zweit" data-neuerungen-start>
+    Neuerungen zeigen
+  </button>
+</div>
+
+<details class="block" open>
+  <summary>Neue Anfrage</summary>
+  <div class="aufklapp-inhalt">
+    <form hx-post="/dashboard/support" hx-target="#tab-inhalt"
+          hx-encoding="multipart/form-data" class="formular">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="voll">Worum geht es?
+        <input type="text" name="betreff" maxlength="160" required
+               placeholder="Kurz in einem Satz"></label>
+      <label class="voll">Beschreibung
+        <span class="meta">Was hast du gemacht, was ist passiert, was hattest du erwartet?</span>
+        <textarea name="text" maxlength="8000" rows="5" required></textarea></label>
+      <label class="voll">Bildschirmfoto <span class="meta">Optional, hilft oft mehr als jede Beschreibung. PNG, JPG oder WebP.</span>
+        <input type="file" name="bild" accept="image/png,image/jpeg,image/webp"></label>
+      <div class="formular-fuss"><button type="submit">Absenden</button></div>
+    </form>
+  </div>
+</details>
+
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>{{ "Alle Anfragen" if verwaltet else "Deine Anfragen" }}</h2></div>
+    <span class="marke">{{ tickets|length }}</span>
+  </div>
+
+  {% if tickets %}
+  {{ m.suche("#ticket-liste", "Betreff oder Person suchen …", "Anliegen") }}
+  <div class="stapel" id="ticket-liste">
+    {% for t in tickets %}
+    <details class="block" data-suchbar>
+      <summary>
+        <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
+          <strong>{{ t.subject }}</strong>
+          {% if verwaltet and t.sender %}
+          <span class="meta">{{ t.sender.vorname }} {{ t.sender.nachname }}</span>{% endif %}
+          <span class="marke zustand-{{ t.status }}">{{ t.status|label }}</span>
+          <span class="meta">{{ t.created_at|relativ }}</span>
+          {% if verlauf.get(t.id) %}
+          <span class="meta">{{ verlauf[t.id]|length }}</span>{% endif %}
+        </span>
+      </summary>
+      <div class="aufklapp-inhalt">
+        <p style="white-space:pre-wrap;">{{ t.message }}</p>
+        {% if t.attachment_filename %}
+        <p><a href="/dashboard/support/bild/{{ t.attachment_filename }}"
+              target="_blank" rel="noopener">Bildschirmfoto ansehen</a></p>
+        {% endif %}
+
+        {% if verlauf.get(t.id) %}
+        <div class="verlauf" style="margin-top:var(--r4);">
+          {% for n in verlauf[t.id] %}
+          <div class="verlauf-eintrag">
+            <span class="verlauf-wer">{{ n.sender.vorname if n.sender else "?" }}</span>
+            <span>
+              <span style="white-space:pre-wrap;">{{ n.message }}</span>
+              {% if n.attachment_filename %}
+              <br><a href="/dashboard/support/bild/{{ n.attachment_filename }}"
+                     target="_blank" rel="noopener">Bild ansehen</a>{% endif %}
+              <br><span class="meta">{{ n.created_at|relativ }}</span>
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if t.status != "geschlossen" %}
+        <form hx-post="/dashboard/support/{{ t.id }}/antwort" hx-target="#tab-inhalt"
+              hx-encoding="multipart/form-data" class="formular"
+              style="margin-top:var(--r4);">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="voll">{{ "Antworten" if verwaltet else "Nachfragen" }}
+            <textarea name="text" maxlength="8000" rows="3" required></textarea></label>
+          <label class="voll">Bild anhängen
+            <input type="file" name="bild" accept="image/png,image/jpeg,image/webp"></label>
+          <div class="formular-fuss">
+            <button type="submit">Senden</button>
+          </div>
+        </form>
+        {% endif %}
+
+        <div class="knopfzeile" style="margin-top:var(--r3);">
+          {% if t.status != "geschlossen" %}
+          <form hx-post="/dashboard/support/{{ t.id }}/schliessen" hx-target="#tab-inhalt">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="btn-zweit btn-klein">Als erledigt schließen</button>
+          </form>
+          {% endif %}
+          {% if verwaltet %}
+          {{ m.loeschen("/dashboard/support/" ~ t.id ~ "/loeschen",
+                        "Anfrage löschen?", csrf, "In den Papierkorb",
+                        "btn-still btn-klein") }}
+          {% endif %}
+        </div>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}
+  {{ m.leer("Keine Anfragen", "Gut so – dann läuft alles.", "support") }}
+  {% endif %}
+</div>
