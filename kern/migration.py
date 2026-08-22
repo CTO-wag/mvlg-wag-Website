@@ -60,6 +60,41 @@ def _typ_fuer_datenbank(typ: str) -> str:
     return typ.replace(typ.split()[0], ersatz, 1) if ersatz else typ
 
 
+# Spalten, die einmal zu knapp bemessen waren. SQLite hat die Laenge nie
+# geprueft und laengere Werte klaglos gespeichert; Postgres weist sie ab.
+# Beim Umzug faellt das als Fehler mitten im Kopieren auf.
+VERBREITERT = {
+    ("activity_log", "value"): "TEXT",
+}
+
+
+def _spalten_verbreitern() -> int:
+    """Zu enge Spalten auf ihren heutigen Typ bringen.
+
+    Nur fuer Postgres. In SQLite steht der Typ ohnehin nur als Notiz in
+    der Tabelle - dort gibt es nichts zu tun, und ALTER COLUMN kennt es
+    auch gar nicht.
+    """
+    if engine.dialect.name != "postgresql":
+        return 0
+    vorhanden = _tabellen()
+    geaendert = 0
+    for (tabelle, spalte), typ in VERBREITERT.items():
+        if tabelle not in vorhanden or spalte not in _spalten(tabelle):
+            continue
+        with engine.begin() as verbindung:
+            jetzt = verbindung.execute(text(
+                "SELECT data_type FROM information_schema.columns "
+                "WHERE table_name = :t AND column_name = :s"),
+                {"t": tabelle, "s": spalte}).scalar()
+            if jetzt == "text":
+                continue
+            verbindung.execute(text(
+                f'ALTER TABLE "{tabelle}" ALTER COLUMN "{spalte}" '
+                f'TYPE {typ}'))
+        geaendert += 1
+    return geaendert
+
 def _spalte_anhaengen(tabelle: str, name: str, typ: str, standard=None) -> bool:
     """Haengt eine Spalte an, wenn sie fehlt. Gibt zurueck, ob etwas geschah.
 
@@ -484,6 +519,19 @@ def migriere(still: bool = False) -> None:
     angehaengt = _neue_spalten()
     if angehaengt and not still:
         print(f"[Migration] {angehaengt} neue Spalte(n) angelegt.")
+
+    verbreitert = _spalten_verbreitern()
+    if verbreitert and not still:
+        print(f"[Migration] {verbreitert} Spalte(n) verbreitert.")
+
+    # Liegt die Datenbank bei Supabase, steht neben ihr eine offene
+    # REST-Schnittstelle. Eine neu angelegte Tabelle waere darueber fuer
+    # jeden lesbar und beschreibbar, bis jemand RLS einschaltet.
+    if engine.dialect.name == "postgresql":
+        from kern.datenumzug import rls_einschalten
+        offen = rls_einschalten(engine, melden=lambda _: None)
+        if offen and not still:
+            print(f"[Migration] RLS auf {offen} Tabelle(n) eingeschaltet.")
 
     # 3. Rollen und Abteilungen ergaenzen (nicht ueberschreiben).
     rollen_anlegen()

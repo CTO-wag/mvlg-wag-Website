@@ -38,7 +38,8 @@ def _naechster_termin(db, user):
     meine = set(zustaendige_abteilungen(user))
     kandidaten = (db.query(CalendarEvent)
                   .filter(CalendarEvent.start_date >= heute)
-                  .order_by(CalendarEvent.start_date, CalendarEvent.start_time)
+                  .order_by(CalendarEvent.start_date,
+                            CalendarEvent.start_time.asc().nullsfirst())
                   .limit(30).all())
     for termin in kandidaten:
         if termin.target_type == "alle":

@@ -782,7 +782,10 @@ class ActivityLog(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     event_type = Column(String(40), nullable=False)
-    value = Column(String(200), nullable=True)
+    # Text statt String(200): Bei "rolle_rechte_geaendert" steht hier die
+    # ganze Rechteliste, und die waechst mit jedem neuen Recht. SQLite hat
+    # die Laenge nie geprueft, Postgres weist sie ab.
+    value = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)
 
 

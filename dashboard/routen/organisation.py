@@ -224,7 +224,8 @@ def _kalender_ansicht(a: Anmeldung, meldung=None):
     heute = date.today()
     kommende = (db.query(CalendarEvent)
                 .filter(CalendarEvent.start_date >= heute - timedelta(days=1))
-                .order_by(CalendarEvent.start_date, CalendarEvent.start_time)
+                .order_by(CalendarEvent.start_date,
+                          CalendarEvent.start_time.asc().nullsfirst())
                 .limit(80).all())
     vergangene = (db.query(CalendarEvent)
                   .filter(CalendarEvent.start_date < heute - timedelta(days=1))
