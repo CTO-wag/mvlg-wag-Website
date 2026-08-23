@@ -133,7 +133,13 @@ export default {
     }
 
     try {
-      const antwort = await fetch(anfrage);
+      /* Eine zuvor ausgelieferte Notfallseite darf weder aus dem Browser-
+         noch aus einem vorgeschalteten Cache wiederkommen. Der Reload-
+         Parameter wird nicht an die eigentliche Anwendung weitergegeben. */
+      const weiterleitung = new URL(anfrage.url);
+      weiterleitung.searchParams.delete("_auffangnetz_reload");
+      const ursprungsAnfrage = new Request(weiterleitung.toString(), anfrage);
+      const antwort = await fetch(ursprungsAnfrage, { cache: "no-store" });
       if (!NICHT_ERREICHBAR.has(antwort.status)) {
         /* Im Normalbetrieb hoechstens einmal je Minute nachhalten - eine
            KV-Abfrage bei JEDER Anfrage waere die teuerste Zeile der ganzen
@@ -1619,7 +1625,12 @@ const HTML = `<!doctype html>
 
   if (wiederDa) {
     wiederDa.addEventListener("click", function () {
-      window.location.reload();
+      /* reload() kann bei einer noch vorhandenen Fehlerantwort aus dem
+         Browser-Cache erneut beim Worker landen. Ein eindeutiger GET zwingt
+         Worker und Browser, die jetzt wieder laufende Plattform zu prüfen. */
+      var ziel = new URL(window.location.href);
+      ziel.searchParams.set("_auffangnetz_reload", Date.now().toString());
+      window.location.replace(ziel.toString());
     });
   }
 
