@@ -4,8 +4,9 @@
     python server.py dashboard   - Verwaltung           (Port 8001)
     python server.py beide       - beide in einem Fenster
 
-Der uebliche Weg ist start.bat; dieses Skript ist der direkte Einstieg fuer
-Entwicklung und Fehlersuche.
+Der uebliche Weg ist start.bat; fuer eine getrennte lokale Umgebung gibt es
+start-entwicklung.bat. Dieses Skript ist der direkte Einstieg fuer Entwicklung
+und Fehlersuche.
 
 Warum zwei Prozesse und nicht eine Anwendung mit zwei Praefixen? Weil sie
 verschiedene Aufgaben haben. Die Website ist oeffentlich und muss schnell und

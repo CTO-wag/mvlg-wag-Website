@@ -474,7 +474,8 @@ def statistiken(a: Anmeldung = Depends(Anmeldung.pflicht)):
                     [(abteilung_label(k), n) for k, n in nach_abteilung.items() if k]),
                 monats_diagramm=diagramme.balken(monatswerte, farbe_index=2),
                 bewerbungs_diagramm=diagramme.ring(
-                    [(s.replace("_", " ").title(), n) for s, n in bewerbungen.items()]),
+                    [(s.replace("_", " ").title(), n) for s, n in bewerbungen.items()],
+                    groesse=120, staerke=16),
                 personen_gesamt=personen_gesamt, aktive=aktive,
                 aufgaben_gesamt=sum(nach_status.values()),
                 erledigt=nach_status.get("erledigt", 0),

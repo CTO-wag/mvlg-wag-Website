@@ -584,12 +584,57 @@ html[data-theme="dark"] .dash-whatsapp:hover{ color:#3BE07B; }
 .zustand-punkt span{ color:var(--gedaempft); overflow-wrap:anywhere; }
 
 /* --- Diagramme ----------------------------------------------------------- */
+.statistik-kopf{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:var(--r4); margin:var(--r2) 0 var(--r4); padding:var(--r4);
+  border:1px solid var(--linie); border-radius:var(--rund);
+  background:var(--flaeche-2);
+}
+.statistik-kopf h2{ margin:.2rem 0 .25rem; font-size:1.35rem; }
+.statistik-kopf .meta{ margin:0; }
+.statistik-etikett{ display:block; color:var(--gedaempft); font-size:.68rem;
+  font-weight:800; letter-spacing:.12em; }
+.statistik-live{ display:inline-flex; align-items:center; gap:.45rem;
+  padding:.45rem .7rem; border:1px solid var(--linie);
+  border-radius:99px; color:var(--gedaempft); font-size:.78rem; white-space:nowrap; }
+.statistik-live i{ width:.5rem; height:.5rem; border-radius:50%; background:var(--gruen); }
+.statistik-kpis{ display:grid; grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:var(--r3); margin-bottom:var(--r4); }
+.statistik-kpi{ min-width:0; padding:var(--r3); border-radius:var(--rund);
+  color:var(--text); display:grid; grid-template-columns:auto 1fr; column-gap:.65rem;
+  align-items:center; border:1px solid var(--linie); background:var(--flaeche); }
+.statistik-kpi-icon{ grid-row:span 2; display:grid; place-items:center;
+  width:2rem; height:2rem; border-radius:.65rem; background:var(--flaeche-2);
+  font-weight:800; }
+.statistik-kpi strong{ font-size:1.25rem; line-height:1.1; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+.statistik-kpi > span:last-child{ font-size:.72rem; color:var(--gedaempft);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.statistik-raster{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:var(--r4); }
+.statistik-panel{ min-width:0; padding:var(--r4); }
+.statistik-panel-breit{ grid-column:span 1; }
+.statistik-panel-kopf{ display:flex; justify-content:space-between;
+  align-items:flex-start; gap:var(--r3); margin-bottom:var(--r3); }
+.statistik-panel-kopf h2{ margin:.2rem 0 0; }
+.statistik-symbol{ display:grid; place-items:center; width:2.2rem; height:2.2rem;
+  border-radius:.7rem; background:var(--flaeche-2); color:var(--akzent);
+  font-size:1.2rem; }
+@media (max-width:1100px){
+  .statistik-kpis{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (max-width:700px){
+  .statistik-kopf{ flex-direction:column; }
+  .statistik-kpis,.statistik-raster{ grid-template-columns:1fr; }
+  .statistik-panel-breit{ grid-column:auto; }
+}
 .diagramm{ width:100%; height:auto; overflow:visible; }
 .diagramm text{ font-family:var(--schrift-mono); font-size:11px; fill:var(--gedaempft); }
 .diagramm .wert{ fill:var(--text); font-weight:600; }
 .diagramm-legende{ display:flex; flex-wrap:wrap; gap:var(--r3); margin-top:var(--r3); font-size:.82rem; }
 .diagramm-legende span{ display:inline-flex; align-items:center; gap:var(--r1); }
 .legende-punkt{ width:.7rem; height:.7rem; border-radius:3px; flex-shrink:0; }
+.bewerbungs-diagramm .diagramm{ display:block; margin:0 auto; }
 
 /* --- Balkendiagramm ------------------------------------------------------ */
 .balken-diagramm{ display:flex; flex-direction:column; gap:var(--r2); }

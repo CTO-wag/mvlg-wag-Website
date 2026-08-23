@@ -78,12 +78,13 @@ def ring(werte, groesse: int = 168, staerke: int = 26) -> Markup:
 
     return Markup(
         f'<svg class="diagramm" viewBox="0 0 {groesse} {groesse}" '
-        f'width="{groesse}" height="{groesse}" role="img" '
+        f'width="{groesse}" height="{groesse}" '
+        f'style="width:{groesse}px;height:{groesse}px;" role="img" '
         f'aria-label="Ringdiagramm mit {len(werte)} Anteilen">'
         # Startpunkt oben statt rechts - so liest man ein Tortendiagramm.
         f'<g transform="rotate(-90 {mitte} {mitte})">' + "".join(kreise) + "</g>"
         f'<text x="{mitte}" y="{mitte - 2}" text-anchor="middle" '
-        f'class="wert" style="font-size:20px;">{gesamt}</text>'
+        f'class="wert" style="font-size:{max(10, round(groesse * .12))}px;">{gesamt}</text>'
         f'<text x="{mitte}" y="{mitte + 14}" text-anchor="middle" '
         f'style="font-size:10px;">gesamt</text>'
         "</svg>"

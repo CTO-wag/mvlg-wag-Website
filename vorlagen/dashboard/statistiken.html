@@ -1,39 +1,60 @@
 {% import "dashboard/teile/makros.html" as m %}
 
-{{ m.kopf("Statistiken", "Was die AG in Zahlen gemacht hat.") }}
+{{ m.kopf("Statistiken", "Der Überblick über Aktivität, Aufgaben und Entwicklung.") }}
 
-<div class="kennzahlen">
-  {{ m.kennzahl(aktive, "aktive Mitglieder") }}
-  {{ m.kennzahl(aufgaben_gesamt, "Aufgaben insgesamt") }}
-  {{ m.kennzahl(erledigt_anteil ~ " %", "davon erledigt", "kennzahl-gut") }}
-  {{ m.kennzahl(treffen, "AG-Treffen") }}
-  {{ m.kennzahl(anwesenheiten, "Anwesenheiten") }}
+<div class="statistik-kopf">
+  <div>
+    <span class="statistik-etikett">AKTUELLER ÜBERBLICK</span>
+    <h2>So läuft die AG</h2>
+    <p class="meta">Kennzahlen und Diagramme werden direkt aus den aktuellen
+      Daten berechnet.</p>
+  </div>
+</div>
+
+<div class="statistik-kpis">
+  <div class="statistik-kpi statistik-kpi-blau">
+    <span class="statistik-kpi-icon">M</span>
+    <strong>{{ aktive }}</strong><span>aktive Mitglieder</span>
+  </div>
+  <div class="statistik-kpi statistik-kpi-violett">
+    <span class="statistik-kpi-icon">A</span>
+    <strong>{{ aufgaben_gesamt }}</strong><span>Aufgaben insgesamt</span>
+  </div>
+  <div class="statistik-kpi statistik-kpi-gruen">
+    <span class="statistik-kpi-icon">✓</span>
+    <strong>{{ erledigt_anteil }}%</strong><span>Aufgaben erledigt</span>
+  </div>
+  <div class="statistik-kpi statistik-kpi-orange">
+    <span class="statistik-kpi-icon">T</span>
+    <strong>{{ treffen }}</strong><span>AG-Treffen</span>
+  </div>
+  <div class="statistik-kpi statistik-kpi-tuerkis">
+    <span class="statistik-kpi-icon">↗</span>
+    <strong>{{ anwesenheiten }}</strong><span>Anwesenheiten</span>
+  </div>
   {% if kassenstand is not none %}
-  {{ m.kennzahl(kassenstand|euro, "Kassenstand",
-                "kennzahl-warnung" if kassenstand < 0 else "kennzahl-gut") }}
+  <div class="statistik-kpi {{ 'statistik-kpi-rot' if kassenstand < 0 else 'statistik-kpi-gruen' }}">
+    <span class="statistik-kpi-icon">€</span>
+    <strong>{{ kassenstand|euro }}</strong><span>Kassenstand</span>
+  </div>
   {% endif %}
 </div>
 
-<div class="raster-2">
-  <div class="panel">
-    <div class="panel-kopf"><div><h2>Aufgaben nach Stand</h2></div></div>
+<div class="statistik-raster">
+  <div class="panel statistik-panel">
+    <div class="statistik-panel-kopf"><div><span class="statistik-etikett">AUFGABEN</span><h2>Nach Status</h2></div><span class="statistik-symbol">◔</span></div>
     {{ status_diagramm }}
   </div>
-  <div class="panel">
-    <div class="panel-kopf"><div><h2>Bewerbungen</h2></div></div>
-    {{ bewerbungs_diagramm }}
+  <div class="panel statistik-panel">
+    <div class="statistik-panel-kopf"><div><span class="statistik-etikett">NACHWUCHS</span><h2>Bewerbungen</h2></div><span class="statistik-symbol">✦</span></div>
+    <div class="bewerbungs-diagramm">{{ bewerbungs_diagramm }}</div>
   </div>
-</div>
-
-<div class="panel">
-  <div class="panel-kopf"><div><h2>Erledigt je Monat</h2>
-    <p class="meta">Aus dem Leistungsnachweis – zählt auch Aufgaben mit, die
-      inzwischen gelöscht wurden. Die Zahl bleibt also stabil, wenn jemand
-      aufräumt.</p></div></div>
-  {{ monats_diagramm }}
-</div>
-
-<div class="panel">
-  <div class="panel-kopf"><div><h2>Aufgaben nach Abteilung</h2></div></div>
-  {{ abteilung_diagramm }}
+  <div class="panel statistik-panel statistik-panel-breit">
+    <div class="statistik-panel-kopf"><div><span class="statistik-etikett">ENTWICKLUNG</span><h2>Erledigte Aufgaben</h2><p class="meta">Die letzten sechs Monate aus dem Leistungsnachweis.</p></div><span class="statistik-symbol">▥</span></div>
+    {{ monats_diagramm }}
+  </div>
+  <div class="panel statistik-panel statistik-panel-breit">
+    <div class="statistik-panel-kopf"><div><span class="statistik-etikett">VERTEILUNG</span><h2>Aufgaben nach Abteilung</h2></div><span class="statistik-symbol">◫</span></div>
+    {{ abteilung_diagramm }}
+  </div>
 </div>
