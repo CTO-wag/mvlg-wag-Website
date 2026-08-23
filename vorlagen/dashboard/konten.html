@@ -68,7 +68,7 @@
 
   <div class="stapel" id="konten-liste">
     {% for k in konten %}
-    <details class="block" data-suchbar
+    <details id="konto-{{ k.id }}" data-such-id="konto-{{ k.id }}" class="block" data-suchbar
             data-suchinhalt="{{ k.vorname }} {{ k.nachname }} {{ k.role }} {{ k.role|label }} {{ k.department }} {{ abteilung_label(k.department) }} {{ k.email }} {{ k.telefonnummer or '' }}">
       <summary>
         <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">

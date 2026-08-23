@@ -101,7 +101,7 @@
   </div>
   <div class="stapel">
     {% for t in aufgaben %}
-    <details data-suchbar
+    <details id="aufgabe-{{ t.id }}" data-such-id="aufgabe-{{ t.id }}" data-suchbar
              class="aufgabe rang-{{ t.priority }} {% if t.status == 'erledigt' %}ist-erledigt{% endif %}">
       <summary class="aufgabe-kopf">
         <span class="aufgabe-titel">

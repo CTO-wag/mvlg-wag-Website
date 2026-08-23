@@ -1,10 +1,12 @@
 """Serverseitige Verwaltung der festen Cloudflare Email-Routing-Adressen."""
 
 import json
+import threading
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from kern import einstellungen as cfg
+from kern.datenbank import sitzung
 from kern.modelle import Funktionsadresse, User
 from kern.text import email_normal, utcnow
 
@@ -79,6 +81,22 @@ def synchronisiere_aus_konten(db, rollen=None) -> int:
             position.last_error = str(problem)[:500]
     db.commit()
     return erledigt
+
+
+def synchronisiere_aus_konten_hintergrund(rollen=None) -> None:
+    """Startet die Cloudflare-Synchronisation ohne den Webrequest zu blockieren."""
+    rollen = tuple(rollen or ("ceo", "coo", "cmo", "cro", "cto"))
+
+    def arbeit():
+        try:
+            with sitzung() as db:
+                synchronisiere_aus_konten(db, rollen)
+        except Exception as problem:                         # pragma: no cover
+            print(f"[Cloudflare] Hintergrund-Synchronisation fehlgeschlagen: "
+                  f"{type(problem).__name__}: {problem}")
+
+    threading.Thread(target=arbeit, daemon=True,
+                     name="cloudflare-sync").start()
 
 
 def _anfrage(methode: str, pfad: str, daten=None):

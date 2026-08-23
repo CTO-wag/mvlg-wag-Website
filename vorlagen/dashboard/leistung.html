@@ -35,7 +35,7 @@
     <span>Projekte</span><span>Initiative</span><span class="rechts">Gesamt</span>
   </div>
   {% for z in zeilen %}
-  <div class="leistung-zeile" data-suchbar>
+  <div id="konto-{{ z.person.id }}" data-such-id="konto-{{ z.person.id }}" class="leistung-zeile" data-suchbar>
     <span class="leistung-platz {% if loop.index <= 3 %}oben{% endif %}">{{ loop.index }}</span>
     <span class="leistung-person">
       <strong>{{ z.person.vorname }} {{ z.person.nachname }}</strong>

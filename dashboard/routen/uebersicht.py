@@ -287,7 +287,7 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
     if aufgaben:
         gruppen.append(("Aufgaben", [
             {"text": t.titel, "meta": t.status.replace("_", " ").title(),
-             "bereich": "aufgaben"} for t in aufgaben]))
+             "bereich": "aufgaben", "ziel": f"aufgabe-{t.id}"} for t in aufgaben]))
 
     if a.darf("accounts_all", "mitglieder_view"):
         personen = (db.query(User)
@@ -297,7 +297,8 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
             gruppen.append(("Personen", [
                 {"text": p.name,
                  "meta": abteilung_label(p.department),
-                 "bereich": "konten" if a.darf("accounts_all") else "mitglieder"}
+                 "bereich": "konten" if a.darf("accounts_all") else "mitglieder",
+                 "ziel": f"konto-{p.id}"}
                 for p in personen]))
 
     if a.darf("bewerbungen"):
@@ -307,7 +308,7 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
         if bewerbungen:
             gruppen.append(("Bewerbungen", [
                 {"text": f"{b.vorname} {b.nachname}", "meta": b.klasse,
-                 "bereich": "bewerbungen"} for b in bewerbungen]))
+                 "bereich": "bewerbungen", "ziel": f"bewerbung-{b.id}"} for b in bewerbungen]))
 
     termine = (db.query(CalendarEvent)
                .filter(_suchfilter_mehrere(CalendarEvent, begriff))
@@ -315,14 +316,15 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
     if termine:
         gruppen.append(("Termine", [
             {"text": t.title, "meta": nach_berlin(t.start_date),
-             "bereich": "kalender"} for t in termine]))
+             "bereich": "kalender", "ziel": f"termin-{t.id}"} for t in termine]))
 
     treffen = (db.query(Meeting)
                .filter(_suchfilter_mehrere(Meeting, begriff))
                .order_by(Meeting.date.desc()).limit(4).all())
     if treffen:
         gruppen.append(("AG-Treffen", [
-            {"text": t.title, "meta": nach_berlin(t.date), "bereich": "treffen"}
+            {"text": t.title, "meta": nach_berlin(t.date), "bereich": "treffen",
+             "ziel": f"treffen-{t.id}"}
             for t in treffen]))
 
     if a.darf("projects"):
@@ -330,7 +332,8 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
                     .order_by(Project.id.desc()).limit(4).all())
         if projekte:
             gruppen.append(("Projekte", [
-                {"text": p.title, "meta": p.status.title(), "bereich": "projekte"}
+                {"text": p.title, "meta": p.status.title(), "bereich": "projekte",
+                 "ziel": f"projekt-{p.id}"}
                 for p in projekte]))
 
     if a.darf("competitions"):
@@ -339,7 +342,8 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
                        .order_by(Competition.id.desc()).limit(4).all())
         if wettbewerbe:
             gruppen.append(("Wettbewerbe", [
-                {"text": w.title, "meta": w.status.title(), "bereich": "wettbewerbe"}
+                {"text": w.title, "meta": w.status.title(), "bereich": "wettbewerbe",
+                 "ziel": f"wettbewerb-{w.id}"}
                 for w in wettbewerbe]))
 
     if a.darf("support_verwaltung"):
@@ -348,7 +352,8 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
                    .order_by(SupportTicket.created_at.desc()).limit(4).all())
         if tickets:
             gruppen.append(("Support", [
-                {"text": t.subject, "meta": t.status.title(), "bereich": "support"}
+                {"text": t.subject, "meta": t.status.title(), "bereich": "support",
+                 "ziel": f"ticket-{t.id}"}
                 for t in tickets]))
 
     if a.darf("nachrichten"):
@@ -358,7 +363,7 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
         if kontakt:
             gruppen.append(("Kontaktanfragen", [
                 {"text": c.subject or c.email, "meta": c.name or c.email,
-                 "bereich": "nachrichten"} for c in kontakt]))
+                 "bereich": "nachrichten", "ziel": f"kontakt-{c.id}"} for c in kontakt]))
 
     if a.darf("attendance"):
         attendance = (db.query(Attendance)
@@ -368,7 +373,7 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
             gruppen.append(("Anwesenheit", [
                 {"text": f"Anwesenheit #{x.id}",
                  "meta": f"{x.event_type} · {x.event_date}",
-                 "bereich": "anwesenheit"} for x in attendance]))
+                 "bereich": "anwesenheit", "ziel": f"anwesenheit-{x.id}"} for x in attendance]))
 
     if a.darf("rollen"):
         rollen_treffer = (db.query(Role).filter(_suchfilter_mehrere(Role, begriff))
@@ -378,11 +383,13 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
                                .order_by(Department.key).limit(4).all())
         if rollen_treffer:
             gruppen.append(("Rollen", [
-                {"text": r.label, "meta": r.key, "bereich": "rollen"}
+                {"text": r.label, "meta": r.key, "bereich": "rollen",
+                 "ziel": f"rolle-{r.id}"}
                 for r in rollen_treffer]))
         if abteilungen_treffer:
             gruppen.append(("Abteilungen", [
-                {"text": d.label, "meta": d.key, "bereich": "rollen"}
+                {"text": d.label, "meta": d.key, "bereich": "rollen",
+                 "ziel": f"abteilung-{d.id}"}
                 for d in abteilungen_treffer]))
 
     if a.darf("seiteninhalte"):
@@ -391,7 +398,8 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
                    .order_by(ContentItem.id.desc()).limit(4).all())
         if inhalte:
             gruppen.append(("Startseiten-Inhalte", [
-                {"text": x.titel, "meta": x.abteilung, "bereich": "redaktion"}
+                {"text": x.titel, "meta": x.abteilung, "bereich": "redaktion",
+                 "ziel": f"inhalt-{x.id}"}
                 for x in inhalte]))
 
     if a.darf("email_vorlagen"):
@@ -400,7 +408,8 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
                     .order_by(EmailTemplate.updated_at.desc()).limit(4).all())
         if vorlagen:
             gruppen.append(("E-Mail-Vorlagen", [
-                {"text": x.key, "meta": x.subject, "bereich": "vordrucke"}
+                {"text": x.key, "meta": x.subject, "bereich": "vordrucke",
+                 "ziel": f"vorlage-{x.id}"}
                 for x in vorlagen]))
 
     if a.darf("finanzen"):
@@ -416,7 +425,8 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
                     {"text": next((str(getattr(x, feld)) for feld in
                                    ("zweck", "name", "titel", "beschreibung")
                                    if getattr(x, feld, None)), f"#{x.id}"),
-                     "meta": f"#{x.id}", "bereich": bereich} for x in treffer]))
+                     "meta": f"#{x.id}", "bereich": bereich,
+                     "ziel": f"{bereich}-{x.id}"} for x in treffer]))
 
     return teil("dashboard/teile/suchtreffer.html", a, gruppen=gruppen,
                 begriff=begriff)

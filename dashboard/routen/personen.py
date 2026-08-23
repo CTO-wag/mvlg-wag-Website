@@ -129,7 +129,7 @@ def konto_anlegen(vorname: str = Form(""), nachname: str = Form(""),
 
     if rolle in ("ceo", "coo", "cmo", "cro", "cto"):
         from kern import cloudflare
-        cloudflare.synchronisiere_aus_konten(db, (rolle,))
+        cloudflare.synchronisiere_aus_konten_hintergrund((rolle,))
 
     if wa_eintrag and whatsapp.modus() != "manuell":
         whatsapp.korb_anstossen()
@@ -213,7 +213,8 @@ def konto_aendern(konto_id: int, vorname: str = Form(""),
     if alte_rolle in ("ceo", "coo", "cmo", "cro", "cto") or ziel.role in (
             "ceo", "coo", "cmo", "cro", "cto"):
         from kern import cloudflare
-        cloudflare.synchronisiere_aus_konten(db, (alte_rolle, ziel.role))
+        cloudflare.synchronisiere_aus_konten_hintergrund(
+            (alte_rolle, ziel.role))
     return _konten_ansicht(a, gut(f"{ziel.name} gespeichert."))
 
 

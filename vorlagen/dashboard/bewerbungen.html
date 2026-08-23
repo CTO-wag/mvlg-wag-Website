@@ -37,7 +37,7 @@
 
 <div id="bewerbungen-liste">
 {% for b in bewerbungen %}
-<details class="block" data-suchbar>
+<details id="bewerbung-{{ b.id }}" data-such-id="bewerbung-{{ b.id }}" class="block" data-suchbar>
   <summary>
     <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
       <strong>{{ b.vorname }} {{ b.nachname }}</strong>

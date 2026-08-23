@@ -63,6 +63,25 @@
       document.querySelectorAll('.leisten-punkt').forEach(function (p) {
         p.classList.remove('aktiv');
       });
+
+      /* Sofortiges Feedback bei htmx-Navigation, ohne den Abschluss vorzutäuschen. */
+      var laufendeHtmxAnfragen = 0;
+      function ladezustand(aktiv) {
+        if (aktiv) {
+          laufendeHtmxAnfragen++;
+        } else {
+          laufendeHtmxAnfragen = Math.max(0, laufendeHtmxAnfragen - 1);
+        }
+        document.body.classList.toggle('dashboard-laedt', laufendeHtmxAnfragen > 0);
+        document.body.setAttribute('aria-busy',
+          laufendeHtmxAnfragen > 0 ? 'true' : 'false');
+      }
+      document.addEventListener('htmx:beforeRequest', function () {
+        ladezustand(true);
+      });
+      document.addEventListener('htmx:afterRequest', function () {
+        ladezustand(false);
+      });
       ich.classList.add('aktiv');
     }
   });
@@ -70,7 +89,8 @@
   window.addEventListener('resize', klebenPruefen);
 
   /* --- Globale Suche ------------------------------------------------------ */
-  var suchZeit = null, suchStelle = -1;
+  var suchZeit = null, suchStelle = -1, suchZiel = null;
+  var eintragSuchText = null;
 
   function trefferKasten() { return document.getElementById('such-treffer'); }
 
@@ -138,6 +158,8 @@
     var eintrag = e.target.closest('.suche-eintrag[data-bereich]');
     if (eintrag) {
       kasten.classList.remove('offen');
+      suchZiel = eintrag.dataset.suchZiel || null;
+      eintragSuchText = eintrag.dataset.suchText || null;
       var punkt = document.querySelector(
         '.leisten-punkt[data-bereich="' + eintrag.dataset.bereich + '"]');
       if (punkt) { punkt.click(); }
@@ -629,7 +651,29 @@
       var anfrage = e.detail.requestConfig || {};
       var warPost = String(anfrage.verb || '').toLowerCase() === 'post';
       if (!warPost) {
-        window.scrollTo({top: 0, behavior: 'smooth'});
+        if (suchZiel) {
+          var trefferZiel = e.detail.target.querySelector(
+            '[data-such-id="' + CSS.escape(suchZiel) + '"]');
+          if (!trefferZiel && eintragSuchText) {
+            var suchText = suchNormalisieren(eintragSuchText);
+            trefferZiel = Array.prototype.find.call(
+              e.detail.target.querySelectorAll('[data-suchbar]'),
+              function (element) {
+                return suchNormalisieren(element.textContent).indexOf(suchText) !== -1;
+              });
+          }
+          if (trefferZiel) {
+            trefferZiel.scrollIntoView({behavior: 'smooth', block: 'center'});
+            trefferZiel.classList.add('such-ziel');
+            window.setTimeout(function () {
+              trefferZiel.classList.remove('such-ziel');
+            }, 1800);
+          }
+          suchZiel = null;
+          eintragSuchText = null;
+        } else {
+          window.scrollTo({top: 0, behavior: 'smooth'});
+        }
       } else {
         /* Genau da bleiben, wo man war. Der Bereich wird beim Abschicken
            komplett ersetzt; ohne das Zuruecksetzen landet man am Anfang,
