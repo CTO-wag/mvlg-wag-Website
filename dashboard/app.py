@@ -19,7 +19,7 @@ from dashboard import navigation
 from dashboard.hilfen import _Umleitung
 from dashboard.routen import (
     arbeit, kommunikation, konto, neuerungen, organisation, personen,
-    system, uebersicht,
+    system, uebersicht, funktionsadressen,
 )
 
 
@@ -63,6 +63,10 @@ async def lebenszyklus(_app: FastAPI):
     print("  " + "-" * 52)
     migriere()
     mail.vordrucke_anlegen()
+    from kern import cloudflare
+    from kern.datenbank import sitzung
+    with sitzung() as db:
+        cloudflare.vorbefuellen(db)
     ersten_zugang_sichern()
     bremse_aufraeumer_starten()
     for zeile in cfg.zusammenfassung():
@@ -164,5 +168,6 @@ app.include_router(personen.router)
 app.include_router(organisation.router)
 app.include_router(kommunikation.router)
 app.include_router(system.router)
+app.include_router(funktionsadressen.router)
 app.include_router(konto.router)
 app.include_router(neuerungen.router)

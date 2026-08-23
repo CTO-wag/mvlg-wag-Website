@@ -87,6 +87,25 @@ class User(Base):
         return f"{self.vorname} {self.nachname}".strip()
 
 
+class Funktionsadresse(Base):
+    """Feste Funktionsadresse mit verwaltetem Cloudflare-Ziel."""
+    __tablename__ = "funktionsadressen"
+    id = Column(Integer, primary_key=True)
+    key = Column(String(40), unique=True, nullable=False, index=True)
+    label = Column(String(80), nullable=False)
+    routing_address = Column(String(160), unique=True, nullable=False)
+    person_name = Column(String(160), nullable=True)
+    destination_email = Column(String(160), nullable=True)
+    destination_id = Column(String(80), nullable=True)
+    destination_verified = Column(Integer, nullable=False, default=0)
+    routing_rule_id = Column(String(80), nullable=True)
+    routing_active = Column(Integer, nullable=False, default=0)
+    sync_status = Column(String(30), nullable=False, default="nicht synchronisiert")
+    last_error = Column(Text, nullable=True)
+    last_synced_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
 class UserSession(Base):
     """Serverseitig verfolgte Anmeldung - einsehbar und aus der Ferne beendbar."""
     __tablename__ = "user_sessions"

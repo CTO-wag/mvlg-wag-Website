@@ -159,6 +159,29 @@
     </div>
     {% endif %}
 
+    {% if darf_anwesenheit %}
+    <details style="margin-top:var(--r4);">
+      <summary class="meta" style="cursor:pointer;">Anwesenheit erfassen oder korrigieren</summary>
+      <form hx-post="/dashboard/treffen/{{ t.id }}/anwesenheit" hx-target="#tab-inhalt"
+            class="formular" style="margin-top:var(--r3);">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="empfaenger-kasten" style="grid-column:1 / -1;">
+          <div class="empfaenger-kopf"><strong>{{ personen|length }} Mitglieder</strong></div>
+          <div class="empfaenger-liste">
+            {% for p in personen %}
+            <label class="haken">
+              <input type="checkbox" name="personen" value="{{ p.id }}"
+                     {% if p.id in anwesend_ids.get(t.id, []) %}checked{% endif %}>
+              <span>{{ p.vorname }} {{ p.nachname }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="formular-fuss"><button type="submit">Anwesenheit speichern</button></div>
+      </form>
+    </details>
+    {% endif %}
+
     {% if darf_verwalten %}
     <details style="margin-top:var(--r4);">
       <summary class="meta" style="cursor:pointer;">Bearbeiten oder löschen</summary>

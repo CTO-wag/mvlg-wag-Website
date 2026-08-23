@@ -35,6 +35,10 @@ def _treffen_ansicht(a: Anmeldung, meldung=None):
                             .join(User, User.id == Attendance.user_id)
                             .filter(Attendance.meeting_id.isnot(None)).all()):
         anwesend.setdefault(eintrag.meeting_id, []).append(person)
+    anwesend_ids = {
+        treffen_id: {person.id for person in personen}
+        for treffen_id, personen in anwesend.items()
+    }
 
     # Zu- und Absagen je Treffen, und was diese Person selbst geantwortet hat.
     zusagen, absagen, eigene = {}, {}, {}
@@ -52,11 +56,13 @@ def _treffen_ansicht(a: Anmeldung, meldung=None):
         punkte.setdefault(punkt.meeting_id, []).append((punkt, person))
 
     return teil("dashboard/treffen.html", a, treffen=treffen, anwesend=anwesend,
+                anwesend_ids=anwesend_ids,
                 personen=db.query(User).filter(User.status == "aktiv")
                           .order_by(User.vorname).all(),
                 zusagen=zusagen, absagen=absagen, eigene_antwort=eigene,
                 punkte=punkte,
                 darf_verwalten=a.darf("meetings_manage"),
+                darf_anwesenheit=a.darf("attendance"),
                 meldung=meldung)
 
 
@@ -182,6 +188,37 @@ def treffen_punkt_loeschen(punkt_id: int, csrf: str = Form(""),
     a.db.delete(punkt)
     a.db.commit()
     return _treffen_ansicht(a, gut("Punkt entfernt."))
+
+
+@router.post("/treffen/{treffen_id}/anwesenheit")
+def treffen_anwesenheit(treffen_id: int, personen: list = Form([]),
+                        csrf: str = Form(""),
+                        a: Anmeldung = Depends(Anmeldung.pflicht)):
+    a.verlange("attendance")
+    a.pruefe_csrf(csrf)
+    treffen = a.db.get(Meeting, treffen_id)
+    if not treffen:
+        return _treffen_ansicht(a, fehler("Dieses Treffen gibt es nicht mehr."))
+    ids = {int(p) for p in personen if str(p).isdigit()}
+    aktive = {p.id for p in a.db.query(User).filter(User.status == "aktiv").all()}
+    ids &= aktive
+    bestehend = a.db.query(Attendance).filter(
+        Attendance.meeting_id == treffen_id).all()
+    alte_ids = {eintrag.user_id for eintrag in bestehend}
+    for eintrag in bestehend:
+        if eintrag.user_id not in ids:
+            leistung.widerrufe(a.db, eintrag.user_id, "anwesenheit", eintrag.id)
+            a.db.delete(eintrag)
+    for person_id in ids - alte_ids:
+        eintrag = Attendance(user_id=person_id, event_type="Treffen",
+                             event_date=treffen.date, meeting_id=treffen_id)
+        a.db.add(eintrag)
+        a.db.flush()
+        leistung.anwesenheit_erfasst(a.db, eintrag)
+    a.db.commit()
+    leistung.anstossen(list(ids | alte_ids))
+    leistung.treffen_abrechnen()
+    return _treffen_ansicht(a, gut("Anwesenheit für dieses Treffen gespeichert."))
 
 
 @router.post("/treffen/{treffen_id}/aendern")

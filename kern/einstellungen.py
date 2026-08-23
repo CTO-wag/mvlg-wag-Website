@@ -300,6 +300,11 @@ SMTP_FROM_NAME = os.environ.get(
     "SMTP_FROM_NAME", "Wirtschafts- & Investment-AG").strip()
 MAIL_REPLY_TO = _text("MAIL_REPLY_TO", "cto@tech.mvlg-wag.de")
 
+#  Cloudflare Email Routing (ausschließlich serverseitig)
+CLOUDFLARE_API_TOKEN = _text("CLOUDFLARE_API_TOKEN", "")
+CLOUDFLARE_ACCOUNT_ID = _text("CLOUDFLARE_ACCOUNT_ID", "")
+CLOUDFLARE_ZONE_ID = _text("CLOUDFLARE_ZONE_ID", "")
+
 #  Benachrichtigungen
 NTFY_BASE_URL = _text("NTFY_BASE_URL", "https://ntfy.sh").rstrip("/")
 DELIVERY_LOG_TAGE = _zahl("DELIVERY_LOG_TAGE", 30)
@@ -387,6 +392,11 @@ def _datenbank_kurz() -> str:
 
 def zusammenfassung() -> list:
     """Kurzer Startbericht - was aktiv ist und was nicht."""
+    cloudflare_status = (
+        "Email Routing konfiguriert"
+        if CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_ZONE_ID
+        else "nicht konfiguriert"
+    )
     zeilen = [
         f"Umgebung     : {APP_ENV}",
         f"Datenbank    : {_datenbank_kurz()}",
@@ -394,6 +404,7 @@ def zusammenfassung() -> list:
         f"Website      : {WEBSITE_URL}",
         f"Dashboard    : {DASHBOARD_URL}",
         f"E-Mail       : {'aktiv über ' + SMTP_HOST if SMTP_HOST else 'nicht konfiguriert'}",
+        f"Cloudflare   : {cloudflare_status}",
         f"WhatsApp-Bot : {WHATSAPP_MODUS}",
         f"Cookies      : {'nur HTTPS' if HTTPS_ONLY_COOKIES else 'auch HTTP (nur zum Testen!)'}",
     ]

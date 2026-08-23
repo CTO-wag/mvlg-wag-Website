@@ -10,6 +10,7 @@ Anwesenheit 18, Projekte 14, Wettbewerbe 10.
 """
 
 import threading
+import time
 from datetime import timedelta
 
 from kern.datenbank import sitzung

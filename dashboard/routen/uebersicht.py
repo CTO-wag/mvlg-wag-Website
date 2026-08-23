@@ -8,7 +8,7 @@ niemanden betrafen - "48 Konten" hilft beim Arbeiten nicht weiter.
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, or_
+from sqlalchemy import String, and_, cast, func, or_
 
 from dashboard.hilfen import Anmeldung, teil
 from kern import diagramme, kasse, umzug
@@ -16,12 +16,78 @@ from kern.aufgaben import kennzahlen, liste as aufgabenliste, sichtbar_filter
 from kern.modelle import (
     Application, Attendance, CalendarEvent, Competition, ContactMessage,
     DirectMessage, DirectMessageRecipient, Leistung, Meeting, Project,
-    SupportTicket, Task, User,
+    SupportTicket, Task, User, Role, Department, ContentItem, EmailTemplate,
+    Buchung, Budget, Dauerauftrag,
 )
 from kern.rechte import abteilung_label, zustaendige_abteilungen
 from kern.text import heute_berlin, nach_berlin, prozent, utcnow
 
 router = APIRouter(prefix="/dashboard")
+
+_SUCH_AUSNAHMEN = {
+    "password_hash", "totp_secret", "totp_ersatzcodes", "calendar_token",
+    "session_token", "api_token", "secret",
+}
+
+
+_TELEFON_SPALTEN = {
+    "telefon", "telefonnummer", "phone", "phone_number", "mobile",
+    "mobil", "mobile_phone",
+}
+
+
+def _telefonvarianten(wert: str) -> list[str]:
+    ziffern = "".join(zeichen for zeichen in wert if zeichen.isdigit())
+    if len(ziffern) < 2:
+        return []
+    varianten = {ziffern}
+    if ziffern.startswith("00"):
+        varianten.add(ziffern[2:])
+    if ziffern.startswith("0") and not ziffern.startswith("00"):
+        varianten.add("49" + ziffern[1:])
+    if ziffern.startswith("49"):
+        varianten.add("0" + ziffern[2:])
+    return list(varianten)
+
+
+def _telefon_normalisiert(spalte):
+    """Entfernt alle gaengigen Schreibtrennzeichen direkt in SQL."""
+    ausdruck = cast(spalte, String)
+    for zeichen in (" ", "-", "(", ")", ".", "/", "+"):
+        ausdruck = func.replace(ausdruck, zeichen, "")
+    return ausdruck
+
+
+def _suchfilter(modell, begriff: str):
+    """Durchsucht alle nicht sensiblen Spalten, inklusive formatierter Telefone.
+
+    Mehrere Suchwoerter duerfen aus unterschiedlichen Feldern desselben
+    Datensatzes stammen, z. B. Name plus Abteilung.
+    """
+    spalten = []
+    for spalte in modell.__table__.columns:
+        if spalte.name in _SUCH_AUSNAHMEN:
+            continue
+        if spalte.name in _TELEFON_SPALTEN:
+            varianten = _telefonvarianten(begriff)
+            telefon = or_(*(
+                _telefon_normalisiert(spalte).ilike(_suchmuster(variante))
+                for variante in varianten))
+            spalten.append(telefon if varianten else
+                           cast(spalte, String).ilike(_suchmuster(begriff)))
+        else:
+            spalten.append(cast(spalte, String).ilike(_suchmuster(begriff)))
+    return or_(*spalten) if spalten else False
+
+
+def _suchfilter_mehrere(modell, begriff: str):
+    teile = [teil for teil in begriff.split() if teil]
+    return and_(*(_suchfilter(modell, teil) for teil in teile)
+                ) if teile else False
+
+
+def _suchmuster(begriff: str) -> str:
+    return f"%{begriff}%"
 
 
 def _startpasswort_abgewaehlt(db, user) -> bool:
@@ -212,12 +278,11 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
     if len(begriff) < 2:
         return teil("dashboard/teile/suchtreffer.html", a, gruppen=[])
 
-    muster = f"%{begriff}%"
     gruppen = []
 
     aufgaben = (db.query(Task)
                 .filter(sichtbar_filter(user, db),
-                        or_(Task.titel.ilike(muster), Task.beschreibung.ilike(muster)))
+                        _suchfilter_mehrere(Task, begriff))
                 .order_by(Task.status, Task.id.desc()).limit(6).all())
     if aufgaben:
         gruppen.append(("Aufgaben", [
@@ -226,9 +291,7 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
 
     if a.darf("accounts_all", "mitglieder_view"):
         personen = (db.query(User)
-                    .filter(or_(User.vorname.ilike(muster),
-                                User.nachname.ilike(muster),
-                                User.email.ilike(muster)))
+                    .filter(_suchfilter_mehrere(User, begriff))
                     .order_by(User.vorname).limit(6).all())
         if personen:
             gruppen.append(("Personen", [
@@ -239,9 +302,7 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
 
     if a.darf("bewerbungen"):
         bewerbungen = (db.query(Application)
-                       .filter(or_(Application.vorname.ilike(muster),
-                                   Application.nachname.ilike(muster),
-                                   Application.email.ilike(muster)))
+                       .filter(_suchfilter_mehrere(Application, begriff))
                        .order_by(Application.created_at.desc()).limit(5).all())
         if bewerbungen:
             gruppen.append(("Bewerbungen", [
@@ -249,7 +310,7 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
                  "bereich": "bewerbungen"} for b in bewerbungen]))
 
     termine = (db.query(CalendarEvent)
-               .filter(CalendarEvent.title.ilike(muster))
+               .filter(_suchfilter_mehrere(CalendarEvent, begriff))
                .order_by(CalendarEvent.start_date.desc()).limit(4).all())
     if termine:
         gruppen.append(("Termine", [
@@ -257,7 +318,7 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
              "bereich": "kalender"} for t in termine]))
 
     treffen = (db.query(Meeting)
-               .filter(or_(Meeting.title.ilike(muster), Meeting.protocol.ilike(muster)))
+               .filter(_suchfilter_mehrere(Meeting, begriff))
                .order_by(Meeting.date.desc()).limit(4).all())
     if treffen:
         gruppen.append(("AG-Treffen", [
@@ -265,7 +326,7 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
             for t in treffen]))
 
     if a.darf("projects"):
-        projekte = (db.query(Project).filter(Project.title.ilike(muster))
+        projekte = (db.query(Project).filter(_suchfilter_mehrere(Project, begriff))
                     .order_by(Project.id.desc()).limit(4).all())
         if projekte:
             gruppen.append(("Projekte", [
@@ -273,7 +334,8 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
                 for p in projekte]))
 
     if a.darf("competitions"):
-        wettbewerbe = (db.query(Competition).filter(Competition.title.ilike(muster))
+        wettbewerbe = (db.query(Competition).filter(
+                       _suchfilter_mehrere(Competition, begriff))
                        .order_by(Competition.id.desc()).limit(4).all())
         if wettbewerbe:
             gruppen.append(("Wettbewerbe", [
@@ -282,13 +344,79 @@ def suche(q: str = "", a: Anmeldung = Depends(Anmeldung.pflicht)):
 
     if a.darf("support_verwaltung"):
         tickets = (db.query(SupportTicket)
-                   .filter(or_(SupportTicket.subject.ilike(muster),
-                               SupportTicket.message.ilike(muster)))
+                   .filter(_suchfilter_mehrere(SupportTicket, begriff))
                    .order_by(SupportTicket.created_at.desc()).limit(4).all())
         if tickets:
             gruppen.append(("Support", [
                 {"text": t.subject, "meta": t.status.title(), "bereich": "support"}
                 for t in tickets]))
+
+    if a.darf("nachrichten"):
+        kontakt = (db.query(ContactMessage)
+                   .filter(_suchfilter_mehrere(ContactMessage, begriff))
+                   .order_by(ContactMessage.created_at.desc()).limit(4).all())
+        if kontakt:
+            gruppen.append(("Kontaktanfragen", [
+                {"text": c.subject or c.email, "meta": c.name or c.email,
+                 "bereich": "nachrichten"} for c in kontakt]))
+
+    if a.darf("attendance"):
+        attendance = (db.query(Attendance)
+                      .filter(_suchfilter_mehrere(Attendance, begriff))
+                      .order_by(Attendance.event_date.desc()).limit(4).all())
+        if attendance:
+            gruppen.append(("Anwesenheit", [
+                {"text": f"Anwesenheit #{x.id}",
+                 "meta": f"{x.event_type} · {x.event_date}",
+                 "bereich": "anwesenheit"} for x in attendance]))
+
+    if a.darf("rollen"):
+        rollen_treffer = (db.query(Role).filter(_suchfilter_mehrere(Role, begriff))
+                          .order_by(Role.key).limit(4).all())
+        abteilungen_treffer = (db.query(Department)
+                               .filter(_suchfilter_mehrere(Department, begriff))
+                               .order_by(Department.key).limit(4).all())
+        if rollen_treffer:
+            gruppen.append(("Rollen", [
+                {"text": r.label, "meta": r.key, "bereich": "rollen"}
+                for r in rollen_treffer]))
+        if abteilungen_treffer:
+            gruppen.append(("Abteilungen", [
+                {"text": d.label, "meta": d.key, "bereich": "rollen"}
+                for d in abteilungen_treffer]))
+
+    if a.darf("seiteninhalte"):
+        inhalte = (db.query(ContentItem).filter(
+                   _suchfilter_mehrere(ContentItem, begriff))
+                   .order_by(ContentItem.id.desc()).limit(4).all())
+        if inhalte:
+            gruppen.append(("Startseiten-Inhalte", [
+                {"text": x.titel, "meta": x.abteilung, "bereich": "redaktion"}
+                for x in inhalte]))
+
+    if a.darf("email_vorlagen"):
+        vorlagen = (db.query(EmailTemplate)
+                    .filter(_suchfilter_mehrere(EmailTemplate, begriff))
+                    .order_by(EmailTemplate.updated_at.desc()).limit(4).all())
+        if vorlagen:
+            gruppen.append(("E-Mail-Vorlagen", [
+                {"text": x.key, "meta": x.subject, "bereich": "vordrucke"}
+                for x in vorlagen]))
+
+    if a.darf("finanzen"):
+        for modell, name, bereich in (
+                (Buchung, "Buchungen", "kassenbuch"),
+                (Budget, "Budgets", "kassenbuch"),
+                (Dauerauftrag, "Daueraufträge", "kassenbuch")):
+            treffer = (db.query(modell).filter(
+                       _suchfilter_mehrere(modell, begriff))
+                       .limit(4).all())
+            if treffer:
+                gruppen.append((name, [
+                    {"text": next((str(getattr(x, feld)) for feld in
+                                   ("zweck", "name", "titel", "beschreibung")
+                                   if getattr(x, feld, None)), f"#{x.id}"),
+                     "meta": f"#{x.id}", "bereich": bereich} for x in treffer]))
 
     return teil("dashboard/teile/suchtreffer.html", a, gruppen=gruppen,
                 begriff=begriff)

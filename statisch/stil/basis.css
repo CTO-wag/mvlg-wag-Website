@@ -653,13 +653,13 @@ input, select, textarea{ max-width:100%; }
 .meldung > div{ min-width:0; }
 .meldung p{ margin:0; }
 .meldung p + p{ margin-top:var(--r2); }
-.meldung-gut{ color:var(--gruen); background:color-mix(in srgb, var(--gruen) 10%, transparent); }
+.meldung-gut{ color:var(--gruen); background:color-mix(in srgb, var(--gruen) 24%, var(--flaeche)); }
 .meldung-gut::before{ content:"✓"; }
-.meldung-fehler{ color:var(--rot); background:color-mix(in srgb, var(--rot) 9%, transparent); }
+.meldung-fehler{ color:var(--rot); background:color-mix(in srgb, var(--rot) 22%, var(--flaeche)); }
 .meldung-fehler::before{ content:"!"; }
-.meldung-warnung{ color:var(--amber); background:var(--amber-hauch); }
+.meldung-warnung{ color:var(--amber); background:color-mix(in srgb, var(--amber) 25%, var(--flaeche)); }
 .meldung-warnung::before{ content:"!"; }
-.meldung-info{ color:var(--blau); background:color-mix(in srgb, var(--blau) 9%, transparent); }
+.meldung-info{ color:var(--blau); background:color-mix(in srgb, var(--blau) 22%, var(--flaeche)); }
 .meldung-info::before{ content:"i"; }
 .meldung strong{ color:inherit; }
 
@@ -690,6 +690,18 @@ html[data-theme="dark"] .meldung{
 html[data-theme="dark"] .meldung p{ color:var(--text); }
 /* Der Text bleibt lesbar, nur das Zeichen und der Rand tragen die Farbe. */
 .meldung > div, .meldung > p{ color:var(--text); }
+html[data-theme="dark"] .meldung-gut{
+  background:color-mix(in srgb, var(--gruen) 32%, var(--flaeche-2));
+}
+html[data-theme="dark"] .meldung-fehler{
+  background:color-mix(in srgb, var(--rot) 30%, var(--flaeche-2));
+}
+html[data-theme="dark"] .meldung-warnung{
+  background:color-mix(in srgb, var(--amber) 32%, var(--flaeche-2));
+}
+html[data-theme="dark"] .meldung-info{
+  background:color-mix(in srgb, var(--blau) 30%, var(--flaeche-2));
+}
 
 .fehler{ color:var(--rot); }
 .gut{ color:var(--gruen); }

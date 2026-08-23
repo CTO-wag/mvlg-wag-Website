@@ -1,0 +1,48 @@
+{% import "dashboard/teile/makros.html" as m %}
+{{ m.kopf("Funktionsadressen", "Nur feste Chef- und Vorstandsadressen – normale Konten erhalten hier keine Adresse.") }}
+{{ m.rueckmeldung(meldung) }}
+
+{% if not cloudflare_konfiguriert %}
+<div class="meldung meldung-warnung"><div>Cloudflare ist nicht konfiguriert. Setze die drei serverseitigen Umgebungsvariablen, bevor du synchronisierst.</div></div>
+{% endif %}
+<div class="meldung meldung-info"><div>Beim ersten Sync werden bestehende Cloudflare-Weiterleitungen anhand der Funktionsadresse eingelesen. Dabei werden vorhandene Regeln nicht verändert.</div></div>
+<form action="/dashboard/funktionsadressen/synchronisieren" method="post"
+      hx-post="/dashboard/funktionsadressen/synchronisieren" hx-target="#tab-inhalt"
+      class="funktionsadressen-werkzeuge">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button type="submit">↻ Cloudflare synchronisieren</button>
+</form>
+
+<div class="funktionsadressen-raster">
+{% for p in positionen %}
+<article class="funktionsadresse-karte">
+  <div class="funktionsadresse-kopf">
+    <div class="funktionsadresse-titel">
+      <span class="funktionsadresse-kuerzel">{{ p.key|upper }}</span>
+      <div><h2>{{ p.label }}</h2><code>{{ p.routing_address }}</code></div>
+    </div>
+    <span class="funktionsadresse-status {% if p.routing_active %}ist-aktiv{% elif p.destination_verified %}ist-bereit{% else %}ist-offen{% endif %}">
+      <span class="status-punkt"></span>
+      {{ p.sync_status }}
+    </span>
+  </div>
+  <form action="/dashboard/funktionsadressen/{{ p.id }}" method="post"
+        hx-post="/dashboard/funktionsadressen/{{ p.id }}" hx-target="#tab-inhalt"
+        class="funktionsadresse-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Zuständige Person<input name="person" value="{{ p.person_name or 'Kein aktives ' ~ p.key|upper ~ '-Konto' }}" readonly></label>
+    <label>Private E-Mail-Adresse<input type="email" name="email" value="{{ p.destination_email or '' }}" readonly></label>
+    <div class="funktionsadresse-checks">
+      <span class="{% if p.destination_id %}erfuellt{% endif %}">✓ Destination</span>
+      <span class="{% if p.destination_verified %}erfuellt{% endif %}">✓ Verifiziert</span>
+      <span class="{% if p.routing_active %}erfuellt{% endif %}">✓ Routing aktiv</span>
+    </div>
+    {% if p.last_error %}<div class="meldung meldung-fehler"><div>{{ p.last_error }}</div></div>{% endif %}
+    <div class="funktionsadresse-fuss">
+      {% if p.last_synced_at %}<span class="meta">Zuletzt geprüft: {{ p.last_synced_at.strftime("%d.%m.%Y %H:%M") }}</span>{% endif %}
+      <button type="submit">Zuständigkeit synchronisieren</button>
+    </div>
+  </form>
+</article>
+{% endfor %}
+</div>

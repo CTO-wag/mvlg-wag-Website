@@ -80,6 +80,15 @@ def _erinnerungen():
 
 def _scoring():
     from kern.leistung import alle_neu_rechnen, treffen_abrechnen
+
+    # Beim Start nicht bis zum naechsten Tageslauf warten. So sind die
+    # Leadership-Werte nach einem Neustart sofort aktuell.
+    try:
+        anzahl = alle_neu_rechnen()
+        print(f"[Leistung] Werte beim Start fuer {anzahl} Konten berechnet.")
+    except Exception as problem:                         # pragma: no cover
+        print(f"[Leistung] Startberechnung fehlgeschlagen: {problem}")
+
     while True:
         time.sleep(_sekunden_bis(cfg.SCORING_HOUR_LOCAL))
         # Erst abrechnen, dann rechnen: Aus einer Zusage wird nach dem

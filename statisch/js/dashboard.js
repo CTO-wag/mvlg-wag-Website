@@ -257,10 +257,15 @@
     var kasten = auswahlkasten(e.target);
     var liste = kasten && (kasten.querySelector('.empfaenger-liste') || kasten);
     if (!liste) { return; }
-    var text = e.target.value.toLowerCase();
+    var worte = suchBegriffe(e.target.value);
     liste.querySelectorAll('.haken').forEach(function (h) {
-      h.hidden = text && (h.dataset.name || h.textContent || '')
-        .toLowerCase().indexOf(text) === -1;
+      var suchtext = suchNormalisieren(
+        (h.dataset.name || '') + ' ' + (h.textContent || '') + ' ' +
+        Array.prototype.map.call(h.querySelectorAll('input, select'),
+          function (feld) { return feld.value || ''; }).join(' '));
+      h.hidden = worte.length && !worte.every(function (wort) {
+        return suchtext.indexOf(wort) !== -1;
+      });
     });
   });
 
@@ -307,10 +312,54 @@
      gerade gefiltert hatte. */
   var suchWorte = {};
 
+  function suchNormalisieren(wert) {
+    return String(wert || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ').trim();
+  }
+
+  function suchBegriffe(wert) {
+    var normal = suchNormalisieren(wert);
+    var woerter = normal.split(/\s+/).filter(Boolean);
+    var ziffern = normal.replace(/\D/g, '');
+    if (ziffern.length >= 3) {
+      woerter = woerter.filter(function (wort) { return !/\d/.test(wort); });
+      woerter.push(ziffern);
+      if (ziffern.indexOf('00') === 0) {
+        woerter.push(ziffern.slice(2));
+      } else if (ziffern.indexOf('0') === 0) {
+        woerter.push('49' + ziffern.slice(1));
+      } else if (ziffern.indexOf('49') === 0) {
+        woerter.push('0' + ziffern.slice(2));
+      }
+    }
+    return woerter;
+  }
+
   function suchtext(el) {
     if (!el.dataset.suchtext) {
-      el.dataset.suchtext = (el.textContent || '')
-        .toLowerCase().replace(/\s+/g, ' ').trim();
+      var werte = Array.prototype.map.call(
+        el.querySelectorAll('input, select, textarea'),
+        function (feld) {
+          if (feld.tagName === 'SELECT') {
+            return Array.prototype.map.call(feld.selectedOptions || [], function (o) {
+              return o.textContent || o.value;
+            }).join(' ');
+          }
+          return feld.value || feld.getAttribute('aria-label') || '';
+        }).join(' ');
+      var grund = el.getAttribute('data-suchinhalt') || el.textContent || '';
+      var ziffern = (grund + ' ' + werte).replace(/\D/g, '');
+      var telefonVarianten = ziffern;
+      if (ziffern.indexOf('00') === 0) {
+        telefonVarianten += ' ' + ziffern.slice(2);
+      } else if (ziffern.indexOf('0') === 0) {
+        telefonVarianten += ' 49' + ziffern.slice(1);
+      } else if (ziffern.indexOf('49') === 0) {
+        telefonVarianten += ' 0' + ziffern.slice(2);
+      }
+      el.dataset.suchtext = suchNormalisieren(grund + ' ' + werte + ' '
+        + (ziffern.length >= 3 ? telefonVarianten : ''));
     }
     return el.dataset.suchtext;
   }
@@ -320,7 +369,7 @@
     var feld = leiste.querySelector('input');
     if (!behaelter || !feld) { return; }
 
-    var worte = feld.value.toLowerCase().split(/\s+/).filter(Boolean);
+    var worte = suchBegriffe(feld.value);
     suchWorte[leiste.dataset.suche] = feld.value;
 
     var treffer = 0, gesamt = 0;

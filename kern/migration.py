@@ -29,7 +29,8 @@ MIGRATIONS_MARKE = "v2_migration_stand"
 #    Abruf des Kalender-Abos (users.calendar_last_fetch).
 # 6: Ersatzcodes fuer den zweiten Faktor, Zu-/Absagen und
 #    Tagesordnung fuer Treffen.
-AKTUELLER_STAND = 6
+# 7: Feste Funktionsadressen fuer Cloudflare Email Routing.
+AKTUELLER_STAND = 7
 
 
 def _spalten(tabelle: str) -> set:

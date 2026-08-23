@@ -396,6 +396,73 @@ html[data-theme="dark"] .dash-whatsapp:hover{ color:#3BE07B; }
   padding:0 var(--r1); font-family:var(--schrift-mono); font-size:.64rem;
   letter-spacing:.08em; text-transform:uppercase; color:var(--gedaempft);
 }
+
+/* --- Funktionsadressen --------------------------------------------------- */
+.funktionsadressen-werkzeuge{
+  display:flex; justify-content:flex-end; margin-bottom:var(--r4);
+}
+.funktionsadressen-raster{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(min(390px,100%),1fr));
+  gap:var(--r4);
+}
+.funktionsadresse-karte{
+  display:flex; flex-direction:column; min-width:0; overflow:hidden;
+  background:var(--flaeche); border:1px solid var(--linie);
+  border-radius:var(--rund); box-shadow:var(--schatten);
+}
+.funktionsadresse-kopf{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:var(--r3); padding:var(--r4); border-bottom:1px solid var(--linie);
+}
+.funktionsadresse-titel{
+  display:flex; align-items:center; gap:var(--r3); min-width:0;
+}
+.funktionsadresse-titel h2{
+  margin:0 0 .25rem; font-family:var(--schrift-titel); font-size:1.1rem;
+}
+.funktionsadresse-titel code{
+  color:var(--gedaempft-2); font-size:.72rem; overflow-wrap:anywhere;
+}
+.funktionsadresse-kuerzel{
+  display:grid; place-items:center; flex:0 0 2.65rem; height:2.65rem;
+  border-radius:var(--rund-klein); background:var(--navy);
+  color:var(--navy-schrift); font-family:var(--schrift-mono);
+  font-size:.68rem; font-weight:600; letter-spacing:.05em;
+}
+.funktionsadresse-status{
+  display:inline-flex; align-items:center; gap:.4rem; flex-shrink:0;
+  padding:.3rem .55rem; border-radius:var(--rund-voll);
+  font-family:var(--schrift-mono); font-size:.64rem; white-space:nowrap;
+}
+.funktionsadresse-status .status-punkt{
+  width:.42rem; height:.42rem; border-radius:50%; background:currentColor;
+}
+.funktionsadresse-status.ist-aktiv{ color:var(--gruen); background:rgba(47,133,90,.1); }
+.funktionsadresse-status.ist-bereit{ color:var(--amber); background:rgba(183,121,31,.12); }
+.funktionsadresse-status.ist-offen{ color:var(--rot); background:rgba(197,48,48,.1); }
+.funktionsadresse-form{
+  display:grid; grid-template-columns:1fr 1fr; gap:var(--r3);
+  padding:var(--r4);
+}
+.funktionsadresse-form label{ min-width:0; }
+.funktionsadresse-form input{ width:100%; margin-top:.35rem; }
+.funktionsadresse-checks{
+  grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:.45rem;
+  padding:.65rem .75rem; border:1px solid var(--linie);
+  border-radius:var(--rund-klein); background:var(--flaeche-2);
+  color:var(--gedaempft-2); font-size:.76rem;
+}
+.funktionsadresse-checks span{ white-space:nowrap; }
+.funktionsadresse-checks span.erfuellt{ color:var(--gruen); font-weight:600; }
+.funktionsadresse-fuss{
+  grid-column:1 / -1; display:flex; align-items:center;
+  justify-content:space-between; gap:var(--r3); flex-wrap:wrap;
+}
+@media (max-width:620px){
+  .funktionsadresse-kopf{ flex-direction:column; }
+  .funktionsadresse-form{ grid-template-columns:1fr; }
+  .funktionsadresse-status{ align-self:flex-start; }
+}
 .vorlagen-reihe{ display:flex; align-items:center; gap:var(--r1); flex-wrap:wrap; }
 .vorlagen-titel{
   font-family:var(--schrift-mono); font-size:.64rem; letter-spacing:.08em;
@@ -829,7 +896,8 @@ html[data-theme="dark"] .wartet-knopf.dringend:hover{
 #meldungsplatz .meldung{
   pointer-events:auto; margin:0; cursor:pointer;
   box-shadow:0 16px 40px rgba(8,15,26,.28);
-  border:1px solid var(--linie);
+  border:1px solid var(--linie); border-left:4px solid currentColor;
+  background-color:var(--flaeche);
   animation:meldung-herein .18s ease-out;
 }
 html[data-theme="dark"] #meldungsplatz .meldung{
