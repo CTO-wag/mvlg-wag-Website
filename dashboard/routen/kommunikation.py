@@ -469,6 +469,18 @@ def vordrucke(a: Anmeldung = Depends(Anmeldung.pflicht)):
     return _vordrucke_ansicht(a)
 
 
+@router.post("/vordrucke/testmodus")
+def vordruck_testmodus(csrf: str = Form(""),
+                       a: Anmeldung = Depends(Anmeldung.pflicht)):
+    a.verlange("email_vorlagen")
+    a.pruefe_csrf(csrf)
+    neu = not werte.an_db(a.db, werte.EMAIL_TESTMODUS)
+    werte.schalte(a.db, werte.EMAIL_TESTMODUS, neu)
+    return _vordrucke_ansicht(a, info(
+        "Testmodus an – E-Mails gehen nur noch an die Vordruck-Verwalter." if neu
+        else "Testmodus aus – E-Mails gehen wieder an alle."))
+
+
 @router.post("/vordrucke/{schluessel}")
 def vordruck_speichern(schluessel: str, betreff: str = Form(""),
                        text: str = Form(""), csrf: str = Form(""),
@@ -523,21 +535,11 @@ def vordruck_testen(schluessel: str, csrf: str = Form(""),
                 "text": "Das ist ein Test aus dem Dashboard.",
                 "abteilung": "Tech"}
     ok = mail.sende_vordruck(a.db, a.user, schluessel, warten=True, **beispiel)
+    ziel = "die Vordruck-Verwalter" if werte.an_db(
+        a.db, werte.EMAIL_TESTMODUS) else a.user.email
     return _vordrucke_ansicht(
-        a, gut(f"Testmail an {a.user.email} verschickt.") if ok
+        a, gut(f"Testmail an {ziel} verschickt.") if ok
         else fehler("Der Versand hat nicht geklappt – siehe Zustellprotokoll."))
-
-
-@router.post("/vordrucke/testmodus")
-def vordruck_testmodus(csrf: str = Form(""),
-                       a: Anmeldung = Depends(Anmeldung.pflicht)):
-    a.verlange("email_vorlagen")
-    a.pruefe_csrf(csrf)
-    neu = not werte.an_db(a.db, werte.EMAIL_TESTMODUS)
-    werte.schalte(a.db, werte.EMAIL_TESTMODUS, neu)
-    return _vordrucke_ansicht(a, info(
-        "Testmodus an – E-Mails gehen nur noch an die Vordruck-Verwalter." if neu
-        else "Testmodus aus – E-Mails gehen wieder an alle."))
 
 
 #  WhatsApp-Bot

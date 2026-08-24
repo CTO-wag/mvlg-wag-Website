@@ -135,6 +135,7 @@
           <div class="formular-fuss">
             <button type="submit">Speichern</button>
           </div>
+
         </form>
 
         {# Eigene Formulare, nicht im Bearbeiten-Formular: verschachtelte
@@ -191,3 +192,47 @@
     {% endfor %}
   </div>
 </div>
+
+{% if funktionsadressen %}
+<details class="block">
+  <summary>
+    <span style="flex:1;"><strong>Funktionsadressen</strong>
+      <span class="meta"> · {{ funktionsadressen|length }} Weiterleitungen</span></span>
+  </summary>
+  <div class="aufklapp-inhalt">
+    <div class="panel-kopf">
+      <p class="meta">Feste Vorstands- und Chefadressen, direkt aus den Konten.</p>
+      <form hx-post="/dashboard/konten/funktionsadressen/synchronisieren" hx-target="#tab-inhalt">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="btn-zweit btn-klein">↻ Alle prüfen</button>
+      </form>
+    </div>
+    {% if not cloudflare_konfiguriert %}
+    <div class="meldung meldung-warnung"><div>Cloudflare ist nicht konfiguriert.</div></div>
+    {% endif %}
+    <div class="funktionsadressen-raster">
+    {% for p in funktionsadressen %}
+    <article class="funktionsadresse-karte">
+      <div class="funktionsadresse-kopf">
+        <div class="funktionsadresse-titel">
+          <span class="funktionsadresse-kuerzel">{{ p.key|upper }}</span>
+          <div><strong>{{ p.label }}</strong><br><code>{{ p.routing_address }}</code></div>
+        </div>
+        <span class="funktionsadresse-status {% if p.routing_active %}ist-aktiv{% elif p.destination_verified %}ist-bereit{% else %}ist-offen{% endif %}">
+          <span class="status-punkt"></span>{{ p.sync_status }}
+        </span>
+      </div>
+      <div class="funktionsadresse-fuss">
+        <span class="meta">{{ p.person_name or 'Kein aktives Konto' }} · {{ p.destination_email or 'kein Ziel' }}</span>
+        <form hx-post="/dashboard/konten/funktionsadressen/{{ p.id }}" hx-target="#tab-inhalt">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="btn-zweit btn-klein">Prüfen</button>
+        </form>
+      </div>
+      {% if p.last_error %}<div class="meldung meldung-fehler"><div>{{ p.last_error }}</div></div>{% endif %}
+    </article>
+    {% endfor %}
+    </div>
+  </div>
+</details>
+{% endif %}

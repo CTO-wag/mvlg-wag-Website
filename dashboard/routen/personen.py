@@ -9,10 +9,10 @@ from dashboard.hilfen import (
     Anmeldung, als_csv, datum, fehler, gut, papierkorb_hinweis, teil,
     warnung, zahl,
 )
-from kern import leistung, mail, papierkorb, protokoll, whatsapp
+from kern import cloudflare, leistung, mail, papierkorb, protokoll, whatsapp
 from kern.modelle import (
     Application, ApplicationReview, Attendance, LeadershipScore,
-    Meeting, SuccessionCandidate, User, UserPermission,
+    Funktionsadresse, Meeting, SuccessionCandidate, User, UserPermission,
 )
 from kern.rechte import (
     PERM_HILFE, PERM_KEYS, PERM_LABELS, abteilung_label, abteilungs_keys,
@@ -38,8 +38,16 @@ def _konten_ansicht(a: Anmeldung, meldung=None, startpasswort=None,
     ausnahmen = {}
     for zeile in db.query(UserPermission).all():
         ausnahmen.setdefault(zeile.user_id, {})[zeile.perm] = bool(zeile.wert)
+    funktionsadressen = []
+    if a.darf("funktionsadressen"):
+        cloudflare.vorbefuellen(db)
+        cloudflare.aus_konten_aktualisieren(db)
+        funktionsadressen = (db.query(Funktionsadresse)
+                             .order_by(Funktionsadresse.id).all())
     return teil("dashboard/konten.html", a,
                 konten=konten,
+                funktionsadressen=funktionsadressen,
+                cloudflare_konfiguriert=cloudflare.konfiguriert(),
                 rollen_liste=rollen(),
                 abteilungen_wahl=abteilungs_keys(),
                 ausnahmen=ausnahmen,
@@ -146,6 +154,64 @@ def konto_anlegen(vorname: str = Form(""), nachname: str = Form(""),
     return _konten_ansicht(
         a, gut(f"Konto für {vor} {nach} angelegt. " + " ".join(hinweise)),
         startpasswort=start, passwort_fuer=f"{vor} {nach}")
+
+
+@router.post("/konten/funktionsadressen/synchronisieren")
+def funktionsadressen_synchronisieren(csrf: str = Form(""),
+                                      a: Anmeldung = Depends(Anmeldung.pflicht)):
+    a.verlange("accounts_all")
+    a.verlange("funktionsadressen")
+    a.pruefe_csrf(csrf)
+    cloudflare.vorbefuellen(a.db)
+    cloudflare.aus_konten_aktualisieren(a.db)
+    fehler_anzahl = 0
+    for position in a.db.query(Funktionsadresse).order_by(Funktionsadresse.id):
+        try:
+            status = cloudflare.synchronisieren(position)
+            if status == "Synchronisiert":
+                protokoll.notiere(a.db, a.user.id, "cloudflare_synchronisiert",
+                                  position.routing_address)
+        except cloudflare.CloudflareFehler as problem:
+            position.sync_status = "Synchronisation fehlgeschlagen"
+            position.last_error = str(problem)[:500]
+            fehler_anzahl += 1
+    a.db.commit()
+    if fehler_anzahl:
+        return _konten_ansicht(a, fehler(
+            f"{fehler_anzahl} Synchronisation(en) fehlgeschlagen."))
+    return _konten_ansicht(a, gut("Cloudflare-Status wurde geprüft."))
+
+
+@router.post("/konten/funktionsadressen/{position_id}")
+def funktionsadresse_synchronisieren(position_id: int, csrf: str = Form(""),
+                                     a: Anmeldung = Depends(Anmeldung.pflicht)):
+    a.verlange("accounts_all")
+    a.verlange("funktionsadressen")
+    a.pruefe_csrf(csrf)
+    cloudflare.vorbefuellen(a.db)
+    cloudflare.aus_konten_aktualisieren(a.db)
+    position = a.db.get(Funktionsadresse, position_id)
+    if not position:
+        return _konten_ansicht(a, fehler(
+            "Diese Funktionsadresse gibt es nicht mehr."))
+    try:
+        if position.destination_email:
+            status = cloudflare.synchronisieren(position)
+            if status == "Synchronisiert":
+                protokoll.notiere(a.db, a.user.id, "cloudflare_synchronisiert",
+                                  position.routing_address)
+        else:
+            position.sync_status = "Kein Ziel hinterlegt"
+            position.last_error = None
+        a.db.commit()
+    except cloudflare.CloudflareFehler as problem:
+        position.sync_status = "Synchronisation fehlgeschlagen"
+        position.last_error = str(problem)[:500]
+        a.db.commit()
+        return _konten_ansicht(a, fehler(
+            f"Cloudflare konnte nicht synchronisieren: {problem}"))
+    return _konten_ansicht(a, gut(
+        "Funktionsadresse gespeichert und Cloudflare geprüft."))
 
 
 @router.post("/konten/{konto_id}/aendern")

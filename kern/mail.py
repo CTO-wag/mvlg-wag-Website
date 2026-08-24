@@ -19,7 +19,7 @@ from email.utils import formataddr, formatdate, make_msgid
 from kern import einstellungen as cfg
 from kern import werte
 from kern.datenbank import sitzung
-from kern.modelle import EmailTemplate
+from kern.modelle import EmailTemplate, User
 from kern.protokoll import zustellung
 from kern.text import esc, sauber
 
@@ -344,9 +344,9 @@ def sende_vordruck(db, empfaenger_user, schluessel: str, warten: bool = False,
                    **daten) -> bool:
     """Vordruck fuellen und an eine Person schicken.
 
-    Beachtet den Testmodus: Ist er an, gehen alle Mails nur an die Konten mit
-    dem Recht "E-Mail-Vordrucke" - so laesst sich ein Text ausprobieren, ohne
-    dass die halbe AG Post bekommt.
+    Beachtet den Testmodus: Ist er an, gehen alle Mails nur an aktive Konten
+    mit dem Recht "E-Mail-Vordrucke" - so laesst sich ein Ablauf ausprobieren,
+    ohne dass die halbe AG Post bekommt.
     """
     if not empfaenger_user or not sauber(getattr(empfaenger_user, "email", "")):
         return False
@@ -360,12 +360,24 @@ def sende_vordruck(db, empfaenger_user, schluessel: str, warten: bool = False,
     testmodus = werte.an_db(db, werte.EMAIL_TESTMODUS)
     if testmodus:
         from kern.rechte import hat_recht
-        if not hat_recht(empfaenger_user, "email_vorlagen", db):
+        verwalter = (db.query(User).filter(User.status == "aktiv").all())
+        empfaenger = []
+        for person in verwalter:
+            if hat_recht(person, "email_vorlagen", db) and sauber(person.email):
+                if person.email not in empfaenger:
+                    empfaenger.append(person.email)
+        if not empfaenger:
             zustellung("email", empfaenger_user.email, betreff, False,
-                       "Testmodus - nur an Vordruck-Verwalter.", schluessel)
+                       "Testmodus - kein Vordruck-Verwalter.", schluessel)
             return False
+        ergebnisse = [
+            sende(adresse, betreff, text, warten=warten,
+                  anlass=schluessel, testmodus=True)
+            for adresse in empfaenger
+        ]
+        return any(ergebnisse)
     return sende(empfaenger_user.email, betreff, text, warten=warten,
-                 anlass=schluessel, testmodus=testmodus)
+                 anlass=schluessel)
 
 
 def pruefe_verbindung() -> tuple:

@@ -108,10 +108,6 @@ def bereiche(db, user) -> list:
     if r.get("whatsapp_bot"):
         liste.append(("whatsapp", "WhatsApp-Bot", "/dashboard/whatsapp",
                       "Kommunikation"))
-    if r.get("funktionsadressen"):
-        liste.append(("funktionsadressen", "Funktionsadressen",
-                      "/dashboard/funktionsadressen", "Kommunikation"))
-
     # -- Foerderung: laeuft ueber Wochen, nicht ueber Stunden ---------------
     if r["projects"]:
         liste.append(("projekte", "Projekte", "/dashboard/projekte", "Förderung"))
