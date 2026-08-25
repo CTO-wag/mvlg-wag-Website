@@ -30,7 +30,7 @@ MIGRATIONS_MARKE = "v2_migration_stand"
 # 6: Ersatzcodes fuer den zweiten Faktor, Zu-/Absagen und
 #    Tagesordnung fuer Treffen.
 # 7: Feste Funktionsadressen fuer Cloudflare Email Routing.
-AKTUELLER_STAND = 7
+AKTUELLER_STAND = 8
 
 
 def _spalten(tabelle: str) -> set:
@@ -198,6 +198,11 @@ def _neue_spalten() -> int:
         # Vermerke fuer die taeglichen Hinweise (kern/hinweise.py)
         ("meetings", "erinnert_am", "DATE", None),
         ("calendar_events", "erinnert_am", "DATE", None),
+        ("meetings", "start_time", "VARCHAR(5)", None),
+        ("meetings", "end_time", "VARCHAR(5)", None),
+        ("meetings", "location", "VARCHAR(200)", None),
+        ("meetings", "calendar_event_id", "INTEGER", None),
+        ("calendar_events", "meeting_id", "INTEGER", None),
         ("applications", "erinnert_am", "DATE", None),
         ("users", "passwort_geaendert_am", "DATETIME", None),
         ("users", "willkommen_gesendet_am", "DATETIME", None),

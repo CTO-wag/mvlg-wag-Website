@@ -157,11 +157,14 @@ def als_ics(db, user: User) -> str:
             termin.start_time, termin.end_date, termin.end_time,
             termin.location, termin.description, termin.updated_at)
 
-    for treffen in (db.query(Meeting).filter(Meeting.date >= grenze)
+    for treffen in (db.query(Meeting)
+                    .filter(Meeting.date >= grenze,
+                            Meeting.calendar_event_id.is_(None))
                     .order_by(Meeting.date).all()):
         zeilen += termin_block(
             f"treffen-{treffen.id}", f"AG-Treffen: {treffen.title}",
-            treffen.date, None, None, None, None,
+            treffen.date, treffen.start_time, None, treffen.end_time,
+            treffen.location,
             (treffen.protocol or "")[:500] or None, None)
 
     zeilen.append("END:VCALENDAR")

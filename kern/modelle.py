@@ -438,6 +438,11 @@ class Meeting(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String(200), nullable=False)
     date = Column(Date, default=date.today)
+    start_time = Column(String(5), nullable=True)
+    end_time = Column(String(5), nullable=True)
+    location = Column(String(200), nullable=True)
+    calendar_event_id = Column(Integer, ForeignKey("calendar_events.id"),
+                                nullable=True, unique=True, index=True)
     # An welchem Tag zuletzt erinnert wurde - verhindert, dass ein Neustart
     # dieselbe Erinnerung ein zweites Mal schickt.
     erinnert_am = Column(Date, nullable=True)
@@ -520,6 +525,8 @@ class CalendarEvent(Base):
     target_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     target_department = Column(String(30), nullable=True)
     erinnert_am = Column(Date, nullable=True)
+    meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=True,
+                        unique=True, index=True)
 
     targets = relationship("CalendarEventTarget", cascade="all, delete-orphan",
                            lazy="selectin", back_populates="event")

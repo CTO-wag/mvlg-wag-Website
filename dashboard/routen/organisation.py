@@ -29,7 +29,8 @@ router = APIRouter(prefix="/dashboard")
 #  AG-Treffen
 def _treffen_ansicht(a: Anmeldung, meldung=None):
     db = a.db
-    treffen = db.query(Meeting).order_by(Meeting.date.desc()).limit(60).all()
+    treffen = (db.query(Meeting).order_by(Meeting.date.desc())
+               .limit(60).all())
     anwesend = {}
     for eintrag, person in (db.query(Attendance, User)
                             .join(User, User.id == Attendance.user_id)
@@ -73,7 +74,9 @@ def treffen(a: Anmeldung = Depends(Anmeldung.pflicht)):
 
 @router.post("/treffen")
 def treffen_anlegen(titel: str = Form(""), wann: str = Form(""),
-                    protokoll_text: str = Form(""), csrf: str = Form(""),
+                    start: str = Form(""), ende: str = Form(""),
+                    ort: str = Form(""), protokoll_text: str = Form(""),
+                    csrf: str = Form(""),
                     a: Anmeldung = Depends(Anmeldung.pflicht)):
     a.verlange("meetings_manage")
     a.pruefe_csrf(csrf)
@@ -81,8 +84,19 @@ def treffen_anlegen(titel: str = Form(""), wann: str = Form(""),
     if not titel_:
         return _treffen_ansicht(a, fehler("Ohne Titel geht es nicht."))
     tag = datum(wann) or date.today()
-    a.db.add(Meeting(title=titel_, date=tag,
-                     protocol=sauber(protokoll_text)[:20000] or None))
+    beginn, schluss, ort_ = uhrzeit(start) or None, uhrzeit(ende) or None, sauber(ort)[:200] or None
+    termin = CalendarEvent(
+        title=titel_, location=ort_, start_date=tag, start_time=beginn,
+        end_time=schluss, target_type="alle", created_by=a.user.id)
+    a.db.add(termin)
+    a.db.flush()
+    treffen = Meeting(title=titel_, date=tag, start_time=beginn,
+                      end_time=schluss, location=ort_,
+                      calendar_event_id=termin.id,
+                      protocol=sauber(protokoll_text)[:20000] or None)
+    a.db.add(treffen)
+    a.db.flush()
+    termin.meeting_id = treffen.id
     protokoll.notiere(a.db, a.user.id, "treffen_neu", titel_)
     a.db.commit()
     # Nur ankuendigen, was noch kommt - ein nachgetragenes Protokoll von
@@ -223,7 +237,9 @@ def treffen_anwesenheit(treffen_id: int, personen: list = Form([]),
 
 @router.post("/treffen/{treffen_id}/aendern")
 def treffen_aendern(treffen_id: int, titel: str = Form(""),
-                    wann: str = Form(""), protokoll_text: str = Form(""),
+                    wann: str = Form(""), start: str = Form(""),
+                    ende: str = Form(""), ort: str = Form(""),
+                    protokoll_text: str = Form(""),
                     csrf: str = Form(""),
                     a: Anmeldung = Depends(Anmeldung.pflicht)):
     a.verlange("meetings_manage")
@@ -236,7 +252,19 @@ def treffen_aendern(treffen_id: int, titel: str = Form(""),
     neues_datum = datum(wann)
     if neues_datum:
         eintrag.date = neues_datum
+    eintrag.start_time = uhrzeit(start) or None
+    eintrag.end_time = uhrzeit(ende) or None
+    eintrag.location = sauber(ort)[:200] or None
     eintrag.protocol = sauber(protokoll_text)[:20000] or None
+    if eintrag.calendar_event_id:
+        kalender_termin = a.db.get(CalendarEvent, eintrag.calendar_event_id)
+        if kalender_termin:
+            kalender_termin.title = eintrag.title
+            kalender_termin.start_date = eintrag.date
+            kalender_termin.start_time = eintrag.start_time
+            kalender_termin.end_time = eintrag.end_time
+            kalender_termin.location = eintrag.location
+            kalender_termin.updated_at = utcnow()
     a.db.commit()
     return _treffen_ansicht(a, gut("Gespeichert."))
 
@@ -248,6 +276,13 @@ def treffen_loeschen(treffen_id: int, csrf: str = Form(""),
     a.pruefe_csrf(csrf)
     eintrag = a.db.get(Meeting, treffen_id)
     if eintrag:
+        kalender_termin = (a.db.get(CalendarEvent, eintrag.calendar_event_id)
+                           if eintrag.calendar_event_id else None)
+        if kalender_termin:
+            eintrag.calendar_event_id = None
+            kalender_termin.meeting_id = None
+            a.db.flush()
+            papierkorb.hinein(a.db, "calendar_event", kalender_termin, a.user.id)
         papierkorb.hinein(a.db, "meeting", eintrag, a.user.id)
         a.db.commit()
     return _treffen_ansicht(a,
@@ -274,7 +309,8 @@ def _kalender_ansicht(a: Anmeldung, meldung=None):
     # Bearbeitet werden sie weiterhin dort, wo sie hingehoeren; hier stehen
     # sie zum Lesen, mit einem Weg dorthin.
     treffen = (db.query(Meeting)
-               .filter(Meeting.date >= heute - timedelta(days=1))
+               .filter(Meeting.date >= heute - timedelta(days=1),
+                       Meeting.calendar_event_id.is_(None))
                .order_by(Meeting.date).limit(20).all())
     return teil("dashboard/kalender.html", a,
                 termine=sichtbar, treffen=treffen,
@@ -290,6 +326,32 @@ def _kalender_ansicht(a: Anmeldung, meldung=None):
 @router.get("/kalender")
 def kalender_bereich(a: Anmeldung = Depends(Anmeldung.pflicht)):
     return _kalender_ansicht(a)
+
+
+@router.post("/kalender/{termin_id}/als-treffen")
+def termin_als_treffen(termin_id: int, csrf: str = Form(""),
+                       a: Anmeldung = Depends(Anmeldung.pflicht)):
+    a.verlange("meetings_manage")
+    a.pruefe_csrf(csrf)
+    termin = a.db.get(CalendarEvent, termin_id)
+    if not termin:
+        return _kalender_ansicht(a, fehler("Diesen Termin gibt es nicht mehr."))
+    if termin.meeting_id:
+        return _kalender_ansicht(a, gut("Dieser Termin ist bereits als AG-Treffen registriert."))
+    termin.target_type = "alle"
+    termin.target_user_id = None
+    termin.target_department = None
+    termin.targets.clear()
+    treffen = Meeting(
+        title=termin.title, date=termin.start_date, start_time=termin.start_time,
+        end_time=termin.end_time, location=termin.location,
+        calendar_event_id=termin.id)
+    a.db.add(treffen)
+    a.db.flush()
+    termin.meeting_id = treffen.id
+    protokoll.notiere(a.db, a.user.id, "treffen_neu", treffen.title)
+    a.db.commit()
+    return _kalender_ansicht(a, gut("Als AG-Treffen registriert. Der Kalendertermin bleibt derselbe."))
 
 
 def _ziele_setzen(db, termin, art, person_id, abteilung, auswahl_personen,
@@ -375,6 +437,14 @@ def termin_aendern(termin_id: int, titel: str = Form(""),
     termin.end_time = uhrzeit(ende) or None
     _ziele_setzen(a.db, termin, ziel, person, abteilung,
                   auswahl_person, auswahl_abteilung)
+    if termin.meeting_id:
+        treffen = a.db.get(Meeting, termin.meeting_id)
+        if treffen:
+            treffen.title = termin.title
+            treffen.date = termin.start_date
+            treffen.start_time = termin.start_time
+            treffen.end_time = termin.end_time
+            treffen.location = termin.location
     termin.updated_at = utcnow()
     a.db.commit()
     return _kalender_ansicht(a, gut("Termin gespeichert."))
@@ -387,6 +457,13 @@ def termin_loeschen(termin_id: int, csrf: str = Form(""),
     a.pruefe_csrf(csrf)
     termin = a.db.get(CalendarEvent, termin_id)
     if termin:
+        if termin.meeting_id:
+            treffen = a.db.get(Meeting, termin.meeting_id)
+            termin.meeting_id = None
+            if treffen:
+                treffen.calendar_event_id = None
+                a.db.flush()
+                papierkorb.hinein(a.db, "meeting", treffen, a.user.id)
         papierkorb.hinein(a.db, "calendar_event", termin, a.user.id)
         a.db.commit()
     return _kalender_ansicht(a,

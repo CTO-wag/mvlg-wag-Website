@@ -130,6 +130,7 @@
     <li>
       <span class="liste-links">
         <strong>{{ t.title }}</strong>
+        {% if t.meeting_id %}<span class="marke zustand-geplant">AG-Treffen</span>{% endif %}
         {% if t.date == heute() %}<span class="marke">heute</span>{% endif %}
       </span>
       <span class="liste-rechts meta">{{ t.date|datum_lang }}</span>
@@ -164,6 +165,18 @@
       </summary>
       <div class="aufklapp-inhalt">
         {% if t.description %}<p style="white-space:pre-wrap;">{{ t.description }}</p>{% endif %}
+        {% if darf_verwalten and not t.meeting_id %}
+        <form hx-post="/dashboard/kalender/{{ t.id }}/als-treffen"
+              hx-target="#tab-inhalt" style="margin-top:var(--r3);">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="btn-zweit btn-klein">
+            Als AG-Treffen registrieren</button>
+        </form>
+        {% elif t.meeting_id %}
+        <p class="meta" style="margin-top:var(--r3);">
+          Als AG-Treffen registriert – Details und Rückmeldungen unter „Treffen“.
+        </p>
+        {% endif %}
         {% if darf_verwalten %}
         <details style="margin-top:var(--r3);">
           <summary class="meta" style="cursor:pointer;">Bearbeiten</summary>

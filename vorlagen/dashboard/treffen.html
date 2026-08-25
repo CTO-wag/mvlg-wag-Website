@@ -12,6 +12,9 @@
       <label>Titel<input type="text" name="titel" maxlength="200" required
                          placeholder="z. B. AG-Treffen KW 34"></label>
       <label>Datum<input type="date" name="wann" value="{{ heute().isoformat() }}"></label>
+      <label>Beginn <span class="meta">optional</span><input type="time" name="start"></label>
+      <label>Ende <span class="meta">optional</span><input type="time" name="ende"></label>
+      <label>Ort <span class="meta">optional</span><input type="text" name="ort" maxlength="200"></label>
       <label class="voll">Protokoll <span class="meta">Kann auch später nachgetragen werden.</span>
         <textarea name="protokoll_text" maxlength="20000" rows="6"></textarea></label>
       <div class="formular-fuss"><button type="submit">Anlegen</button></div>
@@ -30,6 +33,8 @@
     <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
       <strong>{{ t.title }}</strong>
       <span class="meta">{{ t.date|datum_lang }}</span>
+      {% if t.start_time %}<span class="meta">{{ t.start_time }}{% if t.end_time %}–{{ t.end_time }}{% endif %} Uhr</span>{% endif %}
+      {% if t.location %}<span class="meta">{{ t.location }}</span>{% endif %}
       {% if t.date >= heute() %}<span class="marke zustand-geplant">kommt noch</span>
       {% if zusagen.get(t.id) %}<span class="marke zustand-erledigt">{{ zusagen[t.id]|length }} zugesagt</span>{% endif %}
       {% if absagen.get(t.id) %}<span class="marke zustand-offen">{{ absagen[t.id]|length }} abgesagt</span>{% endif %}
@@ -190,6 +195,12 @@
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label>Titel<input type="text" name="titel" value="{{ t.title }}" maxlength="200"></label>
         <label>Datum<input type="date" name="wann" value="{{ t.date.isoformat() if t.date else '' }}"></label>
+        <label>Beginn <span class="meta">optional</span>
+          <input type="time" name="start" value="{{ t.start_time or '' }}"></label>
+        <label>Ende <span class="meta">optional</span>
+          <input type="time" name="ende" value="{{ t.end_time or '' }}"></label>
+        <label>Ort <span class="meta">optional</span>
+          <input type="text" name="ort" maxlength="200" value="{{ t.location or '' }}"></label>
         <label class="voll">Protokoll
           <textarea name="protokoll_text" maxlength="20000" rows="10">{{ t.protocol or "" }}</textarea></label>
         <div class="formular-fuss">
