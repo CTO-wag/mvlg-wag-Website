@@ -157,9 +157,11 @@ def als_ics(db, user: User) -> str:
             termin.start_time, termin.end_date, termin.end_time,
             termin.location, termin.description, termin.updated_at)
 
+    verknuepfte_treffen = db.query(CalendarEvent.meeting_id).filter(
+        CalendarEvent.meeting_id.isnot(None))
     for treffen in (db.query(Meeting)
                     .filter(Meeting.date >= grenze,
-                            Meeting.calendar_event_id.is_(None))
+                            ~Meeting.id.in_(verknuepfte_treffen))
                     .order_by(Meeting.date).all()):
         zeilen += termin_block(
             f"treffen-{treffen.id}", f"AG-Treffen: {treffen.title}",

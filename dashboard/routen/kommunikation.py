@@ -12,7 +12,7 @@ from dashboard.hilfen import (
 )
 from kern import (
     benachrichtigung, mail, papierkorb, protokoll, push, push_anmeldung, werte,
-    whatsapp,
+    support_ki, whatsapp,
 )
 from kern import einstellungen as cfg
 from kern.modelle import (
@@ -339,6 +339,8 @@ async def support_anlegen(betreff: str = Form(""), text: str = Form(""),
     ticket = SupportTicket(user_id=a.user.id, subject=betreff_, message=inhalt,
                            attachment_filename=dateiname)
     a.db.add(ticket)
+    a.db.flush()
+    support_ki.entwurf_erzeugen(ticket)
     a.db.commit()
     benachrichtigung.melde_rechteinhabern(
         a.db, "support_verwaltung", "support", "Neue Support-Anfrage",
@@ -375,6 +377,9 @@ async def support_antwort(ticket_id: int, text: str = Form(""),
 
     db.add(SupportMessage(ticket_id=ticket.id, sender_id=user.id,
                           message=inhalt, attachment_filename=dateiname))
+    ticket.ai_draft = None
+    if ticket.ai_status != "gesendet":
+        ticket.ai_status = "manuell"
     if verwaltet and ticket.user_id != user.id:
         ticket.status = "beantwortet"
         ticket.replied_by = user.id
@@ -388,6 +393,51 @@ async def support_antwort(ticket_id: int, text: str = Form(""),
             f"{user.name} zu „{ticket.subject}“", ausser_id=user.id)
     db.commit()
     return _support_ansicht(a, gut("Antwort gespeichert."))
+
+
+@router.post("/support/{ticket_id}/ki-entwurf")
+def support_ki_entwurf(ticket_id: int, csrf: str = Form(""),
+                       a: Anmeldung = Depends(Anmeldung.pflicht)):
+    a.verlange("support_verwaltung")
+    a.pruefe_csrf(csrf)
+    ticket = a.db.get(SupportTicket, ticket_id)
+    if not ticket:
+        return _support_ansicht(a, fehler("Diese Anfrage gibt es nicht mehr."))
+    if ticket.status == "geschlossen":
+        return _support_ansicht(a, fehler("Geschlossene Anfragen werden nicht automatisch beantwortet."))
+    if support_ki.entwurf_erzeugen(ticket):
+        a.db.commit()
+        return _support_ansicht(a, gut("Antwortentwurf generiert. Bitte vor dem Senden prüfen."))
+    a.db.commit()
+    if ticket.ai_status == "deaktiviert":
+        meldung = "Die Support-Automatik ist nicht eingerichtet. GROQ_API_KEY in config.cmd eintragen."
+    elif ticket.ai_status == "kein_verwalter":
+        meldung = "Kein aktives Konto mit Support-Berechtigung gefunden."
+    elif ticket.ai_status == "fehler" and ticket.ai_error and "Invalid API Key" in ticket.ai_error:
+        meldung = "Der Groq-API-Key ist ungültig. Bitte GROQ_API_KEY in config.cmd prüfen."
+    else:
+        meldung = "Die automatische Antwort konnte nicht erstellt werden. Das Ticket bleibt offen."
+    return _support_ansicht(a, fehler(meldung))
+
+
+@router.post("/support/{ticket_id}/ki-senden")
+def support_ki_senden(ticket_id: int, csrf: str = Form(""),
+                      a: Anmeldung = Depends(Anmeldung.pflicht)):
+    a.verlange("support_verwaltung")
+    a.pruefe_csrf(csrf)
+    ticket = a.db.get(SupportTicket, ticket_id)
+    if not ticket:
+        return _support_ansicht(a, fehler("Diese Anfrage gibt es nicht mehr."))
+    if ticket.status == "geschlossen":
+        return _support_ansicht(a, fehler("Geschlossene Anfragen werden nicht automatisch beantwortet."))
+    if support_ki.entwurf_senden(a.db, ticket):
+        a.db.commit()
+        benachrichtigung.melde(
+            a.db, ticket.user_id, "support", "Antwort vom Support",
+            f"Zu „{ticket.subject}“ gibt es eine Antwort.")
+        return _support_ansicht(a, gut("Antwort gesendet."))
+    a.db.commit()
+    return _support_ansicht(a, fehler("Es gibt keinen gültigen Antwortentwurf zum Senden."))
 
 
 @router.post("/support/{ticket_id}/schliessen")

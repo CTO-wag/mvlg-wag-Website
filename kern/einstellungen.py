@@ -57,7 +57,6 @@ DATENBANK_DATEI = os.path.join(DATEN_DIR, "ag_plattform.db")
 DATABASE_URL = (os.environ.get("DATABASE_URL", "").strip()
                 or "sqlite:///" + DATENBANK_DATEI.replace("\\", "/"))
 
-
 def _text(name: str, standard: str = "") -> str:
     """Eine Zeichenkette aus der Umgebung - leer zaehlt als "nicht gesetzt".
 
@@ -81,6 +80,12 @@ def _zahl(name: str, standard: int) -> int:
         return int(_text(name, str(standard)))
     except ValueError:
         return standard
+
+
+#  Support-Automatik
+GROQ_API_KEY = _text("GROQ_API_KEY")
+GROQ_MODEL = _text("GROQ_MODEL", "openai/gpt-oss-120b")
+SUPPORT_KI_ENABLED = _ja("SUPPORT_KI_ENABLED", "true")
 
 
 #  Betrieb

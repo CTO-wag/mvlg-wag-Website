@@ -92,7 +92,6 @@ def treffen_anlegen(titel: str = Form(""), wann: str = Form(""),
     a.db.flush()
     treffen = Meeting(title=titel_, date=tag, start_time=beginn,
                       end_time=schluss, location=ort_,
-                      calendar_event_id=termin.id,
                       protocol=sauber(protokoll_text)[:20000] or None)
     a.db.add(treffen)
     a.db.flush()
@@ -256,15 +255,15 @@ def treffen_aendern(treffen_id: int, titel: str = Form(""),
     eintrag.end_time = uhrzeit(ende) or None
     eintrag.location = sauber(ort)[:200] or None
     eintrag.protocol = sauber(protokoll_text)[:20000] or None
-    if eintrag.calendar_event_id:
-        kalender_termin = a.db.get(CalendarEvent, eintrag.calendar_event_id)
-        if kalender_termin:
-            kalender_termin.title = eintrag.title
-            kalender_termin.start_date = eintrag.date
-            kalender_termin.start_time = eintrag.start_time
-            kalender_termin.end_time = eintrag.end_time
-            kalender_termin.location = eintrag.location
-            kalender_termin.updated_at = utcnow()
+    kalender_termin = (a.db.query(CalendarEvent)
+                       .filter(CalendarEvent.meeting_id == eintrag.id)
+                       .first())
+    if kalender_termin:
+        kalender_termin.title = eintrag.title
+        kalender_termin.start_date = eintrag.date
+        kalender_termin.start_time = eintrag.start_time
+        kalender_termin.end_time = eintrag.end_time
+        kalender_termin.location = eintrag.location
     a.db.commit()
     return _treffen_ansicht(a, gut("Gespeichert."))
 
@@ -276,10 +275,10 @@ def treffen_loeschen(treffen_id: int, csrf: str = Form(""),
     a.pruefe_csrf(csrf)
     eintrag = a.db.get(Meeting, treffen_id)
     if eintrag:
-        kalender_termin = (a.db.get(CalendarEvent, eintrag.calendar_event_id)
-                           if eintrag.calendar_event_id else None)
+        kalender_termin = (a.db.query(CalendarEvent)
+                           .filter(CalendarEvent.meeting_id == eintrag.id)
+                           .first())
         if kalender_termin:
-            eintrag.calendar_event_id = None
             kalender_termin.meeting_id = None
             a.db.flush()
             papierkorb.hinein(a.db, "calendar_event", kalender_termin, a.user.id)
@@ -308,9 +307,11 @@ def _kalender_ansicht(a: Anmeldung, meldung=None):
     # die naechsten Wochen holen wollte, sah alles ausser dem Wichtigsten.
     # Bearbeitet werden sie weiterhin dort, wo sie hingehoeren; hier stehen
     # sie zum Lesen, mit einem Weg dorthin.
+    verknuepfte_treffen = db.query(CalendarEvent.meeting_id).filter(
+        CalendarEvent.meeting_id.isnot(None))
     treffen = (db.query(Meeting)
                .filter(Meeting.date >= heute - timedelta(days=1),
-                       Meeting.calendar_event_id.is_(None))
+                       ~Meeting.id.in_(verknuepfte_treffen))
                .order_by(Meeting.date).limit(20).all())
     return teil("dashboard/kalender.html", a,
                 termine=sichtbar, treffen=treffen,
@@ -344,8 +345,7 @@ def termin_als_treffen(termin_id: int, csrf: str = Form(""),
     termin.targets.clear()
     treffen = Meeting(
         title=termin.title, date=termin.start_date, start_time=termin.start_time,
-        end_time=termin.end_time, location=termin.location,
-        calendar_event_id=termin.id)
+        end_time=termin.end_time, location=termin.location)
     a.db.add(treffen)
     a.db.flush()
     termin.meeting_id = treffen.id
@@ -461,7 +461,6 @@ def termin_loeschen(termin_id: int, csrf: str = Form(""),
             treffen = a.db.get(Meeting, termin.meeting_id)
             termin.meeting_id = None
             if treffen:
-                treffen.calendar_event_id = None
                 a.db.flush()
                 papierkorb.hinein(a.db, "meeting", treffen, a.user.id)
         papierkorb.hinein(a.db, "calendar_event", termin, a.user.id)

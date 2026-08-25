@@ -91,6 +91,23 @@
         {% endif %}
 
         {% if t.status != "geschlossen" %}
+        {% if verwaltet and t.ai_status != "gesendet" and not t.ai_draft %}
+        <form hx-post="/dashboard/support/{{ t.id }}/ki-entwurf"
+              hx-target="#tab-inhalt" style="margin-top:var(--r4);">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="btn-zweit">
+            Antwort generieren</button>
+        </form>
+        {% endif %}
+        {% if verwaltet and t.ai_draft %}
+        <form hx-post="/dashboard/support/{{ t.id }}/ki-senden"
+              hx-target="#tab-inhalt" style="margin-top:var(--r4);">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="voll">Antwortentwurf
+            <textarea rows="5" readonly>{{ t.ai_draft }}</textarea></label>
+          <button type="submit" class="btn-zweit">Antwort senden</button>
+        </form>
+        {% endif %}
         <form hx-post="/dashboard/support/{{ t.id }}/antwort" hx-target="#tab-inhalt"
               hx-encoding="multipart/form-data" class="formular"
               style="margin-top:var(--r4);">

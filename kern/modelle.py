@@ -441,8 +441,6 @@ class Meeting(Base):
     start_time = Column(String(5), nullable=True)
     end_time = Column(String(5), nullable=True)
     location = Column(String(200), nullable=True)
-    calendar_event_id = Column(Integer, ForeignKey("calendar_events.id"),
-                                nullable=True, unique=True, index=True)
     # An welchem Tag zuletzt erinnert wurde - verhindert, dass ein Neustart
     # dieselbe Erinnerung ein zweites Mal schickt.
     erinnert_am = Column(Date, nullable=True)
@@ -614,6 +612,9 @@ class SupportTicket(Base):
     replied_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     replied_at = Column(DateTime, nullable=True)
     status = Column(String(20), nullable=False, default="offen")
+    ai_status = Column(String(20), nullable=True)
+    ai_error = Column(String(500), nullable=True)
+    ai_draft = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     sender = relationship("User", foreign_keys=[user_id])
     responder = relationship("User", foreign_keys=[replied_by])
