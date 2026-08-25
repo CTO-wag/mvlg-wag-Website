@@ -9,6 +9,8 @@ REM  Produktionswerte wuerden sonst die Live-Datenbank und die Live-Ports
 REM  verwenden. Entwicklung und Betrieb koennen dadurch gleichzeitig laufen.
 REM ============================================================================
 
+pip install -r requirements.txt
+
 REM Eigene lokale SQLite-Datenbank statt Supabase/Produktionsdatenbank.
 set "DATEN_DIR=%~dp0daten-entwicklung"
 set "DATABASE_URL="
@@ -42,3 +44,5 @@ echo.
 
 start "AG-Entwicklung Website" cmd /k "cd /d "%~dp0" && python server.py website --neuladen"
 start "AG-Entwicklung Dashboard" cmd /k "cd /d "%~dp0" && python server.py dashboard --neuladen"
+
+REM fertig
