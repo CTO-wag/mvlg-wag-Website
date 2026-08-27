@@ -157,37 +157,73 @@
 
 {% if rechte.nachrichten %}
 <div class="panel">
-  <div class="panel-kopf"><div><h2>Anfragen über die Website</h2></div>
+  <div class="panel-kopf"><div><h2>Anfragen über die Website</h2>
+    <p class="meta">Von Leuten ohne Konto – Eltern, Interessenten, die Schule.
+      Die Antwort geht als E-Mail an die Adresse, die sie angegeben haben;
+      im Dashboard lesen kann sie dort niemand.</p></div>
     <span class="marke">{{ kontakt|length }}</span></div>
+  {% if not mail_moeglich %}
+  <div class="meldung meldung-warnung"><div>Es ist kein Mailversand
+    eingerichtet (SMTP_HOST in der config.cmd). Solange das so ist, lässt sich
+    keine Anfrage beantworten – eine Antwort käme bei niemandem an.</div></div>
+  {% endif %}
   {% if kontakt %}
-  <div class="stapel">
+  {{ m.suche("#kontakt-liste", "Name, Adresse oder Text suchen …", "Anfragen") }}
+  <div class="stapel" id="kontakt-liste">
     {% for k in kontakt %}
-    <details class="block">
+    <details class="block" data-suchbar>
       <summary>
         <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
           <strong>{{ k.name }}</strong>
           <span class="meta">{{ k.email }} · {{ k.created_at|relativ }}</span>
-          {% if k.reply %}<span class="marke zustand-erledigt">beantwortet</span>
+          {#  Drei Zustände, nicht zwei. „Beantwortet, aber die Mail ist nicht
+              rausgegangen" ist genau der Fall, der sonst untergeht: Im
+              Dashboard steht eine Antwort, bei der Person nichts.  #}
+          {% if k.reply and k.reply_mail_ok %}
+          <span class="marke zustand-erledigt">beantwortet</span>
+          {% elif k.reply %}
+          <span class="marke zustand-abgelehnt">Antwort nicht zugestellt</span>
           {% else %}<span class="marke zustand-offen">offen</span>{% endif %}
         </span>
       </summary>
       <div class="aufklapp-inhalt">
         <p style="white-space:pre-wrap;">{{ k.message }}</p>
+
         {% if k.reply %}
-        <div class="meldung meldung-gut"><div><strong>Antwort:</strong>
+        <div class="meldung meldung-{{ 'gut' if k.reply_mail_ok else 'fehler' }}">
+          <div><strong>Antwort:</strong>
           <p style="white-space:pre-wrap;">{{ k.reply }}</p>
-          <span class="meta">{{ k.replied_at|berlin }}</span></div></div>
-        {% else %}
-        <form hx-post="/dashboard/nachrichten/kontakt/{{ k.id }}/antwort"
-              hx-target="#tab-inhalt" class="formular">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <label class="voll">Antwort
-            <textarea name="antwort" maxlength="4000" rows="4" required></textarea></label>
-          <div class="formular-fuss">
-            <button type="submit">Antworten{% if mail_moeglich %} und per E-Mail schicken{% endif %}</button>
-          </div>
-        </form>
+          <span class="meta">{{ k.replied_at|berlin }}
+            {%- if k.reply_mail_ok %} · per E-Mail an {{ k.email }} verschickt
+            {%- else %} · <strong>nicht zugestellt</strong>
+              {{- ": " ~ k.reply_mail_fehler if k.reply_mail_fehler }}
+            {%- endif %}</span></div>
+        </div>
         {% endif %}
+
+        {% if mail_moeglich %}
+        <details class="block" {% if not k.reply %}open{% endif %}>
+          <summary>{% if k.reply and k.reply_mail_ok %}Nachfassen
+            {%- elif k.reply %}Noch einmal versuchen
+            {%- else %}Antworten{% endif %}</summary>
+          <div class="aufklapp-inhalt">
+            <form hx-post="/dashboard/nachrichten/kontakt/{{ k.id }}/antwort"
+                  hx-target="#tab-inhalt" class="formular">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <label class="voll">Antwort an {{ k.name }} &lt;{{ k.email }}&gt;
+                <span class="meta">Geht als persönliche Mail raus, mit der
+                  ursprünglichen Frage darunter. Antwortet die Person darauf,
+                  landet das in deinem Postfach.</span>
+                <textarea name="antwort" maxlength="4000" rows="5" required
+                          placeholder="Hallo {{ k.name.split(' ')[0] }}, …"></textarea></label>
+              <div class="formular-fuss">
+                <button type="submit">Antwort per E-Mail schicken</button>
+              </div>
+            </form>
+          </div>
+        </details>
+        {% endif %}
+
         <div class="knopfzeile" style="margin-top:var(--r3);">
           {{ m.loeschen("/dashboard/nachrichten/kontakt/" ~ k.id ~ "/loeschen",
                         "Anfrage löschen?", csrf, "In den Papierkorb",

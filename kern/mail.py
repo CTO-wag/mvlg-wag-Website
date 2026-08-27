@@ -111,6 +111,30 @@ VORDRUCKE = {
         "Der Rahmen für alle Benachrichtigungen, die zusätzlich per Mail gehen.",
         ("vorname", "titel", "text", "dashboard_url"),
     ),
+    # Eigener Vordruck statt "notification": Wer ueber das Kontaktformular
+    # schreibt, hat KEIN Konto. Der Benachrichtigungsrahmen haette ihm einen
+    # Dashboard-Link geschickt und den Satz "weil in deinem Konto
+    # Benachrichtigungen eingeschaltet sind" - beides Unsinn fuer jemanden
+    # von aussen und ein guter Grund, die Mail fuer einen Irrlaeufer zu
+    # halten.
+    #
+    # Die urspruengliche Frage steht mit darunter. Zwischen Absenden und
+    # Antwort liegen leicht ein paar Tage; ohne sie weiss die Person nicht
+    # mehr, worauf hier geantwortet wird.
+    "contact_reply": (
+        "Antwort auf deine Nachricht an die Wirtschafts- & Investment-AG",
+        "Hallo {vorname},\n\n"
+        "danke für deine Nachricht. Hier ist unsere Antwort:\n\n"
+        "{antwort}\n\n"
+        "Du kannst auf diese E-Mail einfach antworten - sie geht an eine "
+        "Adresse, die gelesen wird.\n\n"
+        "Viele Grüße\n{absender}\n"
+        "Wirtschafts- & Investment-AG\n\n"
+        "--- Deine Nachricht vom {datum} ---\n{frage}",
+        "Die persönliche Antwort auf eine Anfrage über das Kontaktformular "
+        "der Website. Wird im Dashboard unter „Nachrichten“ geschrieben.",
+        ("vorname", "antwort", "frage", "datum", "absender"),
+    ),
 }
 
 # Vordrucke, bei denen die persoenliche Abmeldung gilt. Bei allen anderen
@@ -192,8 +216,13 @@ def _absaetze(text: str) -> str:
     return "\n".join(teile)
 
 
-def als_html(betreff: str, text: str) -> str:
+def als_html(betreff: str, text: str, automatisch: bool = True,
+             antwort_an: str = "") -> str:
     f = _HELL
+    ziel = _antwortziel(antwort_an)
+    fuss = " ".join(teil for teil in (
+        "Diese Nachricht wurde automatisch verschickt." if automatisch else "",
+        f"Antworten gehen an {esc(ziel)}." if ziel else "") if teil)
     return f"""<!doctype html>
 <html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -243,27 +272,42 @@ def als_html(betreff: str, text: str) -> str:
          color:{f['grau']};">
         Wirtschafts- &amp; Investment-AG · Schüler-AG des
         Max-von-Laue-Gymnasiums Koblenz<br>
-        Diese Nachricht wurde automatisch verschickt.
-        {"Antworten gehen an " + esc(cfg.MAIL_REPLY_TO) + "." if cfg.MAIL_REPLY_TO else ""}
+        {fuss}
       </p>
     </td></tr>
   </table>
 </td></tr></table></body></html>"""
 
 
-def _fusszeile_text() -> str:
+def _antwortziel(antwort_an: str = "") -> str:
+    """An wen eine Antwort auf diese Mail geht - oder "" fuer niemanden."""
+    return sauber(antwort_an) or cfg.MAIL_REPLY_TO
+
+
+def _fusszeile_text(automatisch: bool = True, antwort_an: str = "") -> str:
     zeilen = ["", "—",
               "Wirtschafts- & Investment-AG · Schüler-AG des "
-              "Max-von-Laue-Gymnasiums Koblenz",
-              "Diese Nachricht wurde automatisch verschickt."]
-    if cfg.MAIL_REPLY_TO:
-        zeilen.append(f"Antworten gehen an {cfg.MAIL_REPLY_TO}.")
+              "Max-von-Laue-Gymnasiums Koblenz"]
+    if automatisch:
+        zeilen.append("Diese Nachricht wurde automatisch verschickt.")
+    ziel = _antwortziel(antwort_an)
+    if ziel:
+        zeilen.append(f"Antworten gehen an {ziel}.")
     return "\n".join(zeilen)
 
 
 #  Versand
-def _zustellen(empfaenger: str, betreff: str, text: str) -> tuple:
-    """(erfolg, Fehlermeldung). Blockiert - nie direkt aus einer Route rufen."""
+def _zustellen(empfaenger: str, betreff: str, text: str,
+               antwort_an: str = "", automatisch: bool = True) -> tuple:
+    """(erfolg, Fehlermeldung). Blockiert - nie direkt aus einer Route rufen.
+
+    `antwort_an` setzt Reply-To abweichend von der Vorgabe, `automatisch=False`
+    laesst den Vermerk Auto-Submitted weg. Beides braucht die von Hand
+    geschriebene Antwort auf eine Kontaktanfrage: Sie soll bei der Person
+    landen, die sie geschrieben hat, und kein Mailprogramm soll sie als
+    Maschinenpost behandeln - genau das unterdrueckt sonst die Abwesenheits-
+    notiz, mit der jemand antworten wollte.
+    """
     if not versand_moeglich():
         return False, "Kein SMTP-Server konfiguriert."
 
@@ -274,14 +318,18 @@ def _zustellen(empfaenger: str, betreff: str, text: str) -> tuple:
     nachricht["Date"] = formatdate(localtime=True)
     absenderdomain = cfg.SMTP_FROM.split("@")[-1] if "@" in cfg.SMTP_FROM else None
     nachricht["Message-ID"] = make_msgid(domain=absenderdomain)
-    if cfg.MAIL_REPLY_TO:
-        nachricht["Reply-To"] = cfg.MAIL_REPLY_TO
-    # Sagt Mailprogrammen, dass hier niemand mitliest - unterdrueckt
-    # Abwesenheitsnotizen und Lesebestaetigungen.
-    nachricht["Auto-Submitted"] = "auto-generated"
+    if _antwortziel(antwort_an):
+        nachricht["Reply-To"] = _antwortziel(antwort_an)
+    if automatisch:
+        # Sagt Mailprogrammen, dass hier niemand mitliest - unterdrueckt
+        # Abwesenheitsnotizen und Lesebestaetigungen. Bei einer von Hand
+        # geschriebenen Antwort waere der Vermerk schlicht falsch.
+        nachricht["Auto-Submitted"] = "auto-generated"
 
-    nachricht.set_content(text + "\n" + _fusszeile_text())
-    nachricht.add_alternative(als_html(betreff, text), subtype="html")
+    nachricht.set_content(
+        text + "\n" + _fusszeile_text(automatisch, antwort_an))
+    nachricht.add_alternative(
+        als_html(betreff, text, automatisch, antwort_an), subtype="html")
 
     if os.path.exists(LOGO_DATEI):
         try:
@@ -313,7 +361,8 @@ def _zustellen(empfaenger: str, betreff: str, text: str) -> tuple:
 
 
 def sende(empfaenger: str, betreff: str, text: str, warten: bool = False,
-          anlass: str = None, testmodus: bool = False) -> bool:
+          anlass: str = None, testmodus: bool = False,
+          antwort_an: str = "", automatisch: bool = True) -> bool:
     """Verschickt eine Mail - normalerweise im Hintergrund.
 
     warten=True nur dort, wo das Ergebnis in derselben Antwort gebraucht wird
@@ -328,7 +377,9 @@ def sende(empfaenger: str, betreff: str, text: str, warten: bool = False,
         return False
 
     def arbeit():
-        erfolg, fehler = _zustellen(empfaenger, betreff, text)
+        erfolg, fehler = _zustellen(empfaenger, betreff, text,
+                                    antwort_an=antwort_an,
+                                    automatisch=automatisch)
         zustellung("email", empfaenger, betreff, erfolg, fehler, anlass)
         if not erfolg:
             print(f"[E-Mail] an {empfaenger} fehlgeschlagen: {fehler}")
@@ -341,6 +392,7 @@ def sende(empfaenger: str, betreff: str, text: str, warten: bool = False,
 
 
 def sende_vordruck(db, empfaenger_user, schluessel: str, warten: bool = False,
+                   antwort_an: str = "", automatisch: bool = True,
                    **daten) -> bool:
     """Vordruck fuellen und an eine Person schicken.
 
@@ -372,12 +424,14 @@ def sende_vordruck(db, empfaenger_user, schluessel: str, warten: bool = False,
             return False
         ergebnisse = [
             sende(adresse, betreff, text, warten=warten,
-                  anlass=schluessel, testmodus=True)
+                  anlass=schluessel, testmodus=True,
+                  antwort_an=antwort_an, automatisch=automatisch)
             for adresse in empfaenger
         ]
         return any(ergebnisse)
     return sende(empfaenger_user.email, betreff, text, warten=warten,
-                 anlass=schluessel)
+                 anlass=schluessel, antwort_an=antwort_an,
+                 automatisch=automatisch)
 
 
 def pruefe_verbindung() -> tuple:

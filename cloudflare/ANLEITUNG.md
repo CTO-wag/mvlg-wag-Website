@@ -1,32 +1,61 @@
 # Auffangnetz einrichten
 
-Was du danach hast: Ist die Plattform nicht erreichbar, sieht ein Besucher
-statt der englischen Cloudflare-Seite eine eigene Seite. Sie erklärt, was los
-ist, sieht im Hintergrund nach, ob die Plattform wieder da ist, nimmt ein
-Support-Ticket für den CTO auf – und, das Wichtigste: **sie nimmt weiterhin
-Bewerbungen entgegen.**
+Was du danach hast: Ist die Plattform nicht erreichbar, bekommt ein Besucher
+trotzdem die Startseite. Nicht die englische Cloudflare-Seite, und auch keine
+Fehlermeldung – **dieselbe Seite wie immer**: dasselbe Stylesheet, dieselben
+Schriften, derselbe Aufbau. Bewerbung und Kontaktformular funktionieren
+weiter; der Worker nimmt beides selbst entgegen.
 
-Neu geladen wird die Seite nur auf Knopfdruck, nie von selbst. Sie trägt das
-Bewerbungsformular; ein Reload mitten im Tippen würde alles Getippte
-wegwerfen, und wer sich einmal umsonst beworben hat, tut es kein zweites Mal.
-Ist die Plattform wieder erreichbar, steht das im Band und daneben liegt ein
-Knopf – wer mittendrin ist, schickt erst ab. Das geht auch dann noch: Die
-Bewerbung nimmt der Worker entgegen, nicht der Server.
+Der Ausfall steht an genau einer Stelle: **Wer auf „Login" tippt, erfährt es.**
+Dann geht ein Hinweis auf – das System ist gerade nicht erreichbar, wir sehen
+nach, und hier kannst du es dem CTO melden.
 
-Unter der Fehlermeldung steht die komplette Startseite noch einmal, fest
-eingetragen: wer wir sind, wie das Jahr läuft, dein Weg in der AG, und das
-vollständige Bewerbungsformular. Was im Dashboard gepflegt wird (Aktivitäten,
-Arbeitsproben, Quiz), fehlt dort mit Absicht – es käme aus derselben
-Datenbank, die gerade nicht antwortet.
+Das ist Absicht. Wer zum ersten Mal auf mvlg-wag.de kommt, weil ihm jemand von
+der AG erzählt hat, soll lesen, worum es geht, und sich bewerben können. Für
+ihn ist ein Ausfall unserer Verwaltung belanglos – eine Störungsmeldung als
+erste Zeile dagegen kostet ihn. Wer sich anmelden will, gehört dagegen zur AG,
+und für ihn ist „das System ist gerade aus" die richtige, vollständige
+Antwort.
 
-Eine Bewerbung, die während eines Ausfalls eingeht, wird bei Cloudflare
-hinterlegt und automatisch eingetragen, sobald die Plattform wieder läuft –
-mit dem richtigen Zeitpunkt, samt Bestätigungsmail an die bewerbende Person
-und Benachrichtigung an alle, die Bewerbungen sichten. Für sie sieht es
-hinterher aus wie eine ganz normale Bewerbung.
+Was fehlt, fehlt mit Absicht: das Quiz und alles, was sonst live aus der
+Datenbank käme. Die Datenbank ist ja gerade der Teil, der nicht antwortet. Die
+vier im Dashboard pflegbaren Blöcke (Vorteile, Stufen, Aktivitäten,
+Portfolio) sind eingebacken – sie stammen von dem Tag, an dem die Notfassung
+zuletzt gebaut wurde.
 
-Dauer: etwa 20 Minuten. Du brauchst nur einen Browser – auf dem Laptop muss
-nichts installiert werden.
+Was während eines Ausfalls hereinkommt – Bewerbung, Kontaktanfrage,
+Störungsmeldung – wird bei Cloudflare hinterlegt und automatisch eingetragen,
+sobald die Plattform wieder läuft. Mit dem richtigen Zeitpunkt, samt
+Bestätigungsmail und Benachrichtigung an die Zuständigen. Hinterher sieht es
+aus wie ganz normal hereingekommen.
+
+Dauer: etwa 20 Minuten.
+
+---
+
+## Schritt 0: Die Notfassung bauen
+
+Der Worker steht am Rand des Netzes und kann sich **nichts** nachladen – der
+Server, von dem Stylesheet, Schriften und Wappen kämen, ist genau der
+ausgefallene. Alles muss mit in die Worker-Datei. Das erledigt ein Skript:
+
+```
+python werkzeuge/auffangnetz_bauen.py
+```
+
+Es liest `statisch/stil/basis.css`, `statisch/stil/website.css`, die
+Schriftschnitte und die Bilder ein und schreibt sie nach
+`cloudflare/eingebettet.js`. Steht eine Datenbank zur Verfügung, holt es
+zusätzlich die vier pflegbaren Startseiten-Blöcke; sonst bleibt der bisherige
+Stand stehen.
+
+**Wann ausführen:** immer, wenn sich das Aussehen der Website ändert oder wenn
+im Dashboard Startseiten-Blöcke gepflegt wurden. Sonst sieht die Notfassung
+aus wie die Seite von vorletztem Jahr – und zwar ausgerechnet dann, wenn man
+es am wenigsten gebrauchen kann.
+
+`cloudflare/eingebettet.js` gehört mit ins Repository und mit ins Deployment.
+Von Hand ändern lohnt nicht: Der nächste Lauf überschreibt es.
 
 ---
 
@@ -40,6 +69,21 @@ nichts installiert werden.
    und löschen.
 5. Den vollständigen Inhalt von `cloudflare/worker.js` hineinkopieren.
 6. Oben rechts **Deploy** klicken.
+
+**Achtung:** `worker.js` allein reicht seit dem Umbau nicht mehr – die Datei
+holt sich Stylesheet, Schriften und Bilder aus `cloudflare/eingebettet.js`.
+Über den Editor im Browser lassen sich zwei Dateien nicht gut einspielen.
+Nimm dafür wrangler, das packt beides zusammen:
+
+```
+cd cloudflare
+npx wrangler deploy
+```
+
+Vorher einmal `python werkzeuge/auffangnetz_bauen.py` laufen lassen (Schritt
+0). Wer doch über den Browser-Editor geht, muss dort beide Dateien anlegen –
+`worker.js` und `eingebettet.js` – und `eingebettet.js` ist etwa ein halbes
+Megabyte lang.
 
 Das ist schon der halbe Weg. Der Worker läuft, hängt aber noch an keiner
 Adresse und kann noch keine Meldungen speichern.
@@ -183,35 +227,45 @@ Der ehrliche Test ist der, bei dem du es kaputt machst.
 1. Auf dem Laptop das Fenster der Plattform schließen (**nicht** den Tunnel –
    dann bekommst du 502 statt 1033, beide werden abgefangen, aber so ist es
    schneller wieder da).
-2. Vom Telefon `https://mvlg-wag.de` öffnen. Du musst deine eigene Seite sehen:
-   „Die Plattform ist gerade nicht erreichbar."
-3. Warte 15 Sekunden – unten muss der Zähler herunterlaufen.
-4. **Dem CTO melden** antippen, etwas hineinschreiben, abschicken.
+2. Vom Telefon `https://mvlg-wag.de` öffnen. Du musst die **ganz normale
+   Startseite** sehen. Genau das ist der Test: Sieht sie anders aus als sonst
+   – andere Schrift, kein Wappen, verrutschte Kästen –, dann fehlt
+   `eingebettet.js` oder ist veraltet (Schritt 0).
+3. Oben rechts auf **Login** tippen. Erst jetzt darf stehen: „Das System ist
+   gerade nicht erreichbar."
+4. Warte 15 Sekunden – der Zähler im Hinweis muss herunterlaufen.
+5. **Dem CTO melden** aufklappen, etwas hineinschreiben, abschicken.
    Es muss stehen: „Angekommen."
-5. Dein Telefon sollte klingeln (wenn Schritt 4b gemacht ist).
-6. Die Plattform auf dem Laptop wieder starten.
-7. Die Fehlerseite auf dem Telefon lädt sich innerhalb von etwa einer Minute
-   **von selbst** neu und zeigt die echte Seite.
+6. Dein Telefon sollte klingeln (wenn Schritt 4b gemacht ist).
+7. Die Plattform auf dem Laptop wieder starten. Im offenen Hinweis erscheint
+   innerhalb einer Minute **Jetzt anmelden**.
 8. Im Dashboard unter **Support** steht ein neues Ticket
    „Ausfallmeldung: … konnte die Plattform nicht erreichen".
 
-Wenn Punkt 8 klappt, ist alles richtig verbunden.
+Wenn Punkt 2, 3 und 8 klappen, ist alles richtig verbunden.
 
 **Und einmal dasselbe mit einer Bewerbung** – das ist der Weg, der wirklich
 zählt:
 
-1. Plattform wieder abschalten, `https://mvlg-wag.de` öffnen.
-2. Nach unten scrollen. Unter der Fehlermeldung steht die ganze Startseite.
-3. Das Bewerbungsformular ausfüllen und abschicken. Es muss stehen:
-   „Danke, … Deine Bewerbung liegt sicher."
-4. Plattform starten, ein paar Minuten warten.
-5. Im Dashboard unter **Bewerbungen** steht sie – mit dem Zeitpunkt, zu dem
+1. Plattform wieder abschalten, `https://mvlg-wag.de/bewerbung` öffnen.
+2. Das Bewerbungsformular ausfüllen und abschicken. Es muss stehen:
+   „Danke, … Deine Bewerbung liegt bei uns."
+3. Plattform starten, ein paar Minuten warten.
+4. Im Dashboard unter **Bewerbungen** steht sie – mit dem Zeitpunkt, zu dem
    sie wirklich abgeschickt wurde, nicht dem des Neustarts.
 
-Anders als bei den Störungsmeldungen nimmt der Worker eine Bewerbung
-**immer** an, auch wenn die Plattform währenddessen zurückkommt. Lieber eine
-doppelte als eine verlorene: Eine doppelte sieht man und löscht sie, eine
-fehlende sieht niemand.
+**Und mit einer Frage über das Kontaktformular:**
+
+1. Plattform abschalten, `https://mvlg-wag.de` öffnen, ganz nach unten zu
+   „Fragen? Schreib einfach." scrollen und etwas abschicken.
+2. Plattform starten, ein paar Minuten warten.
+3. Im Dashboard unter **Nachrichten** steht sie bei „Anfragen über die
+   Website" – und lässt sich von dort per E-Mail beantworten.
+
+Anders als bei den Störungsmeldungen nimmt der Worker Bewerbungen und
+Anfragen **immer** an, auch wenn die Plattform währenddessen zurückkommt.
+Lieber eine doppelte als eine verlorene: Eine doppelte sieht man und löscht
+sie, eine fehlende sieht niemand.
 
 ---
 
@@ -286,14 +340,14 @@ aber es war kein ntfy-Thema hinterlegt. Schritt 4b nachholen.
 
 ## Was das Netz nicht kann
 
-- **Keine gepflegten Inhalte zeigen.** Aktivitäten, Arbeitsproben, die
-  Vorteilsliste und das Quiz stehen in der Datenbank, die gerade nicht
-  antwortet. Auf der Notfassung fehlen sie. Was dort steht, ist fest
-  eingetragen und ändert sich nur, wenn jemand `worker.js` anfasst – wenn ihr
-  also den Auftritt umschreibt, gehört diese Datei nachgezogen.
-- **Kein Login, kein Dashboard.** Die Notfassung ist die öffentliche Seite.
-  Auf `app.mvlg-wag.de` bleibt es bei der schlichten Fehlermeldung – wer sich
-  dort anmelden wollte, ist in der AG und braucht keine Vorstellung.
+- **Aktuelle Inhalte zeigen.** Aktivitäten, Portfolio, Vorteilsliste und
+  Stufen sind der Stand vom letzten `python werkzeuge/auffangnetz_bauen.py`.
+  Wer im Dashboard etwas ändert, sieht es auf der Notfassung erst nach dem
+  nächsten Bauen. Das Quiz fehlt ganz – es braucht den Server.
+- **Anmelden.** Dafür braucht es die Datenbank. Genau das steht im Hinweis,
+  der beim Klick auf „Login" aufgeht; auf `app.mvlg-wag.de` und auf
+  `/dashboard/…` steht er gleich offen, denn wer dorthin wollte, wollte sich
+  anmelden.
 - **Eine laufende Eingabe retten.** Wer gerade ein Formular abgeschickt hat und
   dabei in den Ausfall läuft, verliert das Getippte. Das ließe sich nur auf dem
   Gerät selbst abfangen, nicht am Rand des Netzes. Was auf der Notfassung

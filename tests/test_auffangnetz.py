@@ -23,7 +23,7 @@ from tests import hilfe                                      # noqa: F401
 from kern import ausfallmeldungen
 from kern import einstellungen as cfg
 from kern.datenbank import SessionLocal
-from kern.modelle import Application, SupportTicket, User
+from kern.modelle import Application, ContactMessage, SupportTicket, User
 from tests.hilfe import frische_datenbank
 
 WURZEL = pathlib.Path(__file__).resolve().parent.parent
@@ -35,6 +35,7 @@ class _NachgebauterWorker(BaseHTTPRequestHandler):
 
     meldungen = []
     bewerbungen = []
+    nachrichten = []
     bestaetigt = []
     schluessel = SCHLUESSEL
 
@@ -48,7 +49,8 @@ class _NachgebauterWorker(BaseHTTPRequestHandler):
         if not self._erlaubt():
             self.send_response(403); self.end_headers(); return
         koerper = json.dumps({"meldungen": self.meldungen,
-                              "bewerbungen": self.bewerbungen}).encode("utf-8")
+                              "bewerbungen": self.bewerbungen,
+                              "nachrichten": self.nachrichten}).encode("utf-8")
         self.send_response(200)
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(koerper)))
@@ -98,6 +100,8 @@ class TestWorkerDateien(unittest.TestCase):
 
     def setUp(self):
         self.js = (WURZEL / "cloudflare/worker.js").read_text(encoding="utf-8")
+        self.eingebettet = (WURZEL / "cloudflare/eingebettet.js").read_text(
+            encoding="utf-8")
 
     def test_keine_steuerzeichen_in_der_quelle(self):
         """Beim Schreiben hatte sich einmal ein Nullbyte eingeschlichen. Das
@@ -109,9 +113,48 @@ class TestWorkerDateien(unittest.TestCase):
 
     def test_die_seite_holt_nichts_von_aussen(self):
         """Der Server, von dem Bilder und Schriften kämen, ist genau der, der
-        gerade nicht antwortet."""
-        for verdacht in ('src="http', "href=\"http", "@import", "fonts.g"):
+        gerade nicht antwortet.
+
+        Ein Textverweis zählt nicht dazu: Im Fuß steht seit jeher ein Link zur
+        Schule, und der lädt nichts - er wartet auf einen Klick. Gesucht wird
+        also nach dem, was der Browser von selbst holen würde.
+        """
+        for verdacht in ('src="http', "@import", "fonts.googleapis",
+                         "fonts.gstatic", "url(http", "url('http",
+                         'url("http'):
             self.assertNotIn(verdacht, self.js, verdacht)
+            self.assertNotIn(verdacht, self.eingebettet, verdacht)
+        # <link> zieht immer etwas nach. Erlaubt ist nur eine data:-Adresse
+        # oder der Platzhalter, in den beim Bauen eine eingesetzt wird - dass
+        # das wirklich passiert, prüft tests/auffangnetz.mjs an der fertigen
+        # Seite.
+        for zeile in self.js.split("\n"):
+            if "<link" in zeile:
+                self.assertRegex(zeile, r'href="(data:|%%[A-Z]+%%)',
+                                 zeile.strip())
+
+    def test_die_eingebetteten_sachen_sind_da(self):
+        """Ohne Stylesheet und Schriften sähe die Notfassung aus wie ein
+        Textdokument - und genau daran erkennt man sie sonst sofort."""
+        for name in ("SCHRIFTEN", "STIL", "WAPPEN", "LOGO", "FAVICON",
+                     "INHALTE"):
+            self.assertIn(f"export const {name} = ", self.eingebettet, name)
+        self.assertIn("data:font/woff2;base64,", self.eingebettet)
+        # Ein Stück aus statisch/stil/basis.css - kommt es nicht mit, ist die
+        # Datei zwar da, aber leer gebaut worden.
+        self.assertIn("--seitenrand", self.eingebettet)
+        self.assertIn(".marke-logo", self.eingebettet)
+
+    def test_der_besucher_erfaehrt_den_ausfall_nicht(self):
+        """Der ganze Sinn des Umbaus: Wer zum ersten Mal auf die Seite kommt,
+        soll die Startseite sehen und keine Störungsmeldung. Erst wer sich
+        anmelden will, bekommt sie - für ihn ist sie die richtige Antwort."""
+        # Das alte Band ganz oben darf nicht zurückkommen.
+        self.assertNotIn("Die Plattform ist gerade nicht erreichbar", self.js)
+        self.assertNotIn("Diese Notfassung liefert Cloudflare aus", self.js)
+        # Die Meldung liegt zugeklappt in der Seite und hängt am Login.
+        self.assertIn('id="ausfall" hidden', self.js)
+        self.assertIn("data-anmelden", self.js)
 
     def test_ein_500_der_anwendung_wird_nicht_ueberdeckt(self):
         """Ein 500 heißt: Die Anwendung hat geantwortet, sie läuft also. Ihre
@@ -139,6 +182,7 @@ class TestMeldungenWerdenTickets(unittest.TestCase):
         frische_datenbank()
         _NachgebauterWorker.meldungen = []
         _NachgebauterWorker.bewerbungen = []
+        _NachgebauterWorker.nachrichten = []
         _NachgebauterWorker.bestaetigt = []
         cls.server = HTTPServer(("127.0.0.1", 0), _NachgebauterWorker)
         cls.faden = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -156,6 +200,7 @@ class TestMeldungenWerdenTickets(unittest.TestCase):
     def setUp(self):
         _NachgebauterWorker.meldungen = []
         _NachgebauterWorker.bewerbungen = []
+        _NachgebauterWorker.nachrichten = []
         _NachgebauterWorker.bestaetigt = []
         db = SessionLocal()
         db.query(SupportTicket).filter(
@@ -312,6 +357,7 @@ class TestBewerbungenAusDerAusfallzeit(unittest.TestCase):
     def setUp(self):
         _NachgebauterWorker.meldungen = []
         _NachgebauterWorker.bewerbungen = []
+        _NachgebauterWorker.nachrichten = []
         _NachgebauterWorker.bestaetigt = []
         # Auch HINTERHER aufraeumen, nicht nur davor: Die eingespielten
         # Bewerbungen tragen ein festes Datum. Sobald das alt genug ist,
@@ -430,6 +476,99 @@ class TestBewerbungenAusDerAusfallzeit(unittest.TestCase):
         finally:
             cfg.AUSFALL_WORKER_URL = self.adresse
             server.shutdown()
+
+
+class TestNachrichtenAusDerAusfallzeit(unittest.TestCase):
+    """Was über das Kontaktformular der Notfassung hereinkam.
+
+    Seit die Notfassung aussieht wie die richtige Startseite, steht dort auch
+    das Kontaktformular - und wer es ausfüllt, erwartet zu Recht eine Antwort.
+    Aus den Angaben muss deshalb dasselbe werden wie im Normalbetrieb: eine
+    Anfrage im Dashboard, die sich per E-Mail beantworten lässt.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        frische_datenbank()
+        cls.server = HTTPServer(("127.0.0.1", 0), _NachgebauterWorker)
+        cls.faden = threading.Thread(target=cls.server.serve_forever,
+                                     daemon=True)
+        cls.faden.start()
+        cls.adresse = f"http://127.0.0.1:{cls.server.server_address[1]}"
+        cls.vorher = (cfg.AUSFALL_WORKER_URL, cfg.AUSFALL_SCHLUESSEL)
+        cfg.AUSFALL_WORKER_URL = cls.adresse
+        cfg.AUSFALL_SCHLUESSEL = SCHLUESSEL
+
+    @classmethod
+    def tearDownClass(cls):
+        cfg.AUSFALL_WORKER_URL, cfg.AUSFALL_SCHLUESSEL = cls.vorher
+        cls.server.shutdown()
+
+    def setUp(self):
+        _NachgebauterWorker.meldungen = []
+        _NachgebauterWorker.bewerbungen = []
+        _NachgebauterWorker.nachrichten = []
+        _NachgebauterWorker.bestaetigt = []
+        db = SessionLocal()
+        db.query(ContactMessage).delete()
+        db.commit()
+        db.close()
+
+    def _anfragen(self):
+        db = SessionLocal()
+        try:
+            return db.query(ContactMessage).order_by(ContactMessage.id).all()
+        finally:
+            db.close()
+
+    def _hinlegen(self, **zusatz):
+        eintrag = {
+            "kennung": "nachricht:2026-08-27T09:00:00.000Z-abcd1234",
+            "name": "Maria Musterfrau", "email": "maria@example.org",
+            "nachricht": "Kann mein Kind auch in der neunten Klasse "
+                         "mitmachen? Umlaute: äöüß",
+            "zeitpunkt": "2026-08-27T09:00:00.000Z",
+        }
+        eintrag.update(zusatz)
+        _NachgebauterWorker.nachrichten = [eintrag]
+
+    def test_aus_einer_nachricht_wird_eine_anfrage(self):
+        self._hinlegen()
+        bilanz = ausfallmeldungen.abholen()
+        self.assertEqual(bilanz["nachrichten"], 1, bilanz)
+        anfragen = self._anfragen()
+        self.assertEqual(len(anfragen), 1)
+        self.assertEqual(anfragen[0].name, "Maria Musterfrau")
+        self.assertEqual(anfragen[0].email, "maria@example.org")
+        self.assertIn("äöüß", anfragen[0].message)
+        # Noch unbeantwortet - sie steht also in der offenen Liste.
+        self.assertIsNone(anfragen[0].reply)
+
+    def test_der_zeitpunkt_kommt_aus_der_nachricht(self):
+        """Sonst stünde dort der Moment, in dem der Rechner wieder anging -
+        und niemand sähe, wie lange jemand schon auf Antwort wartet."""
+        self._hinlegen()
+        ausfallmeldungen.abholen()
+        self.assertEqual(self._anfragen()[0].created_at.strftime("%Y-%m-%d"),
+                         "2026-08-27")
+
+    def test_unbrauchbares_wird_weggeworfen_statt_liegenzubleiben(self):
+        self._hinlegen(email="keine-adresse")
+        bilanz = ausfallmeldungen.abholen()
+        self.assertEqual(bilanz["nachrichten"], 0)
+        self.assertEqual(self._anfragen(), [])
+        # Trotzdem bestätigt - sonst wird es bei jedem Lauf neu geprüft.
+        self.assertEqual(len(_NachgebauterWorker.bestaetigt), 1)
+
+    def test_zweimal_abholen_legt_nicht_zweimal_an(self):
+        """Bestätigt der Worker nicht, kommt dieselbe Nachricht wieder. Zwei
+        Einträge hießen: Der Vorstand antwortet zweimal auf dasselbe."""
+        self._hinlegen()
+        ausfallmeldungen.abholen()
+        self._hinlegen()
+        zweit = ausfallmeldungen.abholen()
+        self.assertEqual(zweit["nachrichten"], 0, zweit)
+        self.assertEqual(len(self._anfragen()), 1)
 
 
 class TestAnbindungAnDenPlaner(unittest.TestCase):

@@ -11,7 +11,7 @@ import urllib.request
 
 from kern import einstellungen as cfg
 from kern.datenbank import sitzung
-from kern.modelle import SupportTicket, User
+from kern.modelle import ContactMessage, SupportTicket, User
 from kern.text import kuerzen, sauber, utcnow
 
 # Steht am Anfang des Betreffs. Daran erkennt der naechste Lauf seine eigenen
@@ -112,7 +112,7 @@ def abholen() -> dict:
     unerreichbares Auffangnetz ist kein Grund, den Faden zu beenden.
     """
     bilanz = {"neu": 0, "doppelt": 0, "bewerbungen": 0,
-              "bewerbungen_doppelt": 0, "fehler": ""}
+              "bewerbungen_doppelt": 0, "nachrichten": 0, "fehler": ""}
     if not eingerichtet():
         return bilanz
 
@@ -130,9 +130,11 @@ def abholen() -> dict:
     # ein Worker, der noch nicht neu ausgerollt ist, nichts blockiert.
     if isinstance(meldungen, dict):
         bewerbungen = meldungen.get("bewerbungen") or []
+        nachrichten = meldungen.get("nachrichten") or []
         meldungen = meldungen.get("meldungen") or []
     else:
         bewerbungen = []
+        nachrichten = []
 
     if bewerbungen:
         b_bilanz = _bewerbungen_eintragen(bewerbungen)
@@ -140,6 +142,12 @@ def abholen() -> dict:
         bilanz["bewerbungen_doppelt"] = b_bilanz["doppelt"]
         if b_bilanz["fehler"] and not bilanz["fehler"]:
             bilanz["fehler"] = b_bilanz["fehler"]
+
+    if nachrichten:
+        n_bilanz = _nachrichten_eintragen(nachrichten)
+        bilanz["nachrichten"] = n_bilanz["neu"]
+        if n_bilanz["fehler"] and not bilanz["fehler"]:
+            bilanz["fehler"] = n_bilanz["fehler"]
 
     if not meldungen:
         return bilanz
@@ -192,6 +200,75 @@ def abholen() -> dict:
     # verpasst hat oder gar kein ntfy-Thema eingetragen ist.
     if angelegt:
         _vorstand_benachrichtigen(angelegt)
+    return bilanz
+
+
+#  Kontaktanfragen aus der Zeit ohne Verbindung
+def _nachrichten_eintragen(rohe: list) -> dict:
+    """Aus dem Kontaktformular der Notfassung echte Anfragen machen.
+
+    Seit die Notfassung aussieht wie die richtige Startseite, steht das
+    Kontaktformular auch waehrend eines Ausfalls da - und wer es ausfuellt,
+    erwartet zu Recht eine Antwort. Hier wird daraus dasselbe, was auch das
+    echte Formular anlegt (website/routen/oeffentlich.py): eine
+    ContactMessage, die im Dashboard unter "Nachrichten" liegt und sich per
+    E-Mail beantworten laesst.
+
+    Geprueft wird noch einmal alles. Der Worker prueft schon, aber er steht im
+    offenen Netz - was von dort kommt, ist eine Behauptung, keine Tatsache.
+    """
+    from kern import benachrichtigung
+    from kern.text import email_gueltig, email_normal
+
+    bilanz = {"neu": 0, "fehler": ""}
+    erledigt = []
+    angelegt = []
+
+    with sitzung() as db:
+        for roh in rohe:
+            kennung = roh.get("kennung") or ""
+            name = sauber(roh.get("name"))[:160]
+            post = email_normal(sauber(roh.get("email")))[:160]
+            text = sauber(roh.get("nachricht"))[:4000]
+            if not name or not text or not email_gueltig(post):
+                # Unbrauchbar. Wegwerfen, sonst liegt es vier Wochen im Weg.
+                erledigt.append(kennung)
+                continue
+
+            wann = _zeitpunkt(roh.get("zeitpunkt"))
+            # Dieselbe Anfrage zweimal einzutragen waere schlimmer als
+            # unschoen: Der Vorstand antwortete zweimal auf dasselbe.
+            schon_da = db.query(ContactMessage).filter(
+                ContactMessage.email == post,
+                ContactMessage.message == text).first()
+            if schon_da:
+                erledigt.append(kennung)
+                continue
+
+            db.add(ContactMessage(name=name, email=post, message=text,
+                                  created_at=wann))
+            bilanz["neu"] += 1
+            erledigt.append(kennung)
+            angelegt.append((name, text))
+        db.commit()
+
+    if erledigt:
+        try:
+            _rufen("/__ausfall/bestaetigen", {"kennungen": erledigt})
+        except Exception as fehler:                          # pragma: no cover
+            bilanz["fehler"] = (f"Anfragen eingetragen, aber nicht bestaetigt "
+                                f"({type(fehler).__name__})")
+
+    for name, text in angelegt:
+        try:
+            with sitzung() as db:
+                benachrichtigung.melde_rechteinhabern(
+                    db, "nachrichten", "messages",
+                    "Nachricht aus der Ausfallzeit",
+                    f"{name}: {kuerzen(text, 140)}")
+                db.commit()
+        except Exception as fehler:                          # pragma: no cover
+            print(f"[Ausfallmeldungen] Benachrichtigung: {fehler}")
     return bilanz
 
 

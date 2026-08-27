@@ -36,7 +36,7 @@ routes = [
 #  sie hier eintragen.
 [[kv_namespaces]]
 binding = "LAGER"
-id = "HIER_DIE_ID_EINTRAGEN"
+id = "6507974c41344a2c94e117d19e49b66f"
 
 # ---------------------------------------------------------------------------
 #  Offene Werte (keine Geheimnisse)

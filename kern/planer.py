@@ -198,6 +198,9 @@ def _ausfallmeldungen():
             if bilanz.get("bewerbungen"):
                 print(f"[Ausfallmeldungen] {bilanz['bewerbungen']} Bewerbung(en) "
                       f"aus der Ausfallzeit eingetragen.")
+            if bilanz.get("nachrichten"):
+                print(f"[Ausfallmeldungen] {bilanz['nachrichten']} Anfrage(n) "
+                      f"aus der Ausfallzeit eingetragen.")
             if bilanz["fehler"]:
                 print(f"[Ausfallmeldungen] {bilanz['fehler']}")
         except Exception as problem:                         # pragma: no cover

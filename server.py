@@ -18,7 +18,6 @@ dann nicht die Verwaltung mit lahm.
 
 import argparse
 import os
-import re
 import sys
 import threading
 
@@ -37,29 +36,13 @@ def _config_einlesen() -> str:
     Datenordner und liefe versehentlich auf einer frischen, leeren Datenbank.
     Genau dieser Fehler kostet einmal einen ganzen Datenstand.
 
-    Bereits gesetzte Umgebungsvariablen gewinnen: wer etwas ausdruecklich
-    vorgibt, will das auch.
+    Die Suche selbst steht in kern/konfig.py, weil sie ein zweites Programm
+    braucht (werkzeuge/auffangnetz_bauen.py). Wichtig ist nur, dass sie VOR
+    dem Import von kern.einstellungen laeuft - das liest die Umgebung beim
+    Import, und danach kommt nichts mehr an.
     """
-    for kandidat in (os.path.join(HIER, "config.cmd"),
-                     os.path.join(os.path.dirname(HIER),
-                                  "Management-System-V1", "config.cmd")):
-        if not os.path.exists(kandidat):
-            continue
-        try:
-            with open(kandidat, "r", encoding="utf-8", errors="replace") as datei:
-                for zeile in datei:
-                    treffer = re.match(r'\s*set\s+"([^=]+)=(.*)"\s*$', zeile)
-                    if not treffer:
-                        treffer = re.match(r"\s*set\s+([A-Za-z_]\w*)=(.*?)\s*$", zeile)
-                    if not treffer:
-                        continue
-                    name, wert = treffer.group(1).strip(), treffer.group(2)
-                    if name and name not in os.environ:
-                        os.environ[name] = wert
-        except OSError:
-            continue
-        return kandidat
-    return ""
+    from kern.konfig import einlesen
+    return einlesen()
 
 
 def _starte(anwendung: str, host: str, port: int, neuladen: bool) -> None:

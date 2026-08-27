@@ -77,18 +77,51 @@ pruefe("Gar keine Antwort liefert die eigene Seite",
 pruefe("Seite traegt noindex und Retry-After",
        a.headers.get("x-robots-tag") === "noindex"
        && a.headers.get("retry-after") === "120");
-pruefe("Seite ist in sich geschlossen (kein externer Verweis)",
-       !/src="http|href="http|@import|fonts\./.test(html));
-pruefe("Meldeknopf ist da, wenn ein Lager haengt",
-       !/id="melden-auf" hidden/.test(html));
-pruefe("Keine Emojis auf der Seite",
-       !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(html));
+/* Nachgeladen werden darf nichts - der Server, von dem es kaeme, ist der
+   ausgefallene. Ein blosser Textverweis (die Schule im Fuss) ist etwas
+   anderes als eine Datei, die der Browser holen muss. */
+pruefe("Seite laedt nichts nach",
+       !/src="https?:/.test(html) && !/@import/.test(html)
+       && !/url\(\s*['"]?https?:/.test(html)
+       && !/<link[^>]+href="https?:/.test(html)
+       && !/fonts\.(googleapis|gstatic)/.test(html));
+pruefe("Sie bringt das echte Stylesheet mit",
+       html.includes("--seitenrand") && html.includes(".marke-logo")
+       && html.includes("data:font/woff2;base64,"));
+pruefe("Und kein Platzhalter ist stehengeblieben", !/%%[A-Z_]+%%/.test(html));
 
-/* Ohne Lager: kein Knopf, der nichts tut */
+/* Ohne den eingebetteten Stil geprueft: dort steht ein Haken als
+   CSS-Inhalt, und der faellt sonst in dieselbe Falle. */
+const nurMarkup = (t) => t.replace(/<style>[\s\S]*?<\/style>/g, "")
+                          .replace(/<script>[\s\S]*?<\/script>/g, "");
+pruefe("Keine Emojis auf der Seite",
+       !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(nurMarkup(html)));
+
+/* --- 2b. Der normale Besucher merkt nichts ------------------------------
+   Das ist der ganze Sinn der Uebung: Wer zum ersten Mal auf die Seite kommt,
+   soll die Startseite sehen und nicht eine Stoerungsmeldung. Die Nachricht
+   liegt zwar in der Seite - sie geht aber erst auf, wenn jemand auf Login
+   tippt. */
+pruefe("Die Stoerungsmeldung steht zugeklappt in der Seite",
+       /id="ausfall"[^>]*\shidden/.test(html));
+pruefe("Der Besucher bekommt die Startseite, nicht eine Fehlerseite",
+       html.indexOf("Deine erste Aktie")
+         < html.indexOf("Das System ist gerade nicht erreichbar")
+       && !nurMarkup(html).includes("Notfassung"));
+pruefe("Und der Hinweis steht beim ersten Aufruf zu",
+       /var OFFEN = "" === "1"/.test(html));
+
+/* Wer sich anmelden will, erfaehrt es sofort - fuer ihn ist es seine Sache. */
+a = await hole("/login");
+const loginHtml = await a.text();
+pruefe("Auf /login geht der Hinweis von selbst auf",
+       /var OFFEN = "1" === "1"/.test(loginHtml));
+
+/* Ohne Lager: die Formulare sagen es, statt ins Leere zu schicken */
 a = await netz.fetch(new Request("https://mvlg-wag.de/"), { ABHOL_SCHLUESSEL: "x" });
 html = await a.text();
-pruefe("Ohne Lager wird der Meldeknopf ausgeblendet",
-       /id="melden-auf" hidden/.test(html) && /id="melden" hidden/.test(html));
+pruefe("Ohne Lager wissen die Formulare Bescheid",
+       /var LAGER = "" === "1"/.test(html));
 
 /* --- 3. Lebt-Nachfrage -------------------------------------------------- */
 ursprungStatus = 0;
@@ -171,17 +204,76 @@ pruefe("Oeffentliche Seite bringt die ganze Startseite",
        html.includes("Max-von-Laue-Gymnasium")
        && html.includes("Zwei Halbjahre") && html.includes("Dein Weg")
        && html.includes("Von Sch"));
-pruefe("Und ein vollstaendiges Bewerbungsformular",
-       html.includes('id="bewerbung-formular"') && html.includes("b-motivation")
-       && html.includes("b-telefon") && html.includes("b-vorwissen")
-       && html.includes('value="recruitment"'));
-pruefe("Mit Honigtopf gegen Skripte", html.includes("b-webseite"));
+pruefe("Mit Kontaktformular, das auch etwas tut",
+       html.includes('id="kontakt-formular"')
+       && html.includes("/__ausfall/nachricht"));
+
+/* /bewerbung liegt vollstaendig im Worker. Ein Interessent, der zufaellig in
+   einen Ausfall geraet, ist der teuerste Verlust dieser Anlage. */
+a = await hole("/bewerbung");
+const bewHtml = await a.text();
+pruefe("Und ein vollstaendiges Bewerbungsformular unter /bewerbung",
+       bewHtml.includes('id="bewerbung-formular"')
+       && bewHtml.includes("b-motivation") && bewHtml.includes("b-telefon")
+       && bewHtml.includes("b-vorwissen")
+       && bewHtml.includes('value="recruitment"'));
+pruefe("Mit Honigtopf gegen Skripte", bewHtml.includes("b-webseite"));
+
 a = await netz.fetch(new Request("https://app.mvlg-wag.de/dashboard"), umgebung);
 const dashHtml = await a.text();
-pruefe("Auf dem Dashboard bleibt das alles weg",
-       !dashHtml.includes('id="bewerbung-formular"')
-       && !dashHtml.includes("Zwei Halbjahre")
-       && !dashHtml.includes("%%LANDING%%"));
+pruefe("Wer aufs Dashboard wollte, erfaehrt es sofort",
+       /var OFFEN = "1" === "1"/.test(dashHtml));
+
+/* --- 7b. Nachrichten aus dem Kontaktformular ---------------------------- */
+const nachricht = (zusatz) => hole("/__ausfall/nachricht", {
+  method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify(Object.assign({
+    name: "Maria Musterfrau", email: "maria@example.org",
+    nachricht: "Kann mein Kind auch in der neunten Klasse mitmachen?",
+  }, zusatz || {})) });
+
+[...lager.keys()].filter(k => k.startsWith("zaehler-n:")).forEach(k => lager.delete(k));
+r = await nachricht();
+pruefe("Nachricht wird angenommen",
+       r.status === 200 && (await r.json()).ok === true, r.status);
+pruefe("Und liegt im Lager",
+       [...lager.keys()].filter(k => k.startsWith("nachricht:")).length === 1);
+
+ursprungStatus = 200;
+r = await nachricht({ email: "zweite@example.org" });
+pruefe("Auch wenn die Plattform wieder laeuft - der Text ist schon getippt",
+       r.status === 200 && (await r.json()).ok === true);
+ursprungStatus = 0;
+
+pruefe("Unsinnige E-Mail wird abgelehnt",
+       (await nachricht({ email: "keine-mail" })).status === 400);
+pruefe("Zu kurze Nachricht wird abgelehnt",
+       (await nachricht({ nachricht: "hallo" })).status === 400);
+pruefe("Ohne Namen geht es nicht",
+       (await nachricht({ name: "" })).status === 400);
+
+const vorherN = [...lager.keys()].filter(k => k.startsWith("nachricht:")).length;
+r = await nachricht({ webseite: "http://spam.example" });
+pruefe("Der Honigtopf schluckt Skripte still",
+       r.status === 200 && (await r.json()).ok === true
+       && [...lager.keys()].filter(k => k.startsWith("nachricht:")).length
+          === vorherN);
+
+r = await hole("/__ausfall/abholen",
+               { headers: { "x-ausfall-schluessel": umgebung.ABHOL_SCHLUESSEL } });
+const nPaket = await r.json();
+pruefe("Nachrichten kommen mit der Abholung",
+       nPaket.nachrichten.length === 2, nPaket.nachrichten.length);
+pruefe("Vollstaendig und mit Zeitpunkt",
+       nPaket.nachrichten.every(n => n.name && n.email && n.nachricht
+                                     && n.zeitpunkt && n.kennung));
+r = await hole("/__ausfall/bestaetigen", {
+  method: "POST", headers: { "x-ausfall-schluessel": umgebung.ABHOL_SCHLUESSEL,
+                             "content-type": "application/json" },
+  body: JSON.stringify({ kennungen: nPaket.nachrichten.map(n => n.kennung) }) });
+pruefe("Und lassen sich bestaetigen",
+       (await r.json()).entfernt === 2
+       && [...lager.keys()].filter(k => k.startsWith("nachricht:")).length === 0);
 
 /* --- 8. Ehrliche Rueckmeldung ueber das Klingeln ------------------------ */
 ntfyRufe = [];
@@ -361,7 +453,11 @@ a = await hole("/");
 html = await a.text();
 const fassung = a.headers.get("x-auffangnetz");
 pruefe("Fehlerseite traegt die Fassung als Kopfzeile", Boolean(fassung), fassung);
-pruefe("Und sichtbar im Fusstext", html.includes(fassung));
+/* Nicht mehr im Fusstext: Dort stuende sie fuer jeden Besucher, und "diese
+   Seite ist eine Notfassung" ist genau die Auskunft, die er nicht bekommen
+   soll. Als Kommentar bleibt sie fuer den nachlesbar, der sie sucht. */
+pruefe("Und als Kommentar in der Seite",
+       html.includes("<!-- Auffangnetz " + fassung));
 r = await hole("/__ausfall/selbsttest");
 html = await r.text();
 pruefe("Selbsttest nennt dieselbe Fassung",

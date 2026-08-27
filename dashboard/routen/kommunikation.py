@@ -229,6 +229,24 @@ def postfach_loeschen(eintrag_id: int, csrf: str = Form(""),
 def kontakt_antwort(msg_id: int, antwort: str = Form(""),
                     csrf: str = Form(""),
                     a: Anmeldung = Depends(Anmeldung.pflicht)):
+    """Eine Anfrage von der Website beantworten - per E-Mail.
+
+    Ueber das Kontaktformular schreiben Leute, die kein Konto haben und keins
+    bekommen werden: Eltern, Interessenten, die Schule. Eine Antwort, die nur
+    im Dashboard steht, erreicht sie nie. Der einzige Rueckweg ist die
+    Adresse, die sie selbst angegeben haben - und Mail kann die Plattform.
+
+    Drei Dinge sind hier anders als beim uebrigen Mailversand:
+
+    * **Eigener Vordruck** (`contact_reply`). Der Benachrichtigungsrahmen
+      haette einen Dashboard-Link und einen Abmeldehinweis mitgeschickt,
+      beides sinnlos fuer jemanden von aussen.
+    * **Es wird gewartet** (`warten=True`). Sonst stuende in der Rueckmeldung
+      "verschickt", waehrend der Faden im Hintergrund noch scheitert - und
+      der Fehler faende sich nur im Zustellprotokoll.
+    * **Reply-To auf die antwortende Person.** Wer zurueckschreibt, soll bei
+      der ankommen, die geantwortet hat, nicht in einem Sammelpostfach.
+    """
     a.verlange("nachrichten")
     a.pruefe_csrf(csrf)
     eintrag = a.db.get(ContactMessage, msg_id)
@@ -237,28 +255,91 @@ def kontakt_antwort(msg_id: int, antwort: str = Form(""),
     text = sauber(antwort)[:4000]
     if not text:
         return _nachrichten_ansicht(a, fehler("Ohne Text keine Antwort."))
-    eintrag.reply = text
+
+    if not mail.versand_moeglich():
+        # Nicht als beantwortet vermerken. Sonst verschwindet die Anfrage aus
+        # der offenen Liste, ohne dass je jemand etwas bekommen hat.
+        return _nachrichten_ansicht(a, fehler(
+            "Es ist kein Mailversand eingerichtet - die Antwort waere bei "
+            f"{eintrag.email} nie angekommen. Bitte SMTP in der config.cmd "
+            "hinterlegen oder direkt aus dem eigenen Postfach schreiben."))
+
+    versandt, grund = _kontakt_mail(a, eintrag, text)
+
+    eintrag.reply = _antwort_anhaengen(eintrag.reply, text)
     eintrag.replied_by = a.user.id
     eintrag.replied_at = utcnow()
+    eintrag.reply_mail_ok = 1 if versandt else 0
+    eintrag.reply_mail_fehler = None if versandt else (grund or "")[:300]
     a.db.commit()
 
-    versandt = False
-    if mail.versand_moeglich():
-        class _Empfaenger:
-            id = None
-            role = "member"
-            department = "exekutive"
-            vorname = eintrag.name.split(" ")[0] if eintrag.name else "du"
-            nachname = ""
-            email = eintrag.email
-            name = eintrag.name
+    if versandt:
+        return _nachrichten_ansicht(a, gut(
+            f"Antwort an {eintrag.email} verschickt."))
+    return _nachrichten_ansicht(a, fehler(
+        f"Die Antwort ist gespeichert, aber NICHT bei {eintrag.email} "
+        f"angekommen: {grund or 'Grund unbekannt'}. Bitte noch einmal "
+        "abschicken oder direkt aus dem eigenen Postfach schreiben."))
 
-        versandt = mail.sende_vordruck(
-            a.db, _Empfaenger(), "notification",
-            titel="Antwort auf deine Nachricht", text=text)
-    return _nachrichten_ansicht(a, gut(
-        "Antwort gespeichert" + (" und per E-Mail verschickt." if versandt
-                                 else " (kein Mailversand eingerichtet).")))
+
+def _kontakt_mail(a: Anmeldung, eintrag, text: str) -> tuple:
+    """(verschickt, Fehlergrund) - die Antwortmail an eine Kontaktanfrage."""
+    class _Empfaenger:
+        """Der Mailversand erwartet ein Konto; hier gibt es keins.
+
+        Nur die drei Felder, die `sende_vordruck` wirklich liest. `id = None`
+        ist gewollt: An dieser Anfrage haengt keine Person aus der Datenbank,
+        und sie soll auch nicht versehentlich einer zugeordnet werden.
+        """
+        id = None
+        role = "member"
+        department = "exekutive"
+        vorname = (sauber(eintrag.name).split(" ")[0]
+                   if sauber(eintrag.name) else "du")
+        nachname = ""
+        email = eintrag.email
+        name = eintrag.name
+
+    wann = eintrag.created_at
+    versandt = mail.sende_vordruck(
+        a.db, _Empfaenger(), "contact_reply", warten=True,
+        antwort_an=sauber(getattr(a.user, "email", "")),
+        automatisch=False,
+        antwort=text,
+        frage=eintrag.message or "",
+        datum=wann.strftime("%d.%m.%Y") if wann else "damals",
+        absender=a.user.name or "Der Vorstand")
+    if versandt:
+        return True, ""
+    return False, _letzter_mailfehler(a.db, eintrag.email)
+
+
+def _letzter_mailfehler(db, adresse: str) -> str:
+    """Warum es nicht geklappt hat - aus dem Zustellprotokoll.
+
+    `sende_vordruck` gibt nur wahr/falsch zurueck. Der Grund steht eine
+    Ebene tiefer im Protokoll, und genau der ist das, was weiterhilft:
+    "Authentifizierung abgelehnt" verlangt etwas anderes als "Zeit
+    ueberschritten".
+    """
+    zeile = (db.query(DeliveryLog)
+             .filter(DeliveryLog.kanal == "email",
+                     DeliveryLog.ziel == adresse,
+                     DeliveryLog.erfolg == 0)
+             .order_by(DeliveryLog.created_at.desc()).first())
+    return sauber(zeile.fehler) if zeile and zeile.fehler else ""
+
+
+def _antwort_anhaengen(bisher: str, neu: str) -> str:
+    """Mehrere Antworten untereinander statt uebereinander.
+
+    Wer nachfasst, soll die erste Antwort nicht verlieren - sonst steht im
+    Dashboard etwas anderes, als bei der Person angekommen ist.
+    """
+    bisher = (bisher or "").strip()
+    if not bisher:
+        return neu
+    return f"{bisher}\n\n--- Nachgefasst ---\n{neu}"
 
 
 @router.post("/nachrichten/kontakt/{msg_id}/loeschen")

@@ -30,7 +30,8 @@ MIGRATIONS_MARKE = "v2_migration_stand"
 # 6: Ersatzcodes fuer den zweiten Faktor, Zu-/Absagen und
 #    Tagesordnung fuer Treffen.
 # 7: Feste Funktionsadressen fuer Cloudflare Email Routing.
-AKTUELLER_STAND = 8
+# 9: Vermerk, ob die Antwort auf eine Kontaktanfrage per Mail rausging.
+AKTUELLER_STAND = 9
 
 
 def _spalten(tabelle: str) -> set:
@@ -247,6 +248,9 @@ def _neue_spalten() -> int:
         # zweimal. Bestehende Zeilen bleiben leer und werden weiter zugestellt.
         ("push_subscriptions", "ursprung", "VARCHAR(16)", None),
         ("push_subscriptions", "geraete_id", "VARCHAR(40)", None),
+        # contact_messages: ob die Antwort per Mail auch rausging.
+        ("contact_messages", "reply_mail_ok", "INTEGER", None),
+        ("contact_messages", "reply_mail_fehler", "VARCHAR(300)", None),
     ]
     vorhandene_tabellen = _tabellen()
     for tabelle, name, typ, standard in neu:

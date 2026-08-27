@@ -261,9 +261,22 @@ class TestKeinSprungNachOben(unittest.TestCase):
     def setUp(self):
         self.quelle = (WURZEL / "statisch/js/dashboard.js").read_text(encoding="utf-8")
 
+    def _post_zweig(self) -> str:
+        """Nur der Zweig, der nach einem abgeschickten Formular läuft.
+
+        Nicht über eine feste Zahl von Zeichen ab `warPost`: Der GET-Zweig
+        darüber ist inzwischen um den Sprung zum Suchtreffer gewachsen, und
+        eine Fensterbreite, die man einmal passend gewählt hat, wandert
+        stillschweigend aus dem Bild. Gesucht wird deshalb die Verzweigung
+        selbst.
+        """
+        anfang = self.quelle.index("var warPost")
+        ende = self.quelle.index("meldungHolen(", anfang)
+        return self.quelle[self.quelle.rindex("} else {", anfang, ende):ende]
+
     def test_nur_beim_bereichswechsel_nach_oben(self):
         self.assertIn("warPost", self.quelle)
-        i = self.quelle.index("warPost")
+        i = self.quelle.index("var warPost")
         block = self.quelle[i:i + 400]
         self.assertIn("if (!warPost)", block,
                       "es wird weiterhin nach jedem Austausch gescrollt")
@@ -272,10 +285,11 @@ class TestKeinSprungNachOben(unittest.TestCase):
         """Zweiter Anlauf: Erst wurde zur Meldung gescrollt - die steht aber
         ganz oben im Bereich, also landete man doch wieder am Anfang."""
         self.assertIn("standVorDemAbschicken", self.quelle)
-        i = self.quelle.index("warPost")
-        block = self.quelle[i:i + 700]
-        self.assertIn("window.scrollTo(0, standVorDemAbschicken)", block)
-        self.assertNotIn("scrollIntoView", block,
+        zweig = self._post_zweig()
+        self.assertIn("window.scrollTo(0, standVorDemAbschicken)", zweig)
+        # scrollIntoView darf es weiterhin geben - beim Sprung zum
+        # Suchtreffer. Nur nach einem abgeschickten Formular nicht.
+        self.assertNotIn("scrollIntoView", zweig,
                          "es wird immer noch zur Meldung gescrollt")
 
     def test_die_meldung_kommt_zum_menschen(self):

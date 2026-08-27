@@ -598,6 +598,12 @@ class ContactMessage(Base):
     reply = Column(Text, nullable=True)
     replied_by = Column(Integer, nullable=True)
     replied_at = Column(DateTime, nullable=True)
+    # Ist die Antwort auch wirklich rausgegangen? NULL heisst "nie versucht",
+    # 1 "vom Mailserver angenommen", 0 "fehlgeschlagen" - dann steht der
+    # Grund daneben. Ohne diese zwei Spalten sah eine Anfrage als beantwortet
+    # aus, obwohl die Person nie etwas bekommen hat.
+    reply_mail_ok = Column(Integer, nullable=True)
+    reply_mail_fehler = Column(String(300), nullable=True)
     created_at = Column(DateTime, default=utcnow)
 
 

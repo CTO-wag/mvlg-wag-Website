@@ -13,6 +13,11 @@ import tempfile
 
 _ORDNER = tempfile.mkdtemp(prefix="wag-test-")
 os.environ.update({
+    # Riegel gegen den teuersten denkbaren Testlauf: Ruft irgendetwas
+    # unterwegs kern.konfig.einlesen() auf, kaeme von dort DATABASE_URL der
+    # Produktion - und die Tests loeschten und legten Tabellen im Livebestand
+    # an. Mit diesem Schalter bleibt config.cmd ungelesen.
+    "KONFIG_GELESEN": "1",
     "DATEN_DIR": _ORDNER,
     "SECRET_KEY": "t" * 64,
     "APP_ENV": "development",
