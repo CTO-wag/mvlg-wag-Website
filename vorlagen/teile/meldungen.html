@@ -1,0 +1,37 @@
+{#
+  Fehlermeldungen der oeffentlichen Seiten - mit dem Weg zum Support.
+
+  Gemeldet: Wer sich bewirbt und dabei gegen einen Fehler laeuft, versucht es
+  zweimal und gibt auf. Dass es einen Kontakt gibt, steht auf der Startseite -
+  also genau dort, wo er in diesem Moment nicht ist. Die teuerste Stelle der
+  ganzen Seite: Eine verlorene Bewerbung sieht niemand.
+
+  Ab jetzt steht der Weg IN der Meldung. Still und klein: Er soll auffindbar
+  sein, nicht lauter als die Meldung selbst.
+
+  Der Knopf fuehrt zum Kontaktformular auf der Startseite und nimmt den
+  Wortlaut der Meldung mit - eingesetzt wird er drueben aus dem
+  sessionStorage (statisch/js/basis.js). Bewusst NICHT ueber die Adresszeile:
+  Ein Text aus der URL, der in ein Formular laeuft, ist eine Einladung, die
+  man jemandem als Verweis schicken kann.
+
+  Angemeldete bleiben im Dashboard - dort gibt es den richtigen Support mit
+  Ticket, und eine anonyme Anfrage waere ein Rueckschritt.
+#}
+{% macro fehler(text, betreff="") %}
+{% if text %}
+<div class="meldung meldung-fehler" role="alert"><div>
+  {{ text }}
+  {% if user %}
+  <a class="btn-still btn-klein" style="margin-left:var(--r2);"
+     href="{{ DASHBOARD_URL }}/dashboard/support">Support melden</a>
+  {% else %}
+  <button type="button" class="btn-still btn-klein"
+          style="margin-left:var(--r2);"
+          data-support-melden
+          data-support-text="{{ text }}"
+          data-support-betreff="{{ betreff }}">Support melden</button>
+  {% endif %}
+</div></div>
+{% endif %}
+{% endmacro %}

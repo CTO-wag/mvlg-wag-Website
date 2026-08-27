@@ -22,6 +22,23 @@ redaktion_uploads/
 support_uploads/
 *.log
 
+# --- Eine einzige Ausnahme --------------------------------------------------
+#  Der Testbestand zum Ausprobieren. Er ist erfunden: zwei ausgedachte Konten,
+#  ein paar Aufgaben, sonst nichts. Erzeugt von werkzeuge/testdaten.py, und
+#  nur DIESE eine Datei ist freigegeben - nicht der Ordner.
+#
+#  ACHTUNG, und zwar wirklich: Sobald jemand eine Sicherung der Produktion in
+#  daten-entwicklung/ einspielt, um etwas nachzustellen, stehen die Daten von
+#  Minderjaehrigen in genau dieser Datei - und beim naechsten "git add ."
+#  auf GitHub. Vor dem Einspielen einer echten Sicherung also entweder
+#  woanders hin oder hinterher  python werkzeuge/testdaten.py --neu  laufen
+#  lassen. Ein Blick in "git diff --stat" verraet es ebenfalls: Der
+#  Testbestand ist rund 500 KB gross, ein echter ein Vielfaches davon.
+!daten-entwicklung/
+daten-entwicklung/*
+!daten-entwicklung/ag_plattform.db
+!daten-entwicklung/LIESMICH.md
+
 # WhatsApp: die gekoppelte Sitzung ist ein vollwertiger Kontozugang
 whatsapp-sitzung/
 .sitzung/

@@ -189,6 +189,68 @@
     if (punkt) { punkt.click(); }
   });
 
+  /* --- Aus einer Fehlermeldung heraus den Support erreichen ----------------
+     Gemeldet: Leute rennen gegen einen Fehler, versuchen es zweimal und geben
+     auf. Dass es einen Support gibt, wissen sie - nur nicht in dem Moment, in
+     dem sie ihn brauchen.
+
+     Der Knopf in der Meldung (siehe makros.html) öffnet deshalb den Support
+     UND schreibt schon hinein, was passiert ist: die Fehlermeldung im
+     Wortlaut und der Bereich, in dem sie stand. Ohne das steht in jedem
+     zweiten Ticket "geht nicht", und die Rückfrage kostet einen Tag.
+
+     Zwei Schritte, weil der Bereich per htmx nachgeladen wird: Beim Klick
+     wird gemerkt, danach eingesetzt (siehe supportEinsetzen). */
+  var offenerSupport = null;
+
+  function bereichsName() {
+    var punkt = document.querySelector('.leisten-punkt.aktiv .leisten-text');
+    return punkt ? punkt.textContent.trim() : '';
+  }
+
+  document.addEventListener('click', function (e) {
+    var knopf = e.target.closest('[data-support]');
+    if (!knopf) { return; }
+    var wo = bereichsName();
+    offenerSupport = {
+      betreff: wo ? 'Fehler in „' + wo + '“' : 'Fehlermeldung',
+      text: (knopf.dataset.supportText || '').trim(),
+      wo: wo
+    };
+    var punkt = document.querySelector('.leisten-punkt[data-bereich="support"]');
+    if (punkt) {
+      punkt.click();
+    } else {
+      /* Kein Support-Punkt in der Leiste (fehlendes Recht). Dann wenigstens
+         nicht so tun, als sei etwas passiert. */
+      offenerSupport = null;
+      window.location.href = '/dashboard/support';
+    }
+  });
+
+  function supportEinsetzen(wurzel) {
+    if (!offenerSupport) { return; }
+    var formular = wurzel.querySelector('form[hx-post="/dashboard/support"]');
+    if (!formular) { return; }
+    var betreff = formular.querySelector('[name="betreff"]');
+    var text = formular.querySelector('[name="text"]');
+    if (!betreff || !text) { offenerSupport = null; return; }
+
+    betreff.value = offenerSupport.betreff;
+    text.value = 'Diese Meldung kam:\n\n' + offenerSupport.text
+      + '\n\nWas ich gemacht habe:\n';
+    var kasten = formular.closest('details');
+    if (kasten) { kasten.open = true; }
+    formular.scrollIntoView({block: 'center', behavior: 'smooth'});
+    /* In die Beschreibung und hinter den vorbereiteten Text - dort geht es
+       weiter, nicht am Anfang. */
+    window.setTimeout(function () {
+      text.focus({preventScroll: true});
+      text.selectionStart = text.selectionEnd = text.value.length;
+    }, 300);
+    offenerSupport = null;
+  }
+
   /* --- Kalender: nur das passende Zielfeld zeigen -------------------------- */
   function zielfelderAnpassen(wahl) {
     var formular = wahl.closest('form');
@@ -457,6 +519,7 @@
 
   /* --- Nach jedem Bereichswechsel einmal aufräumen ------------------------- */
   function bereichEingerichtet() {
+    supportEinsetzen(document);
     document.querySelectorAll('[data-zielwahl]').forEach(zielfelderAnpassen);
     document.querySelectorAll('[data-suche]').forEach(function (leiste) {
       var alt = suchWorte[leiste.dataset.suche];

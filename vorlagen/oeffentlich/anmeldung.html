@@ -1,4 +1,5 @@
 {% extends "oeffentlich/basis_web.html" %}
+{% import "teile/meldungen.html" as meld with context %}
 {% block ticker %}{% endblock %}
 {% block inhalt %}
 <section class="panel anmeldung-karte zentriert">
@@ -7,7 +8,7 @@
   <span class="hut">Interner Bereich</span>
   <h1 style="font-size:1.7rem;">Anmelden</h1>
 
-  {% if fehler %}<div class="meldung meldung-fehler"><div>{{ fehler }}</div></div>{% endif %}
+  {{ meld.fehler(fehler, "Anmeldung geht nicht") }}
   {% if hinweis %}<div class="meldung meldung-gut"><div>{{ hinweis }}</div></div>{% endif %}
 
   {% if zweiter_faktor %}

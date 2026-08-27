@@ -54,6 +54,64 @@
     }
   });
 
+  /* --- Aus einer Fehlermeldung heraus den Support erreichen ---------------
+     Gemeldet: Wer sich bewirbt und dabei gegen einen Fehler läuft, versucht
+     es zweimal und gibt auf. Dass es einen Kontakt gibt, steht auf der
+     Startseite - also genau dort, wo er in diesem Moment nicht ist.
+
+     Der Knopf in der Meldung (siehe vorlagen/teile/meldungen.html) bringt
+     ihn deshalb zum Kontaktformular und schreibt schon hinein, was passiert
+     ist. Ohne das steht in jeder zweiten Anfrage "geht nicht", und die
+     Rückfrage kostet Tage - bei jemandem, der uns noch gar nicht kennt.
+
+     Über sessionStorage und nicht über die Adresszeile: Ein Text aus der URL,
+     der in ein Formular läuft, ist eine Einladung, die man jemandem als
+     Verweis schicken kann. Der Speicher gilt nur für diesen Tab und diese
+     Herkunft; geschrieben wird ausschliesslich in .value, nie in HTML. */
+  var SUPPORT_SCHLUESSEL = 'wag-support-anlass';
+
+  document.addEventListener('click', function (e) {
+    var knopf = e.target.closest('[data-support-melden]');
+    if (!knopf) { return; }
+    try {
+      sessionStorage.setItem(SUPPORT_SCHLUESSEL, JSON.stringify({
+        text: knopf.dataset.supportText || '',
+        betreff: knopf.dataset.supportBetreff || '',
+        wo: window.location.pathname
+      }));
+    } catch (f) { /* Privatmodus - dann eben ohne vorbereiteten Text */ }
+    window.location.href = '/#kontakt';
+  });
+
+  function supportAnlassEinsetzen() {
+    var feld = document.querySelector('.kontakt-formular [name="nachricht"]');
+    if (!feld) { return; }
+    var roh = null;
+    try {
+      roh = sessionStorage.getItem(SUPPORT_SCHLUESSEL);
+      sessionStorage.removeItem(SUPPORT_SCHLUESSEL);
+    } catch (f) { return; }
+    if (!roh) { return; }
+    var anlass;
+    try { anlass = JSON.parse(roh); } catch (f) { return; }
+    if (!anlass || !anlass.text) { return; }
+
+    feld.value = 'Auf der Seite ' + (anlass.wo || '/') + ' kam diese Meldung:\n\n'
+      + anlass.text + '\n\nWas ich gemacht habe:\n';
+    var abschnitt = feld.closest('#kontakt') || feld;
+    abschnitt.scrollIntoView({behavior: 'smooth', block: 'start'});
+    /* Hinter den vorbereiteten Text - dort geht es weiter, nicht am Anfang. */
+    window.setTimeout(function () {
+      feld.focus({preventScroll: true});
+      feld.selectionStart = feld.selectionEnd = feld.value.length;
+    }, 400);
+  }
+
+  if (document.readyState !== 'loading') { supportAnlassEinsetzen(); }
+  else {
+    document.addEventListener('DOMContentLoaded', supportAnlassEinsetzen);
+  }
+
   /* --- In die Zwischenablage --------------------------------------------- */
   /* Für Kalenderadresse, ntfy-Thema, Startpasswort. Mit sichtbarer Rückmeldung:
      ohne sie weiss niemand, ob der Klick etwas bewirkt hat. */

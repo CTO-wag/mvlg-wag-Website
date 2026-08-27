@@ -229,7 +229,7 @@
           <button type="submit" class="btn-zweit btn-klein">Prüfen</button>
         </form>
       </div>
-      {% if p.last_error %}<div class="meldung meldung-fehler"><div>{{ p.last_error }}</div></div>{% endif %}
+      {% if p.last_error %}{{ m.fehlerkasten(p.last_error) }}{% endif %}
     </article>
     {% endfor %}
     </div>

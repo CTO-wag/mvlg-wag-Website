@@ -1,4 +1,5 @@
 {% extends "oeffentlich/basis_web.html" %}
+{% import "teile/meldungen.html" as meld with context %}
 {% block hauptklasse %}schmal{% endblock %}
 {% block inhalt %}
 <section class="abschnitt">
@@ -25,7 +26,7 @@
 </section>
 
 {% else %}
-{% if fehler %}<div class="meldung meldung-fehler"><div>{{ fehler }}</div></div>{% endif %}
+{{ meld.fehler(fehler, "Bewerbung geht nicht ab") }}
 <section class="panel">
   <form method="post" action="/bewerbung" class="formular">
     <input type="hidden" name="csrf" value="{{ csrf }}">

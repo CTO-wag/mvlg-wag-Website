@@ -36,8 +36,35 @@
   <button type="button" class="btn-zweit btn-klein" style="margin-left:var(--r2);"
           data-springe="{{ m.bereich }}">{{ m.knopf or "Ansehen" }}</button>
   {% endif %}
+  {% if m.art in ("fehler", "warnung") %}{{ supportknopf(m.text) }}{% endif %}
 </div></div>
 {% endif %}
+{% endmacro %}
+
+{# --- Aus einer Fehlermeldung heraus den Support erreichen ------------------
+   Gemeldet: Leute rennen gegen einen Fehler, versuchen es zweimal und geben
+   auf. Dass es einen Support gibt, wissen sie - nur nicht in dem Moment, in
+   dem sie ihn brauchen. Ein Bereich weiter oben in der Leiste hilft nicht,
+   wenn man gerade auf eine rote Zeile schaut.
+
+   Deshalb steht der Weg dorthin ab jetzt IN der Meldung. Still und klein: Er
+   soll auffindbar sein, nicht lauter als die Meldung selbst.
+
+   Der Text der Meldung wird mitgegeben und drueben ins Formular gesetzt -
+   ohne ihn schreibt jeder "geht nicht" und die Rueckfrage kostet einen Tag.
+   Das Einsetzen macht statisch/js/dashboard.js; ein <script> hier waere
+   wirkungslos, weil htmx nachgeladene Skripte ohne gueltige Nonce verwirft. #}
+{% macro supportknopf(text, beschriftung="Support melden") %}
+<button type="button" class="btn-still btn-klein" data-support
+        style="margin-left:var(--r2);"
+        data-support-text="{{ text }}">{{ beschriftung }}</button>
+{% endmacro %}
+
+{# Ein ganzer Fehlerkasten samt Knopf - fuer Fehler, die dauerhaft im Bereich
+   stehen und nicht die Antwort auf ein abgeschicktes Formular sind. #}
+{% macro fehlerkasten(text, beschriftung="Support melden") %}
+<div class="meldung meldung-fehler"><div>{{ text }}
+  {{ supportknopf(text, beschriftung) }}</div></div>
 {% endmacro %}
 
 {# --- Leerer Zustand -------------------------------------------------------

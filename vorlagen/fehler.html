@@ -24,11 +24,25 @@
   {% else %}
   <h1>{{ detail or "Ein Fehler ist aufgetreten" }}</h1>
   {% endif %}
+  {# Der Weg zum Support gehoert auf JEDE Fehlerseite und nicht nur in den
+     Fliesstext von 403 und 500. Wer hier landet, ist gegen etwas gelaufen -
+     das ist genau der Moment, in dem er es melden soll, und der einzige, in
+     dem er auch weiss, was er getan hat. Eine Stunde spaeter weiss es
+     niemand mehr. #}
   <div class="knopfzeile" style="justify-content:center;margin-top:var(--r5);">
     {% if user %}
     <a class="btn" href="{{ DASHBOARD_URL }}/">Zum Dashboard</a>
+    <a class="btn btn-zweit" href="{{ DASHBOARD_URL }}/dashboard/support">Support melden</a>
     {% else %}
     <a class="btn" href="{{ WEBSITE_URL }}/">Zur Startseite</a>
+    {# 404 ohne Anmeldung ist meistens ein alter Verweis und kein Fehler -
+       ein Meldeknopf daneben waere Rauschen. Bei allem anderen ist er
+       richtig. #}
+    {% if status != 404 %}
+    <button type="button" class="btn btn-zweit" data-support-melden
+            data-support-text="Fehler {{ status }}{{ ': ' ~ detail if detail }} auf {{ angefragt or 'der Seite' }}"
+            data-support-betreff="Fehler {{ status }}">Support melden</button>
+    {% endif %}
     {% endif %}
   </div>
 </section>

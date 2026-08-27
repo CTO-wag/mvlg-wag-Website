@@ -62,6 +62,11 @@ def _fehlerseite(request: Request, status: int, detail: str = "") -> HTMLRespons
         db.close()
     antwort = zeige("fehler.html", request=request, user=user, status=status,
                     detail=detail,
+                    # Fuer den Meldeknopf: Ohne die Adresse steht im Ticket
+                    # "Fehler 500" und sonst nichts, und die Suche beginnt bei
+                    # null. Bewusst nicht als `pfad` - das setzt den
+                    # Kanonisierungs-Verweis im Seitenkopf.
+                    angefragt=request.url.path,
                     seitentitel=f"Fehler {status} | Wirtschafts- & Investment-AG",
                     robots="noindex, nofollow")
     # Der Statuscode muss ausdruecklich gesetzt werden: zeige() liefert eine

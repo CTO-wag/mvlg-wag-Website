@@ -37,7 +37,7 @@
       <span class="{% if p.destination_verified %}erfuellt{% endif %}">✓ Verifiziert</span>
       <span class="{% if p.routing_active %}erfuellt{% endif %}">✓ Routing aktiv</span>
     </div>
-    {% if p.last_error %}<div class="meldung meldung-fehler"><div>{{ p.last_error }}</div></div>{% endif %}
+    {% if p.last_error %}{{ m.fehlerkasten(p.last_error) }}{% endif %}
     <div class="funktionsadresse-fuss">
       {% if p.last_synced_at %}<span class="meta">Zuletzt geprüft: {{ p.last_synced_at.strftime("%d.%m.%Y %H:%M") }}</span>{% endif %}
       <button type="submit">Zuständigkeit synchronisieren</button>
