@@ -41,6 +41,13 @@ REM Eigene lokale SQLite-Datenbank statt Supabase/Produktionsdatenbank.
 set "DATEN_DIR=%~dp0daten-entwicklung"
 set "DATABASE_URL="
 
+REM Derselbe Riegel fuer die Dateien: Ohne Schluessel gehen hochgeladene
+REM Bilder nach daten-entwicklung und nicht in den Bucket der Produktion.
+REM Sonst laegen Testbilder zwischen den echten - und ein Aufraeumen
+REM loeschte die echten mit.
+set "SUPABASE_SERVICE_KEY="
+set "SUPABASE_URL="
+
 REM Andere Ports als der Produktivbetrieb (8000/8001).
 set "WEBSITE_PORT=8010"
 set "DASHBOARD_PORT=8011"

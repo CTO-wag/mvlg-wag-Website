@@ -18,6 +18,12 @@ os.environ.update({
     # Produktion - und die Tests loeschten und legten Tabellen im Livebestand
     # an. Mit diesem Schalter bleibt config.cmd ungelesen.
     "KONFIG_GELESEN": "1",
+    # Derselbe Riegel fuer die hochgeladenen Dateien: Wer die Tests aus einem
+    # Fenster startet, in dem vorher config.cmd gelaufen ist, haette den
+    # Schluessel noch in der Umgebung - und jeder Testlauf legte Bilder in
+    # den Bucket der Produktion.
+    "SUPABASE_SERVICE_KEY": "",
+    "SUPABASE_URL": "",
     "DATEN_DIR": _ORDNER,
     "SECRET_KEY": "t" * 64,
     "APP_ENV": "development",

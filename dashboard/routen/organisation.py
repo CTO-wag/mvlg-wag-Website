@@ -1,16 +1,16 @@
 """AG-Treffen, Kalender, Redaktionsplan."""
 
-import os
 import secrets
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import Response
 
 from dashboard.hilfen import (
     Anmeldung, datum, fehler, gut, papierkorb_hinweis, teil, uhrzeit, warnung, zahl,
 )
-from kern import benachrichtigung, kalender, leistung, papierkorb, protokoll
+from kern import (benachrichtigung, kalender, leistung, papierkorb, protokoll,
+                  speicher)
 from kern import einstellungen as cfg
 from kern.modelle import (
     Attendance, CalendarEvent, CalendarEventTarget, ContentAttachment,
@@ -603,11 +603,13 @@ def redaktion_loeschen(item_id: int, csrf: str = Form(""),
 
 
 def _datei_weg(speichername: str) -> None:
+    """Die Datei loeschen - im Supabase-Storage und im Datenordner."""
     try:
-        pfad = os.path.join(cfg.REDAKTION_UPLOAD_DIR, speichername)
-        if os.path.exists(pfad):
-            os.remove(pfad)
-    except OSError:
+        speicher.entfernen(speicher.REDAKTION, speichername)
+    except speicher.SpeicherFehler:
+        # Ein Eintrag, der weg soll, geht weg. Bleibt die Datei dabei
+        # zurueck, ist das aergerlich, aber kein Grund, den Loeschvorgang
+        # abzubrechen.
         pass
 
 
@@ -631,12 +633,18 @@ async def redaktion_datei(item_id: int, datei: UploadFile = File(...),
         return _redaktion_ansicht(a, fehler(
             "Erlaubt sind Bilder (PNG, JPG, WebP, GIF) und PDF."))
 
-    # Zufallsname auf der Platte, echter Name nur in der Datenbank: So kann
+    # Zufallsname im Speicher, echter Name nur in der Datenbank: So kann
     # ein Dateiname aus dem Netz nie einen Pfad bestimmen.
     speichername = secrets.token_hex(16) + endung
-    os.makedirs(cfg.REDAKTION_UPLOAD_DIR, exist_ok=True)
-    with open(os.path.join(cfg.REDAKTION_UPLOAD_DIR, speichername), "wb") as ziel:
-        ziel.write(inhalt)
+    try:
+        await speicher.ablegen_aus_route(speicher.REDAKTION, speichername,
+                                         inhalt, datei.content_type)
+    except speicher.SpeicherFehler as problem:
+        # Ohne die Datei kein Eintrag: Ein Anhang, der in der Liste steht und
+        # beim Anklicken fehlt, kostet mehr Zeit als ein zweiter Versuch.
+        return _redaktion_ansicht(a, fehler(
+            f"Die Datei konnte nicht gespeichert werden. Bitte noch einmal "
+            f"versuchen. ({problem})"))
     a.db.add(ContentAttachment(
         item_id=eintrag.id, dateiname=(datei.filename or "datei")[:160],
         speichername=speichername, groesse=len(inhalt),
@@ -655,10 +663,8 @@ def redaktion_datei_holen(anhang_id: int,
     meine = [x["key"] for x in redaktions_abteilungen(a.user, a.db)]
     if not eintrag or eintrag.abteilung not in meine:
         return Response("Kein Zugriff", status_code=403, media_type="text/plain")
-    pfad = os.path.join(cfg.REDAKTION_UPLOAD_DIR, anhang.speichername)
-    if not os.path.exists(pfad):
-        return Response("Datei fehlt", status_code=404, media_type="text/plain")
-    return FileResponse(pfad, filename=anhang.dateiname)
+    return speicher.antwort(speicher.REDAKTION, anhang.speichername,
+                            dateiname=anhang.dateiname)
 
 
 @router.post("/redaktion/datei/{anhang_id}/loeschen")

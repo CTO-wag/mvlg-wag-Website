@@ -11,6 +11,7 @@ und hochgeladene Dateien unveraendert weiterlaufen.
 """
 
 import os
+import re
 import secrets
 
 #  Ordner
@@ -386,6 +387,46 @@ ERLAUBTE_ANHANGTYPEN = dict(ERLAUBTE_BILDTYPEN, **{
 })
 
 
+#  Wo hochgeladene Dateien liegen: Supabase Storage
+#  Die Datenbank liegt laengst bei Supabase, die Bilder lagen bis hierher auf
+#  der Platte des Rechners, auf dem der Server gerade lief. Beides zusammen
+#  geht nur so lange gut, wie es genau einen Rechner gibt: Zieht die Anwendung
+#  um, steht in der Datenbank der Dateiname und im Ordner liegt nichts.
+#
+#  Ist ein Schluessel eingetragen, wandert jede hochgeladene Datei in den
+#  Bucket. Ist keiner da (Entwicklung, Testlauf), bleibt alles im Datenordner -
+#  ohne Netz und ohne Zugang laeuft die Anwendung dann genau wie vorher.
+def _supabase_projekt() -> str:
+    """Die Projekt-Kennung aus der DATABASE_URL - oder leer.
+
+    Damit die Adresse des Storage nicht ein zweites Mal eingetragen werden
+    muss: Sie steht schon in der Datenbankadresse. Beim Pooler steckt die
+    Kennung im Benutzernamen (postgres.abcdef...), bei der direkten
+    Verbindung im Rechnernamen (db.abcdef....supabase.co). Zwei Eintraege
+    fuer dasselbe Projekt gehen irgendwann auseinander - und dann laegen die
+    Dateien in einem anderen Projekt als die Datenbank.
+    """
+    if "supabase" not in DATABASE_URL:
+        return ""
+    for muster in (r"postgres\.([a-z0-9]{16,})", r"db\.([a-z0-9]{16,})\.supabase\."):
+        treffer = re.search(muster, DATABASE_URL)
+        if treffer:
+            return treffer.group(1)
+    return ""
+
+
+_projekt = _supabase_projekt()
+SUPABASE_URL = (_text("SUPABASE_URL").rstrip("/")
+                or (f"https://{_projekt}.supabase.co" if _projekt else ""))
+# Der Service-Role-Key aus dem Supabase-Dashboard (Project Settings -> API).
+# Er darf am Bucket alles und gehoert deshalb ausschliesslich in die
+# config.cmd - niemals in den Quelltext und niemals in den Browser.
+SUPABASE_SERVICE_KEY = _text("SUPABASE_SERVICE_KEY")
+SUPABASE_BUCKET = _text("SUPABASE_BUCKET", "dateien")
+# Erst beides zusammen schaltet den Storage ein.
+DATEIEN_IN_SUPABASE = bool(SUPABASE_URL and SUPABASE_SERVICE_KEY)
+
+
 def _datenbank_kurz() -> str:
     """Woher die Daten kommen - ohne Passwort im Klartext."""
     if DATABASE_URL.startswith("sqlite"):
@@ -393,6 +434,15 @@ def _datenbank_kurz() -> str:
     ort = DATABASE_URL.split("@")[-1].split("/")[0] if "@" in DATABASE_URL else "?"
     art = "Supabase" if "supabase" in DATABASE_URL else "Postgres"
     return f"{art} ({ort})"
+
+
+def _dateien_kurz() -> str:
+    """Wohin hochgeladene Bilder und Anhaenge gehen."""
+    if DATEIEN_IN_SUPABASE:
+        return f"Supabase Storage (Bucket {SUPABASE_BUCKET})"
+    if SUPABASE_URL:
+        return "Datenordner (SUPABASE_SERVICE_KEY fehlt)"
+    return "Datenordner"
 
 
 def zusammenfassung() -> list:
@@ -406,6 +456,7 @@ def zusammenfassung() -> list:
         f"Umgebung     : {APP_ENV}",
         f"Datenbank    : {_datenbank_kurz()}",
         f"Datenordner  : {DATEN_DIR}",
+        f"Dateien      : {_dateien_kurz()}",
         f"Website      : {WEBSITE_URL}",
         f"Dashboard    : {DASHBOARD_URL}",
         f"E-Mail       : {'aktiv über ' + SMTP_HOST if SMTP_HOST else 'nicht konfiguriert'}",

@@ -1,18 +1,17 @@
 """Nachrichten, Support, E-Mail-Vordrucke, WhatsApp-Bot."""
 
-import os
 import secrets
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
-from fastapi.responses import FileResponse, PlainTextResponse, Response
+from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy import func
 
 from dashboard.hilfen import (
     Anmeldung, fehler, gut, info, papierkorb_hinweis, teil, warnung, zahl,
 )
 from kern import (
-    benachrichtigung, mail, papierkorb, protokoll, push, push_anmeldung, werte,
-    support_ki, whatsapp,
+    benachrichtigung, mail, papierkorb, protokoll, push, push_anmeldung,
+    speicher, werte, support_ki, whatsapp,
 )
 from kern import einstellungen as cfg
 from kern.modelle import (
@@ -413,9 +412,16 @@ async def support_anlegen(betreff: str = Form(""), text: str = Form(""),
         if not endung:
             return _support_ansicht(a, fehler("Erlaubt sind PNG, JPG und WebP."))
         dateiname = secrets.token_hex(16) + endung
-        os.makedirs(cfg.SUPPORT_UPLOAD_DIR, exist_ok=True)
-        with open(os.path.join(cfg.SUPPORT_UPLOAD_DIR, dateiname), "wb") as ziel:
-            ziel.write(daten)
+        try:
+            await speicher.ablegen_aus_route(speicher.SUPPORT, dateiname,
+                                             daten, bild.content_type)
+        except speicher.SpeicherFehler as problem:
+            # Das Ticket erst gar nicht anlegen: Es stuende sonst mit einem
+            # Dateinamen da, hinter dem nichts liegt - und niemand wuesste,
+            # dass der Screenshot fehlt.
+            return _support_ansicht(a, fehler(
+                f"Das Bild konnte nicht gespeichert werden. Bitte noch einmal "
+                f"versuchen. ({problem})"))
 
     ticket = SupportTicket(user_id=a.user.id, subject=betreff_, message=inhalt,
                            attachment_filename=dateiname)
@@ -452,9 +458,13 @@ async def support_antwort(ticket_id: int, text: str = Form(""),
         endung = cfg.ERLAUBTE_BILDTYPEN.get(bild.content_type or "")
         if endung and len(daten) <= cfg.MAX_SCREENSHOT_BYTES:
             dateiname = secrets.token_hex(16) + endung
-            os.makedirs(cfg.SUPPORT_UPLOAD_DIR, exist_ok=True)
-            with open(os.path.join(cfg.SUPPORT_UPLOAD_DIR, dateiname), "wb") as ziel:
-                ziel.write(daten)
+            try:
+                await speicher.ablegen_aus_route(speicher.SUPPORT, dateiname,
+                                                 daten, bild.content_type)
+            except speicher.SpeicherFehler as problem:
+                return _support_ansicht(a, fehler(
+                    f"Das Bild konnte nicht gespeichert werden. Die Antwort "
+                    f"wurde deshalb nicht abgeschickt. ({problem})"))
 
     db.add(SupportMessage(ticket_id=ticket.id, sender_id=user.id,
                           message=inhalt, attachment_filename=dateiname))
@@ -564,10 +574,7 @@ def support_bild(dateiname: str, a: Anmeldung = Depends(Anmeldung.pflicht)):
         erlaubt = bool(eigenes or eigene_nachricht)
     if not erlaubt:
         return Response("Kein Zugriff", status_code=403, media_type="text/plain")
-    pfad = os.path.join(cfg.SUPPORT_UPLOAD_DIR, dateiname)
-    if not os.path.exists(pfad):
-        return Response("Nicht gefunden", status_code=404, media_type="text/plain")
-    return FileResponse(pfad)
+    return speicher.antwort(speicher.SUPPORT, dateiname)
 
 
 #  E-Mail-Vordrucke
