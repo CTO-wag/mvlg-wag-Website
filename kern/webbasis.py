@@ -221,6 +221,23 @@ def baue_app(name: str, *, ist_dashboard: bool) -> FastAPI:
         antwort.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         antwort.headers["X-Permitted-Cross-Domain-Policies"] = "none"
 
+        # Client Hints anfordern. Ohne diese Zeile schickt Chrome nur die
+        # grobe Kennung; erst auf Nachfrage nennt er das echte Geraetemodell
+        # und die echte Systemfassung. Genau das braucht der Support bei
+        # "auf meinem Handy ist alles verrutscht" - der User-Agent von
+        # Chrome behauptet dort seit der "User-Agent Reduction" bei jedem
+        # Android-Geraet dasselbe.
+        #
+        # Bewusst ohne Critical-CH: Das wuerde den ersten Aufruf jeder
+        # Sitzung sofort wiederholen lassen, damit die Angaben schon dort
+        # dabei sind. Einen Seitenaufbau doppelt zu laden ist der Diagnose
+        # nicht wert - ab dem zweiten Aufruf sind sie ohnehin da.
+        if cfg.DIAGNOSE_AKTIV:
+            antwort.headers["Accept-CH"] = (
+                "Sec-CH-UA-Platform-Version, Sec-CH-UA-Model, "
+                "Sec-CH-UA-Full-Version-List, Sec-CH-UA-Arch, "
+                "Sec-CH-UA-Bitness")
+
         nonce = request.state.nonce
         # Kein 'unsafe-inline' bei script-src: das war in V1 der groesste
         # Schwachpunkt der Richtlinie. Skripte laufen nur mit Nonce.

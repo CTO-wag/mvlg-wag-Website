@@ -102,6 +102,12 @@ def bereiche(db, user) -> list:
     liste.append(("nachrichten", "Nachrichten", "/dashboard/nachrichten",
                   "Kommunikation"))
     liste.append(("support", "Support", "/dashboard/support", "Kommunikation"))
+    # Steht beim Support, weil sie nur dafuer da ist: nachsehen, womit eine
+    # Person arbeitet, statt danach zu fragen. Nicht an einem Recht, sondern
+    # an der Rolle - siehe dashboard/routen/analyse.py.
+    if user.role == "cto":
+        liste.append(("analyse", "Nutzer-Analyse", "/dashboard/analyse",
+                      "Kommunikation"))
     if r.get("email_vorlagen"):
         liste.append(("vordrucke", "E-Mail-Vordrucke", "/dashboard/vordrucke",
                       "Kommunikation"))

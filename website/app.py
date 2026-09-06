@@ -37,6 +37,12 @@ app.router.lifespan_context = lebenszyklus
 # Name klemmt (kern/kalender_abo.py).
 from kern.kalender_abo import baue_router as _kalender_abo  # noqa: E402
 app.include_router(_kalender_abo())
+# Meldeweg fuer die Geraetediagnose. Auch hier und nicht nur im
+# Dashboard: Ein JavaScript-Fehler auf der oeffentlichen Seite ist
+# genauso eine Supportfrage, und die Push-Anmeldung passiert sogar
+# ueberwiegend dort. Siehe kern/diagnose.py.
+from kern.diagnose import baue_router as _diagnose_router  # noqa: E402
+app.include_router(_diagnose_router())
 
 app.include_router(oeffentlich.router)
 app.include_router(anmeldung.router)

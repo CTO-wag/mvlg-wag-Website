@@ -143,6 +143,14 @@
 {% endblock %}
 
 <script nonce="{{ nonce }}" src="{{ statisch('js/basis.js') }}"></script>
+{# Geraetediagnose fuer den Support (kern/diagnose.py). Nur fuer Angemeldete:
+   Bei allen anderen gaebe es niemanden, dem die Angaben zuzuordnen waeren -
+   und Daten ohne Zweck werden hier nicht erhoben. Steht in der gemeinsamen
+   Basis und nicht nur im Dashboard, weil ein Fehler auf der oeffentlichen
+   Seite genauso eine Supportfrage ist. #}
+{% if user %}
+<script nonce="{{ nonce }}" src="{{ statisch('js/diagnose.js') }}" defer></script>
+{% endif %}
 {% block skripte %}{% endblock %}
 </body>
 </html>

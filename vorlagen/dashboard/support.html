@@ -3,6 +3,21 @@
 {{ m.kopf("Support", "Etwas funktioniert nicht oder ist unklar? Hier fragen.") }}
 {{ m.rueckmeldung(meldung) }}
 
+{# Der Weg in die Nutzer-Analyse. Steht hier und nicht nur in der Leiste,
+   weil er genau dann gebraucht wird, wenn man ein Ticket vor sich hat -
+   und nicht, wenn man gerade an die Seitenleiste denkt. #}
+{% if user.role == "cto" %}
+<div class="tour-start">
+  <div>
+    <strong>Nutzer-Analyse</strong>
+    <span>Gerät, Browser, Leitung, Push-Berechtigung und Browserfehler einer
+      Person – bevor du nachfragen musst.</span>
+  </div>
+  <button type="button" class="btn-zweit"
+          hx-get="/dashboard/analyse" hx-target="#tab-inhalt">Person auswählen</button>
+</div>
+{% endif %}
+
 <div class="tour-start">
   <div>
     <strong>Rundgang durch das Dashboard</strong>
@@ -123,6 +138,12 @@
         {% endif %}
 
         <div class="knopfzeile" style="margin-top:var(--r3);">
+          {% if user.role == "cto" and t.sender %}
+          <button type="button" class="btn-still btn-klein"
+                  hx-get="/dashboard/analyse/{{ t.user_id }}" hx-target="#tab-inhalt"
+                  title="Womit arbeitet {{ t.sender.vorname }}?">
+            Gerät &amp; Diagnose ansehen</button>
+          {% endif %}
           {% if t.status != "geschlossen" %}
           <form hx-post="/dashboard/support/{{ t.id }}/schliessen" hx-target="#tab-inhalt">
             <input type="hidden" name="csrf" value="{{ csrf }}">

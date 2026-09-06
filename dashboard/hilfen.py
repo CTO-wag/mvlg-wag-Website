@@ -10,6 +10,7 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
+from kern import diagnose
 from kern.datenbank import hole_db
 from kern.einstellungen import (
     HTTPS_ONLY_COOKIES, TRUST_PROXY_HEADERS, adressen_fuer,
@@ -43,6 +44,12 @@ class Anmeldung:
             website, _ = adressen_fuer(request)
             antwort = wache(user, request, f"{website}/login")
             raise _Umleitung(antwort)
+        # Beilaeufig festhalten, womit diese Person gerade arbeitet - siehe
+        # kern/diagnose.py. Steht hier und nicht in der Middleware, weil es
+        # nur bei einem echten Bereichsaufruf interessant ist und nicht bei
+        # jedem Bild und jeder Schriftdatei. Schreibt hoechstens einmal je
+        # Minute, faengt jeden Fehler selbst ab.
+        diagnose.merken(db, request, user)
         return cls(request, db, user)
 
     # --- Bequemlichkeiten --------------------------------------------------

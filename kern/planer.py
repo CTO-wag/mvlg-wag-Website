@@ -110,6 +110,7 @@ def _scoring():
 
 def _taegliches_aufraeumen():
     from kern.aufbewahrung import bewerbungen_aufraeumen
+    from kern.diagnose import aufraeumen as diagnose_aufraeumen
     from kern.papierkorb import aufraeumen as papierkorb_aufraeumen
     from kern.protokoll import aufraeumen as protokoll_aufraeumen
     while True:
@@ -131,6 +132,15 @@ def _taegliches_aufraeumen():
                 print(f"[Aufbewahrung] Bewerbungen gelöscht: {weg}")
         except Exception as problem:                         # pragma: no cover
             print(f"[Aufbewahrung] fehlgeschlagen: {problem}")
+        # Ebenfalls getrennt: Die Diagnosedaten sind die einzigen, die ohne
+        # Zutun der Mitglieder entstehen. Ihre Frist muss auch dann laufen,
+        # wenn davor etwas hakt.
+        try:
+            bilanz = diagnose_aufraeumen()
+            if bilanz:
+                print(f"[Diagnose] aufgeräumt: {bilanz}")
+        except Exception as problem:                         # pragma: no cover
+            print(f"[Diagnose] Aufräumen fehlgeschlagen: {problem}")
 
 
 def _whatsapp():

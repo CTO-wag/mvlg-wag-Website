@@ -311,6 +311,25 @@ CLOUDFLARE_API_TOKEN = _text("CLOUDFLARE_API_TOKEN", "")
 CLOUDFLARE_ACCOUNT_ID = _text("CLOUDFLARE_ACCOUNT_ID", "")
 CLOUDFLARE_ZONE_ID = _text("CLOUDFLARE_ZONE_ID", "")
 
+#  Nutzer-Analyse (Support)
+#  Was ueber die Geraete der Mitglieder festgehalten wird, damit der Support
+#  bei "geht bei mir nicht" nachsehen kann statt nachzufragen. Aus. Ein.
+#  Die Frist ist kein Beiwerk: ohne sie waechst die Tabelle unbegrenzt, und
+#  Diagnosedaten von vorletztem Jahr helfen niemandem mehr.
+DIAGNOSE_AKTIV = _ja("DIAGNOSE_AKTIV", "true")
+DIAGNOSE_TAGE = _zahl("DIAGNOSE_TAGE", 90)
+
+#  Herkunft einer IP-Adresse (Land, Anbieter, VPN-Verdacht).
+#  Dafuer geht die IP an einen fremden Dienst - deshalb getrennt schaltbar.
+#  Steht sie auf false, bleibt die Analyse vollstaendig im Haus; VPN wird
+#  dann nur noch aus Zeitzone und Sprache geschaetzt.
+#  Die Adresse traegt {ip} als Platzhalter. Voreingestellt ist ipwho.is:
+#  ueber HTTPS, ohne Anmeldung, ohne Schluessel. Wer einen Dienst mit
+#  ausdruecklicher VPN-Erkennung hat (ip-api.com Pro, proxycheck.io),
+#  traegt dessen Adresse hier ein - kern/diagnose.py versteht beide Formate.
+IP_INFO_AKTIV = _ja("IP_INFO_AKTIV", "true")
+IP_INFO_URL = _text("IP_INFO_URL", "https://ipwho.is/{ip}")
+
 #  Benachrichtigungen
 NTFY_BASE_URL = _text("NTFY_BASE_URL", "https://ntfy.sh").rstrip("/")
 DELIVERY_LOG_TAGE = _zahl("DELIVERY_LOG_TAGE", 30)

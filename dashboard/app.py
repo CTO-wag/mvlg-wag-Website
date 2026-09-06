@@ -19,7 +19,7 @@ from dashboard import navigation
 from dashboard.hilfen import _Umleitung
 from dashboard.routen import (
     arbeit, kommunikation, konto, neuerungen, organisation, personen,
-    system, uebersicht, funktionsadressen,
+    analyse, system, uebersicht, funktionsadressen,
 )
 
 
@@ -162,12 +162,18 @@ app.include_router(_kalender_abo())
 
 app.include_router(_pwa_router(ist_dashboard=True))
 
+# Meldeweg fuer die Geraetediagnose (kern/diagnose.py). Liegt wie
+# das Kalender-Abo in beiden Anwendungen unter derselben Adresse.
+from kern.diagnose import baue_router as _diagnose_router  # noqa: E402
+app.include_router(_diagnose_router())
+
 app.include_router(uebersicht.router)
 app.include_router(arbeit.router)
 app.include_router(personen.router)
 app.include_router(organisation.router)
 app.include_router(kommunikation.router)
 app.include_router(system.router)
+app.include_router(analyse.router)
 app.include_router(funktionsadressen.router)
 app.include_router(konto.router)
 app.include_router(neuerungen.router)

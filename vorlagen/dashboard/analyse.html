@@ -1,0 +1,466 @@
+{% import "dashboard/teile/makros.html" as m %}
+{#
+  Zwei Ansichten in einer Datei: die Personenauswahl und das Dossier.
+  Getrennte Dateien wären sauberer, aber die Kopfzeile, der Hinweis auf die
+  Aufbewahrung und der Zurück-Weg wären dreimal da - und beim Ändern zweimal
+  vergessen.
+#}
+
+{% if not dossier %}
+{# ======================= Auswahl: wen ansehen? ========================= #}
+{{ m.kopf("Nutzer-Analyse",
+          "Person auswählen und sehen, womit sie arbeitet – Gerät, Browser,
+           Leitung, Fehler. Für Support-Anfragen, die mit „geht bei mir
+           nicht“ anfangen.") }}
+{{ m.rueckmeldung(meldung) }}
+
+{% if not erfassung_an %}
+<div class="meldung meldung-warnung"><div>
+  <strong>Die Erfassung ist ausgeschaltet.</strong>
+  <p>In config.cmd steht <code>DIAGNOSE_AKTIV</code> auf „false“. Vorhandene
+    Daten bleiben sichtbar, neue kommen keine dazu.</p>
+</div></div>
+{% endif %}
+
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Mitglieder</h2>
+      <p class="meta">Die Zahlen sagen, ob es sich lohnt hineinzusehen:
+        bekannte Geräte, Browserfehler der letzten {{ aufbewahrung }} Tage,
+        offene Anfragen.</p></div>
+    <span class="marke">{{ zeilen|length }}</span>
+  </div>
+
+  {{ m.suche("#analyse-liste", "Name oder E-Mail suchen …", "Personen") }}
+  <div class="tabelle-rahmen">
+    <table id="analyse-liste">
+      <thead>
+        <tr>
+          <th>Person</th>
+          <th>Zuletzt gesehen</th>
+          <th class="rechts">Geräte</th>
+          <th class="rechts">Fehler</th>
+          <th class="rechts">Offen</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for z in zeilen %}
+        <tr data-suchbar>
+          <td>
+            <strong>{{ z.person.vorname }} {{ z.person.nachname }}</strong>
+            {% if z.person.status != "aktiv" %}
+            <span class="marke">inaktiv</span>{% endif %}
+            {% if z.vpn >= 45 %}
+            <span class="marke zustand-offen" title="Verdacht auf VPN oder Proxy">VPN?</span>
+            {% endif %}
+            <br><span class="meta">{{ z.person.email }}</span>
+          </td>
+          <td>{{ z.zuletzt|relativ if z.zuletzt else "–" }}</td>
+          <td class="zahl">{{ z.geraete or "–" }}</td>
+          <td class="zahl">{{ z.fehler or "–" }}</td>
+          <td class="zahl">{{ z.tickets or "–" }}</td>
+          <td class="rechts">
+            <button type="button" class="btn-zweit btn-klein"
+                    hx-get="/dashboard/analyse/{{ z.person.id }}"
+                    hx-target="#tab-inhalt">Ansehen</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Was hier erfasst wird</h2></div></div>
+  <p class="meta">
+    Aus jedem Aufruf: Browser, Betriebssystem, Gerätemodell, Sprache,
+    IP-Adresse. Einmal je Sitzung aus dem Browser: Bildschirm, Grafikeinheit,
+    Arbeitsspeicher, Leitungsgeschwindigkeit, Zeitzone, ob die Seite als App
+    läuft, ob Push erlaubt ist, Ladezeiten. Dazu jeder JavaScript-Fehler, der
+    auf einem Gerät auftritt.
+    {% if ip_dienst_an %}
+    Die Herkunft der IP-Adresse (Land, Anbieter, VPN-Verdacht) wird bei einem
+    fremden Dienst erfragt – <code>IP_INFO_AKTIV</code> schaltet das ab.
+    {% else %}
+    Die Herkunft der IP-Adresse wird <strong>nicht</strong> extern erfragt
+    (<code>IP_INFO_AKTIV=false</code>); der VPN-Verdacht ergibt sich dann nur
+    aus Zeitzone und Sprache.
+    {% endif %}
+    <br><br>
+    Nicht erfasst: Standort, Browserverlauf, Eingaben, Tastatur- oder
+    Mausaufzeichnung, Fingerabdruck über Canvas oder Schriftarten.
+    Alles verfällt nach {{ aufbewahrung }} Tagen. Jeder Aufruf eines Dossiers
+    steht im Aktivitätsprotokoll.
+  </p>
+</div>
+
+{% else %}
+{# =========================== Dossier ================================== #}
+{% set p = dossier.person %}
+{% call m.kopf(p.vorname ~ " " ~ p.nachname, p.email) %}
+<button type="button" class="btn-zweit btn-klein"
+        hx-get="/dashboard/analyse" hx-target="#tab-inhalt">Zurück zur Liste</button>
+{% endcall %}
+{{ m.rueckmeldung(meldung) }}
+
+<div class="kennzahlen">
+  {{ m.kennzahl(dossier.profile|length, "bekannte Geräte") }}
+  {{ m.kennzahl(dossier.sitzungen|selectattr("revoked", "equalto", 0)|list|length,
+                "offene Anmeldungen") }}
+  {{ m.kennzahl(dossier.browserfehler|length, "Browserfehler",
+                "kennzahl-warnung" if dossier.browserfehler else "kennzahl-gut") }}
+  {{ m.kennzahl(dossier.fehlversuche, "Fehlversuche",
+                "kennzahl-warnung" if dossier.fehlversuche > 3 else "") }}
+</div>
+
+{# --- Konto: der Rahmen, in dem alles andere steht ---------------------- #}
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Konto</h2></div></div>
+  <div class="tabelle-rahmen">
+    <table>
+      <tbody>
+        <tr><td>Rolle</td><td>{{ p.role|label }} · {{ p.department|label }}</td></tr>
+        <tr><td>Zustand</td><td>
+          {{ p.status|label }}
+          {% if dossier.gesperrt %}
+          <span class="marke zustand-offen">gesperrt bis
+            {{ p.locked_until|berlin("%H:%M") }}</span>{% endif %}
+        </td></tr>
+        <tr><td>Telefon</td><td>{{ p.telefonnummer|telefon or "–" }}</td></tr>
+        <tr><td>Dabei seit</td><td>{{ p.eintrittsdatum|datum_lang if p.eintrittsdatum else "–" }}</td></tr>
+        <tr><td>Zweiter Faktor</td><td>
+          {% if p.totp_aktiv %}<span class="marke zustand-erledigt">aktiv</span>
+          {% else %}<span class="marke zustand-offen">nicht eingerichtet</span>{% endif %}
+        </td></tr>
+        <tr><td>Passwort geändert</td><td>
+          {% if dossier.passwort_alter is none %}
+            <span class="marke zustand-offen">nie – noch das Startpasswort</span>
+          {% else %}vor {{ dossier.passwort_alter }} Tagen{% endif %}
+        </td></tr>
+        <tr><td>Kalender-Abo</td><td>
+          {% if p.calendar_last_fetch %}
+            zuletzt abgerufen {{ p.calendar_last_fetch|relativ }}
+          {% else %}
+            <span class="meta">nie abgerufen – das Abo ist nicht eingerichtet</span>
+          {% endif %}
+        </td></tr>
+        {% if dossier.pref %}
+        <tr><td>Als App geöffnet</td><td>
+          {% if dossier.pref.als_app_am %}{{ dossier.pref.als_app_am|relativ }}
+          {% else %}<span class="meta">nie – läuft nur im Browser-Tab</span>{% endif %}
+        </td></tr>
+        <tr><td>Einführung</td><td>
+          {{ "Rundgang erledigt" if dossier.pref.tutorial_erledigt else "Rundgang offen" }} ·
+          {{ "Neuerungen gesehen" if dossier.pref.neuerungen_erledigt else "Neuerungen offen" }}
+        </td></tr>
+        {% endif %}
+        {% if dossier.melde_pref %}
+        <tr><td>Meldewege</td><td>
+          {% for kanal, an in [("E-Mail", dossier.melde_pref.email),
+                               ("Push", dossier.melde_pref.webpush),
+                               ("ntfy", dossier.melde_pref.ntfy)] %}
+          <span class="marke {{ 'zustand-erledigt' if an else 'zustand-offen' }}">
+            {{ kanal }}{{ "" if an else " aus" }}</span>
+          {% endfor %}
+          {% if not dossier.melde_pref.enabled %}
+          <span class="marke zustand-offen">alle Meldungen aus</span>{% endif %}
+        </td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# --- Geräte: der Kern des Ganzen --------------------------------------- #}
+<div class="panel">
+  <div class="panel-kopf">
+    <div><h2>Geräte</h2>
+      <p class="meta">Ein Eintrag je Gerät, aufgefrischt bei jedem Besuch.
+        Aufklappen zeigt alles, was der Browser über sich verrät.</p></div>
+    <span class="marke">{{ dossier.profile|length }}</span>
+  </div>
+
+  {% if dossier.profile %}
+  <div class="stapel">
+    {% for g in dossier.profile %}
+    {% set d = g.profil %}
+    <details class="block" {% if loop.first %}open{% endif %}>
+      <summary>
+        <span style="flex:1;display:flex;align-items:center;gap:var(--r2);flex-wrap:wrap;min-width:0;">
+          <strong>{{ d.beschreibung or "Unbekanntes Gerät" }}</strong>
+          {% if d.ist_mobil %}<span class="marke">mobil</span>{% endif %}
+          {% if d.vpn_verdacht >= 45 %}
+          <span class="marke zustand-offen">VPN-Verdacht {{ d.vpn_verdacht }} %</span>
+          {% elif d.vpn_verdacht > 0 %}
+          <span class="marke">VPN-Verdacht {{ d.vpn_verdacht }} %</span>
+          {% endif %}
+          {% if not g.hat_browserdaten %}
+          <span class="marke" title="Der Browser hat noch nichts gemeldet – etwa,
+                weil die Sitzung vor dieser Neuerung begann.">nur Kopfzeilen</span>
+          {% endif %}
+          <span class="meta">{{ d.zuletzt|relativ }}</span>
+        </span>
+      </summary>
+      <div class="aufklapp-inhalt">
+
+        {# Netz und Herkunft zuerst: Das ist die Frage, die am häufigsten
+           gestellt wird, und die einzige mit einem Knopf. #}
+        <div class="tabelle-rahmen">
+          <table>
+            <tbody>
+              <tr><td>IP-Adresse</td><td><code>{{ d.ip_address or "–" }}</code></td></tr>
+              {% if d.ip_land or d.ip_stadt %}
+              <tr><td>Ort</td><td>
+                {{ d.ip_stadt or "" }}{% if d.ip_stadt and d.ip_region %}, {% endif %}
+                {{ d.ip_region or "" }}{% if d.ip_land %} · {{ d.ip_land }}{% endif %}
+                <span class="meta">(Adressgenauigkeit, nicht der Aufenthaltsort)</span>
+              </td></tr>
+              {% endif %}
+              {% if d.ip_provider %}
+              <tr><td>Anbieter</td><td>{{ d.ip_provider }}
+                {% if d.ip_asn %}<span class="meta">{{ d.ip_asn }}</span>{% endif %}
+                {% if d.ip_art %}<span class="marke">{{ d.ip_art }}</span>{% endif %}
+              </td></tr>
+              {% endif %}
+              {% if d.vpn_gruende %}
+              <tr><td>VPN-Verdacht</td><td>
+                <strong>{{ d.vpn_verdacht }} %</strong><br>
+                <span class="meta">{{ d.vpn_gruende }}</span></td></tr>
+              {% endif %}
+              <tr><td>Erstmals gesehen</td><td>{{ d.erstmals|relativ }}
+                <span class="meta">{{ d.aufrufe }} Aufrufe</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <form hx-post="/dashboard/analyse/{{ p.id }}/herkunft" hx-target="#tab-inhalt"
+              style="margin-top:var(--r3);">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="profil_id" value="{{ d.id }}">
+          <button type="submit" class="btn-zweit btn-klein">
+            Herkunft der Adresse neu prüfen</button>
+          {% if d.ip_geprueft_am %}
+          <span class="meta">zuletzt {{ d.ip_geprueft_am|relativ }}</span>{% endif %}
+        </form>
+
+        {# Was der Browser gemeldet hat, nach Gruppen. #}
+        {% for gruppe, felder in g.gruppen %}
+        <h3 style="margin-top:var(--r4);">{{ gruppe }}</h3>
+        <div class="tabelle-rahmen">
+          <table><tbody>
+            {% for name, wert in felder %}
+            <tr><td>{{ name }}</td><td>{{ wert }}</td></tr>
+            {% endfor %}
+          </tbody></table>
+        </div>
+        {% endfor %}
+
+        {% if g.kopfzeilen %}
+        <details style="margin-top:var(--r4);">
+          <summary class="meta" style="cursor:pointer;">
+            Was der Server ohne Zutun des Browsers sieht</summary>
+          <div class="tabelle-rahmen" style="margin-top:var(--r2);">
+            <table><tbody>
+              {% for name, wert in g.kopfzeilen %}
+              <tr><td>{{ name }}</td><td>{{ wert }}</td></tr>
+              {% endfor %}
+            </tbody></table>
+          </div>
+          {% if d.user_agent %}
+          <p class="meta" style="margin-top:var(--r2);word-break:break-all;">
+            <code>{{ d.user_agent }}</code></p>
+          {% endif %}
+        </details>
+        {% endif %}
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}
+  {{ m.leer("Noch kein Gerät bekannt",
+            "Die Erfassung beginnt beim nächsten Besuch dieser Person.", "leer") }}
+  {% endif %}
+</div>
+
+<div class="raster-2">
+  {# --- Browserfehler --------------------------------------------------- #}
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Fehler im Browser</h2>
+      <p class="meta">Was auf dem Gerät schiefging – auf dem Server steht
+        davon nichts.</p></div>
+      <span class="marke">{{ dossier.browserfehler|length }}</span></div>
+    {% if dossier.browserfehler %}
+    <ul class="liste">
+      {% for f in dossier.browserfehler %}
+      <li>
+        <span class="liste-links">
+          <strong>{{ f.meldung|kuerzen(120) }}</strong>
+          <span class="meta">
+            {{ f.adresse or "?" }}
+            {% if f.quelle %}· {{ f.quelle|kuerzen(60) }}{% endif %}
+            {% if f.zeile %}:{{ f.zeile }}{% endif %}
+          </span>
+        </span>
+        <span class="liste-rechts"><span class="meta">{{ f.created_at|relativ }}</span></span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ m.leer("Keine Fehler", "Gut so.", "leer") }}
+    {% endif %}
+  </div>
+
+  {# --- Anmeldungen ----------------------------------------------------- #}
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Anmeldungen</h2>
+      <p class="meta">Auch die vergeblichen – die erklären ein gesperrtes
+        Konto.</p></div></div>
+    {% if dossier.versuche %}
+    <div class="tabelle-rahmen">
+      <table>
+        <thead><tr><th></th><th>Adresse</th><th>Wann</th></tr></thead>
+        <tbody>
+          {% for v in dossier.versuche %}
+          <tr>
+            <td><span class="marke {{ 'zustand-erledigt' if v.erfolg else 'zustand-offen' }}">
+              {{ "ok" if v.erfolg else (v.grund or "fehlgeschlagen") }}</span></td>
+            <td><code>{{ v.ip_address or "?" }}</code></td>
+            <td>{{ v.created_at|relativ }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    {{ m.leer("Keine Anmeldungen protokolliert", "", "leer") }}
+    {% endif %}
+  </div>
+</div>
+
+{# --- Offene Sitzungen -------------------------------------------------- #}
+<div class="panel">
+  <div class="panel-kopf"><div><h2>Angemeldete Sitzungen</h2>
+    <p class="meta">Beenden lassen sie sich in der Sicherheitsübersicht.</p></div></div>
+  {% if dossier.sitzungen %}
+  <div class="tabelle-rahmen">
+    <table>
+      <thead><tr><th>Gerät</th><th>Adresse</th><th>Zuletzt aktiv</th><th>Zustand</th></tr></thead>
+      <tbody>
+        {% for s in dossier.sitzungen %}
+        <tr>
+          <td>{{ s.user_agent|kuerzen(60) or "?" }}</td>
+          <td><code>{{ s.ip_address or "?" }}</code></td>
+          <td>{{ s.last_active|relativ }}</td>
+          <td>
+            {% if s.revoked %}<span class="marke">beendet</span>
+            {% else %}<span class="marke zustand-erledigt">offen</span>{% endif %}
+            {% if not s.dauerhaft %}<span class="marke">nur diese Sitzung</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ m.leer("Keine Sitzungen", "", "leer") }}
+  {% endif %}
+</div>
+
+<div class="raster-2">
+  {# --- Zustellungen ---------------------------------------------------- #}
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Was rausgegangen ist</h2>
+      <p class="meta">Beantwortet „ich bekomme keine Benachrichtigungen“
+        ohne Rückfrage.</p></div></div>
+    {% if dossier.zustellungen %}
+    <ul class="liste">
+      {% for z in dossier.zustellungen %}
+      <li>
+        <span class="liste-links">
+          <strong>{{ z.betreff|kuerzen(60) or z.anlass or "–" }}</strong>
+          <span class="meta">{{ z.kanal }}
+            {% if z.fehler %}· {{ z.fehler|kuerzen(80) }}{% endif %}</span>
+        </span>
+        <span class="liste-rechts">
+          <span class="marke {{ 'zustand-erledigt' if z.erfolg else 'zustand-offen' }}">
+            {{ "zugestellt" if z.erfolg else "fehlgeschlagen" }}</span>
+          <span class="meta">{{ z.created_at|relativ }}</span>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ m.leer("Nichts protokolliert", "", "leer") }}
+    {% endif %}
+  </div>
+
+  {# --- Push-Anmeldungen ------------------------------------------------ #}
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Push-Anmeldungen</h2>
+      <p class="meta">Ohne Eintrag hier kann kein Handy eine Meldung
+        bekommen.</p></div></div>
+    {% if dossier.push_geraete %}
+    <ul class="liste">
+      {% for g in dossier.push_geraete %}
+      <li>
+        <span class="liste-links"><strong>{{ g.geraet or "Unbekanntes Gerät" }}</strong>
+          <span class="meta">über {{ g.ursprung or "?" }} ·
+            angemeldet {{ g.created_at|relativ }}</span></span>
+        <span class="liste-rechts"><span class="meta">
+          {% if g.last_ok_at %}zuletzt erreicht {{ g.last_ok_at|relativ }}
+          {% else %}noch nie erreicht{% endif %}</span></span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ m.leer("Kein Gerät angemeldet",
+              "Das ist der häufigste Grund für „ich bekomme nichts“.", "leer") }}
+    {% endif %}
+  </div>
+</div>
+
+<div class="raster-2">
+  {# --- Support --------------------------------------------------------- #}
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Support-Anfragen</h2></div></div>
+    {% if dossier.tickets %}
+    <ul class="liste">
+      {% for t in dossier.tickets %}
+      <li>
+        <span class="liste-links"><strong>{{ t.subject|kuerzen(60) }}</strong>
+          <span class="meta">{{ t.created_at|relativ }}</span></span>
+        <span class="liste-rechts">{{ m.zustand(t.status) }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ m.leer("Keine Anfragen", "", "support") }}
+    {% endif %}
+  </div>
+
+  {# --- Aktivität ------------------------------------------------------- #}
+  <div class="panel">
+    <div class="panel-kopf"><div><h2>Letzte Handlungen</h2>
+      <p class="meta">Aus dem Aktivitätsprotokoll.</p></div></div>
+    {% if dossier.aktivitaet %}
+    <ul class="liste">
+      {% for e in dossier.aktivitaet %}
+      <li>
+        <span class="liste-links"><strong>{{ e.event_type|label }}</strong>
+          {% if e.value %}<span class="meta">{{ e.value|kuerzen(80) }}</span>{% endif %}</span>
+        <span class="liste-rechts"><span class="meta">{{ e.created_at|relativ }}</span></span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ m.leer("Nichts protokolliert", "", "leer") }}
+    {% endif %}
+  </div>
+</div>
+
+<p class="meta" style="margin-top:var(--r4);">
+  Diese Einsicht ist im Aktivitätsprotokoll vermerkt. Diagnosedaten werden
+  nach {{ aufbewahrung }} Tagen automatisch gelöscht.
+</p>
+{% endif %}

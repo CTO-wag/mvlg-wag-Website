@@ -870,8 +870,95 @@ class Inhalt(Base):
     geaendert_von = Column(Integer, ForeignKey("users.id"), nullable=True)
 
 
+#  Diagnose (neu in V2)
+#  Zwei Tabellen fuer die Nutzer-Analyse im Support. Sie halten NICHT fest,
+#  was jemand tut - das steht im activity_log -, sondern WOMIT: welches
+#  Geraet, welcher Browser, welche Leitung, welche Fehler. Genau die Fragen,
+#  die bei "bei mir geht das nicht" als erstes zu klaeren sind und die
+#  bisher per Rueckfrage geklaert werden mussten.
+class Geraeteprofil(Base):
+    """Ein Geraet, mit dem eine Person die Plattform benutzt.
+
+    Ein Datensatz je (Person, Geraet) - nicht je Aufruf. Sonst waere die
+    Tabelle nach einem Monat groesser als der Rest der Datenbank und der
+    CTO haette statt einer Antwort zehntausend fast gleiche Zeilen.
+
+    Zwei Spalten tragen JSON statt eigener Spalten: `kopfdaten` und
+    `browserdaten`. Was ein Browser ueber sich verraet, aendert sich mit
+    jeder Chrome-Fassung; jedes neue Merkmal als Spalte anzuhaengen hiesse
+    eine Migration je Merkmal. Was gefiltert wird, hat trotzdem eine eigene
+    Spalte - danach wird gesucht.
+    """
+    __tablename__ = "geraeteprofile"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # Die Geraetekennung aus dem Cookie (kern/push_anmeldung.py). Damit
+    # bleibt dasselbe Handy ueber Sitzungen hinweg dasselbe Handy.
+    geraete_id = Column(String(40), nullable=True, index=True)
+    sitzung_id = Column(String(48), nullable=True)
+
+    #  Was ohne Zutun des Browsers feststeht
+    ip_address = Column(String(64), nullable=True, index=True)
+    user_agent = Column(Text, nullable=True)
+    # Kurzform fuer die Liste: "Chrome 131 auf Android 14 - Pixel 8"
+    beschreibung = Column(String(200), nullable=True)
+    plattform = Column(String(40), nullable=True)
+    browser = Column(String(60), nullable=True)
+    modell = Column(String(80), nullable=True)
+    ist_mobil = Column(Integer, nullable=False, default=0)
+
+    #  Was aus der IP-Adresse folgt (kern/diagnose.py)
+    ip_land = Column(String(60), nullable=True)
+    ip_region = Column(String(80), nullable=True)
+    ip_stadt = Column(String(80), nullable=True)
+    ip_provider = Column(String(120), nullable=True)
+    ip_asn = Column(String(40), nullable=True)
+    ip_art = Column(String(40), nullable=True)          # privat | mobil | hosting
+    ip_geprueft_am = Column(DateTime, nullable=True)
+    # 0-100. Kein Ja/Nein: ein VPN laesst sich von aussen nicht beweisen,
+    # nur wahrscheinlich machen. Die Gruende stehen daneben, damit der CTO
+    # die Zahl einschaetzen kann statt ihr zu glauben.
+    vpn_verdacht = Column(Integer, nullable=False, default=0)
+    vpn_gruende = Column(String(400), nullable=True)
+
+    #  Die beweglichen Teile, als JSON
+    kopfdaten = Column(Text, nullable=True)
+    browserdaten = Column(Text, nullable=True)
+
+    erstmals = Column(DateTime, default=utcnow)
+    zuletzt = Column(DateTime, default=utcnow, index=True)
+    aufrufe = Column(Integer, nullable=False, default=0)
+
+    user = relationship("User", foreign_keys=[user_id])
+
+
+class ClientFehler(Base):
+    """Ein Fehler, der im Browser passiert ist - nicht auf dem Server.
+
+    Der Anlass: Ein JavaScript-Fehler auf einem fremden Handy hinterlaesst
+    auf dem Server keine Spur. Die Seite bleibt weiss, die Person schreibt
+    "geht nicht", und niemand kann nachsehen. Ab jetzt schon.
+    """
+    __tablename__ = "client_fehler"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    geraete_id = Column(String(40), nullable=True, index=True)
+    art = Column(String(20), nullable=False, default="js")   # js | versprechen | netz
+    meldung = Column(String(500), nullable=False)
+    quelle = Column(String(300), nullable=True)
+    zeile = Column(Integer, nullable=True)
+    stapel = Column(Text, nullable=True)
+    adresse = Column(String(300), nullable=True)             # wo es passierte
+    created_at = Column(DateTime, default=utcnow, index=True)
+
+    user = relationship("User", foreign_keys=[user_id])
+
+
 # Ein Index, der in V1 fehlte: die Aufgabenliste filtert praktisch immer nach
 # Status und Abteilung. Bei wenigen hundert Zeilen faellt das nicht auf, bei
 # ein paar tausend schon.
 Index("ix_tasks_status_abteilung", Task.status, Task.task_department)
 Index("ix_leistung_user_art", Leistung.user_id, Leistung.art)
+Index("ix_geraeteprofil_user_zuletzt", Geraeteprofil.user_id,
+      Geraeteprofil.zuletzt)
+Index("ix_client_fehler_user_zeit", ClientFehler.user_id, ClientFehler.created_at)
