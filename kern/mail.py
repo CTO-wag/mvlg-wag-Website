@@ -187,6 +187,7 @@ _HELL = {"navy": "#0E2647", "text": "#18211F", "grau": "#66726D",
          "amber": "#B7791F"}
 
 _DUNKEL_CSS = """
+:root{color-scheme:light dark;supported-color-schemes:light dark;}
 @media (prefers-color-scheme: dark){
   body,.rahmen{background:#0A0F1A !important;}
   .karte{background:#131B2C !important;border-color:#2A3552 !important;}
@@ -194,6 +195,11 @@ _DUNKEL_CSS = """
   .leise,.leise *{color:#9AA7C2 !important;}
   .trennlinie{border-color:#2A3552 !important;}
   a.knopf{background:#E8A83D !important;color:#0A0F1A !important;}
+  /* Die Kopfleiste bleibt Navy. Ohne diese Regel faerbt Apple Mail sie im
+     Dunkelmodus selbst um - siehe die Erklaerung bei color-scheme oben. */
+  .kopfleiste{background:#0E2647 !important;}
+  .kopfname{color:#FFFFFF !important;}
+  .kopfschule{color:#C8D6E8 !important;}
 }
 """
 
@@ -226,6 +232,15 @@ def als_html(betreff: str, text: str, automatisch: bool = True,
     return f"""<!doctype html>
 <html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Beide Farbschemata ausdruecklich anmelden. Ohne diese zwei Zeilen haelt
+     Apple Mail die Nachricht fuer eine, die den Dunkelmodus nicht kennt, und
+     rechnet die Farben selbst um: Die navyblaue Kopfleiste wurde hellblau,
+     die weisse Schrift darauf dunkel - nur das Wappen konnte es nicht
+     umfaerben, und so klebte ein dunkelblauer Kasten auf hellblauem Grund.
+     Genau so war es auf dem iPhone zu sehen. Mit der Anmeldung laesst Apple
+     Mail die Finger davon und benutzt das CSS weiter unten. -->
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <style>{_DUNKEL_CSS}</style></head>
 <body class="rahmen" style="margin:0;padding:0;background:{f['grund']};">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
@@ -235,27 +250,33 @@ def als_html(betreff: str, text: str, automatisch: bool = True,
          class="karte" style="max-width:560px;background:{f['flaeche']};
          border:1px solid {f['linie']};border-radius:10px;overflow:hidden;">
     <!-- Kopfleiste: Wappen und Name auf Navy.
-         Das Bild hat denselben Navy-Ton fest eingebaut (siehe
-         werkzeuge/vorschaubild_bauen.py). Frueher hatte es einen weissen
-         Hintergrund - in der Mail klebte damit ein weisser Kasten auf der
-         blauen Leiste, im hellen wie im dunklen Modus. Transparenz waere der
-         andere Weg, aber Mailprogramme tauschen im Dunkelmodus gern
-         Hintergruende aus; ein Bild mit eigenem Grund sieht ueberall gleich
-         aus. Der Name steht als Text daneben, nicht im Bild: so bleibt er
+         Das Bild traegt denselben Navy-Ton fest eingebaut (siehe
+         werkzeuge/vorschaubild_bauen.py) und dazu weiche Ecken. Beides hat
+         einen Grund. Ein weisser Grund - so war es ganz frueher - klebte als
+         heller Kasten auf der blauen Leiste. Voellige Transparenz ist auch
+         keine Loesung, weil Mailprogramme im Dunkelmodus Hintergruende
+         austauschen und das dunkle Wappen dann auf dunklem Grund verschwaende.
+         Der eingebaute Grund mit runden Ecken haelt beide Faelle aus: Auf der
+         navyblauen Leiste ist der Uebergang unsichtbar, und faerbt ein
+         Programm die Leiste doch um, steht dort ein rundes Abzeichen statt
+         eines abgeschnittenen Klotzes.
+         Der Name steht als Text daneben und nicht im Bild - so bleibt er
          lesbar, wenn jemand Bilder abgeschaltet hat. -->
-    <tr><td style="background:{f['navy']};padding:18px 24px;">
+    <tr><td class="kopfleiste" style="background:{f['navy']};padding:18px 24px;">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0">
         <tr>
           <td style="padding-right:14px;" valign="middle">
             <img src="cid:{LOGO_KENNUNG}" width="72" height="58"
                  alt="Wappen der Wirtschafts- und Investment-AG"
                  style="display:block;width:72px;height:58px;border:0;
-                        background:{f['navy']};color:#FFFFFF;font-size:11px;">
+                        color:#FFFFFF;font-size:11px;">
           </td>
           <td valign="middle" style="font-family:Georgia,serif;">
-            <div style="color:#FFFFFF;font-size:17px;font-weight:bold;
+            <div class="kopfname" style="color:#FFFFFF;font-size:17px;
+                        font-weight:bold;
                         line-height:1.25;">Wirtschafts- &amp; Investment-AG</div>
-            <div style="color:#C8D6E8;font-size:12px;line-height:1.4;
+            <div class="kopfschule" style="color:#C8D6E8;font-size:12px;
+                        line-height:1.4;
                         padding-top:2px;">Max-von-Laue-Gymnasium Koblenz</div>
           </td>
         </tr>

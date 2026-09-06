@@ -188,31 +188,86 @@ class TestSecurityTxt(unittest.TestCase):
 
 
 class TestMailLogo(unittest.TestCase):
-    """Das Logo in der E-Mail hatte einen weissen Hintergrund eingebrannt.
+    """Das Wappen in der E-Mail - und wie es zweimal danebenging.
 
-    In der Mail sitzt es auf der navyblauen Kopfleiste - also klebte dort ein
-    weisser Kasten, im hellen wie im dunklen Modus.
+    Erst hatte es einen weissen Hintergrund eingebrannt: In der Mail sitzt es
+    auf der navyblauen Kopfleiste, dort klebte damit ein weisser Kasten.
+
+    Dann bekam es denselben Navy-Ton wie die Leiste. Auf dem Bildschirm war
+    der Uebergang unsichtbar - bis eine Mail auf einem iPhone im Dunkelmodus
+    ankam: Apple Mail faerbte die Leiste hellblau und die Schrift dunkel, nur
+    das Bild konnte es nicht anfassen. Ergebnis war derselbe Kasten, nur in
+    der anderen Richtung.
+
+    Jetzt traegt das Bild gar keinen Hintergrund mehr, sondern den hellen
+    Saum, der es auf jedem Grund traegt. Und die Mail meldet beide
+    Farbschemata an, damit Apple Mail gar nicht erst umfaerbt.
     """
 
-    def test_hintergrund_ist_navy_und_nicht_weiss(self):
+    def test_ecken_sind_durchsichtig(self):
+        """Kein eingebrannter Grund - egal welcher."""
         from PIL import Image
         from kern.mail import LOGO_DATEI
-        bild = Image.open(LOGO_DATEI).convert("RGB")
+        bild = Image.open(LOGO_DATEI).convert("RGBA")
         for ecke in ((0, 0), (bild.width - 1, 0), (0, bild.height - 1),
                      (bild.width - 1, bild.height - 1)):
             with self.subTest(ecke=ecke):
-                self.assertEqual(bild.getpixel(ecke), (14, 38, 71),
-                                 "Ecke ist nicht #0E2647 - in der Mail wäre "
-                                 "das ein Kasten auf der blauen Leiste")
+                self.assertEqual(bild.getpixel(ecke)[3], 0,
+                                 "Ecke ist nicht durchsichtig - je nachdem, "
+                                 "wie ein Mailprogramm die Kopfleiste "
+                                 "einfaerbt, klebt dort wieder ein Kasten")
 
-    def test_kopfleiste_hat_denselben_farbwert(self):
-        """Bild und Leiste müssen exakt denselben Ton haben, sonst sieht man
-        die Kante."""
+    def test_saum_traegt_das_wappen_auf_dunklem_grund(self):
+        """Ohne den hellen Saum verschwaende das dunkle Wappen auf Navy.
+
+        Genau das war das Gegenargument gegen Transparenz - der Saum ist die
+        Antwort darauf, also muss er auch wirklich da sein.
+        """
+        from PIL import Image
+        from kern.mail import LOGO_DATEI
+        bild = Image.open(LOGO_DATEI).convert("RGBA")
+
+        # Wo das Wappen anfaengt, muss Helles stehen - nicht das Dunkelblau
+        # des Schildes. Geprueft auf mehreren Hoehen, damit nicht zufaellig
+        # eine einzelne Zeile durch die hellen Aehren laeuft.
+        hell = dunkel = 0
+        for anteil in (0.35, 0.5, 0.65):
+            y = int(bild.height * anteil)
+            deckend = [x for x in range(bild.width)
+                       if bild.getpixel((x, y))[3] > 120]
+            self.assertTrue(deckend, f"Zeile {y} ist vollstaendig leer")
+            for x in (deckend[0], deckend[-1]):
+                r, g, b, _ = bild.getpixel((x, y))
+                if (r + g + b) / 3 > 140:
+                    hell += 1
+                else:
+                    dunkel += 1
+        self.assertGreater(hell, dunkel,
+                           "Der Rand des Wappens ist ueberwiegend dunkel - "
+                           "ohne hellen Saum verschwindet es auf der "
+                           "navyblauen Kopfleiste")
+
+        # Und der Saum laeuft weich aus, sonst haette er harte Treppen.
+        weich = sum(1 for x in range(0, bild.width, 2)
+                    for y in range(0, bild.height, 2)
+                    if 0 < bild.getpixel((x, y))[3] < 250)
+        self.assertGreater(weich, 200, "der Saum hat keine weichen Kanten")
+
+    def test_beide_farbschemata_sind_angemeldet(self):
+        """Der eigentliche Grund, warum Apple Mail die Farben umrechnete."""
+        from kern.mail import als_html
+        html = als_html("Betreff", "Text")
+        self.assertIn('name="color-scheme" content="light dark"', html)
+        self.assertIn('name="supported-color-schemes" content="light dark"', html)
+        self.assertIn("color-scheme:light dark", html)
+
+    def test_kopfleiste_bleibt_auch_im_dunkelmodus_navy(self):
         from kern.mail import als_html
         html = als_html("Betreff", "Text")
         self.assertIn("background:#0E2647;padding:18px 24px", html)
-        self.assertIn("background:#0E2647;", html.split("<img")[1][:400],
-                      "das Bild selbst trägt keinen Rückfall-Hintergrund")
+        self.assertIn(".kopfleiste{background:#0E2647 !important;}", html)
+        # Kein Rueckfall-Hintergrund mehr am Bild selbst - der war der Kasten.
+        self.assertNotIn("background:#0E2647;", html.split("<img")[1][:400])
 
     def test_name_steht_als_text_in_der_kopfleiste(self):
         """Wer Bilder abgeschaltet hat, soll trotzdem sehen, von wem es kommt."""

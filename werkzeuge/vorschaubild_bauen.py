@@ -191,44 +191,66 @@ def _saum_zeichnen(logo: Image.Image, staerke: float) -> Image.Image:
 
 
 def mail_logo() -> str:
-    """Das Wappen fuer die E-Mail-Kopfleiste - auf Navy, nicht auf Weiss.
+    """Das Wappen fuer die E-Mail-Kopfleiste - freistehend, mit hellem Saum.
 
-    Die alte Datei hatte einen weissen Hintergrund fest eingebrannt (kein
-    einziger durchsichtiger Punkt). In der Mail sitzt sie auf der navyblauen
-    Kopfleiste - also klebte dort ein weisser Kasten, im Hellen wie im
-    Dunkeln.
+    Die Geschichte dieser Funktion in drei Schritten, weil jeder davon einen
+    Fehler behoben und den naechsten aufgedeckt hat:
 
-    Warum nicht einfach durchsichtig? Weil Mailprogramme mit Transparenz
-    unterschiedlich umgehen und manche im Dunkelmodus die Hintergruende
-    austauschen; dann stuende ein dunkles Wappen auf dunklem Grund. Ein Bild
-    mit fest eingebautem Navy sieht ueberall gleich aus - und weil die
-    Kopfleiste denselben Farbwert traegt, ist der Uebergang unsichtbar.
+    1. Ganz frueher lag ein weisser Hintergrund fest im Bild. Auf der
+       navyblauen Kopfleiste klebte damit ein weisser Kasten.
+    2. Also bekam das Bild denselben Navy-Ton wie die Leiste. Auf dem
+       Bildschirm war der Uebergang unsichtbar - bis eine Mail auf einem
+       iPhone im Dunkelmodus ankam. Apple Mail rechnet die Farben solcher
+       Nachrichten selbst um: Die Leiste wurde hellblau, die weisse Schrift
+       dunkel. Nur das Bild konnte es nicht umfaerben, und so sass ein
+       dunkelblauer Klotz auf hellblauem Grund.
+    3. Jetzt traegt das Bild gar keinen Hintergrund mehr.
+
+    Das Gegenargument gegen Transparenz war bisher, ein dunkles Wappen
+    verschwaende auf dunklem Grund. Das stimmt - aber genau dagegen gibt es
+    den Saum, den diese Datei ohnehin schon zeichnet. Mit ihm steht das
+    Wappen auf Navy, auf Hellblau und auf Fast-Schwarz gleich gut da, und
+    ein Kasten kann gar nicht erst entstehen, egal was ein Mailprogramm mit
+    dem Hintergrund anstellt.
+
+    Der zweite Teil der Behebung steht in kern/mail.py: Die Nachricht meldet
+    jetzt beide Farbschemata an, damit Apple Mail die Farben ueberhaupt in
+    Ruhe laesst. Diese Datei ist die Absicherung fuer alle Programme, die es
+    trotzdem tun.
     """
-    navy = (14, 38, 71)                      # #0E2647, wie die Kopfleiste
     logo = _saum_entfernen(Image.open(os.path.join(BILDER, "logo.png")))
-    breite = 300                             # angezeigt mit 150 - fuer scharfe Schirme
+    breite = 300                             # angezeigt mit 72 - fuer scharfe Schirme
     hoehe = round(logo.height * breite / logo.width)
     logo = logo.resize((breite, hoehe), Image.LANCZOS)
 
-    # Ein schmaler weisser Saum. Das Wappen ist selbst dunkelblau; auf der
-    # navyblauen Leiste verschwaemme es sonst zu einem Fleck - genau der
-    # Eindruck, den der Dunkelmodus hinterliess. Auf der Website macht das
-    # eine CSS-Regel (img.wappen), in einer E-Mail gibt es die nicht: dort
+    # Der helle Saum. Das Wappen ist selbst dunkelblau; auf der navyblauen
+    # Leiste verschwaemme es sonst zu einem Fleck. Auf der Website macht das
+    # eine CSS-Regel (img.wappen), in einer E-Mail gibt es die nicht - dort
     # muss der Saum ins Bild.
-    rand = 10
-    bild = Image.new("RGB", (breite + rand * 2, hoehe + rand * 2), navy)
-    # 3.5 bezogen auf die 300 Pixel Breite dieser Datei - angezeigt wird sie
-    # mit 72, dort bleibt daraus eine feine Kante. Mehr faengt an zu leuchten.
-    saum = _saum_zeichnen(logo, 3.5)
+    # 6.0 bezogen auf die 300 Pixel Breite dieser Datei. Bei 3.5 - dem Wert
+    # von frueher, als noch ein Navy-Grund darunter lag - traegt er auf einem
+    # dunklen Grund nicht mehr; ab etwa 9 faengt er auf hellem Grund an zu
+    # leuchten. Dazwischen sieht es auf jedem Grund richtig aus.
+    rand = 12                                # Platz, damit der Saum nicht anstoesst
+    bild = Image.new("RGBA", (breite + rand * 2, hoehe + rand * 2), (0, 0, 0, 0))
+    saum = _saum_zeichnen(logo, 6.0)
     bild.paste(saum, (rand, rand), saum)
-    bild.paste(logo, (rand, rand), logo)
+    # alpha_composite statt paste: Auf durchsichtigem Grund wuerde paste die
+    # Deckung des Wappens einfach ueberschreiben und die weichen Kanten des
+    # Saums darunter wegschneiden.
+    bild.alpha_composite(logo, (rand, rand))
+
     # Das Wappen hat wenige Farben - eine Palette spart drei Viertel der
     # Groesse. Das Bild haengt an jeder einzelnen Mail, das zaehlt.
-    sparsam = bild.quantize(colors=128, method=Image.MEDIANCUT, dither=Image.NONE)
+    # FASTOCTREE statt MEDIANCUT: Nur dieses Verfahren nimmt den Alphakanal
+    # mit. Mit MEDIANCUT waere die Durchsichtigkeit weg und der Kasten
+    # zurueck - der Fehler, um den es hier ueberhaupt geht.
+    sparsam = bild.quantize(colors=128, method=Image.FASTOCTREE,
+                            dither=Image.NONE)
     ziel = os.path.join(BILDER, "logo-mail.png")
     sparsam.save(ziel, "PNG", optimize=True)
     return (f"logo-mail.png: {bild.size[0]}x{bild.size[1]}, "
-            f"{os.path.getsize(ziel) / 1024:.0f} KB, Hintergrund #0E2647")
+            f"{os.path.getsize(ziel) / 1024:.0f} KB, durchsichtig mit Saum")
 
 
 if __name__ == "__main__":
