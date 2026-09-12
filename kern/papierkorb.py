@@ -228,23 +228,66 @@ def konto_daten_loesen(db, ziel: User) -> None:
 
     # Was ohne die Person keinen Sinn mehr ergibt, geht mit.
     from kern.modelle import (
-        ActivityLog, DirectMessageRecipient, Leistung, NotificationPreference,
+        ActivityLog, Anmeldeversuch, Attendance, CalendarEventTarget,
+        ClientFehler, ContentAttachment, Dauerauftrag, DirectMessage,
+        DirectMessageRecipient, EmailChangeRequest, EmailTemplate,
+        Geraeteprofil, Leistung, MeetingPunkt, MeetingRueckmeldung,
+        NotificationPreference, Inhalt,
         PasswordResetToken, PushSubscription, UserPermission, UserPreference,
         UserSession, WhatsAppNachricht,
     )
+    # Personenbezogene Hilfsdaten haben keinen eigenen Inhalt, der im
+    # Papierkorb wiederhergestellt werden muss. Sie werden beim Kontolöschen
+    # vollständig entfernt; sonst bleibt der Fremdschlüssel am Konto hängen.
     for modell in (UserSession, UserPreference, NotificationPreference,
                    PushSubscription, PasswordResetToken, UserPermission,
-                   ActivityLog, Leistung, WhatsAppNachricht):
+                   ActivityLog, Leistung, WhatsAppNachricht, Anmeldeversuch,
+                   EmailChangeRequest, Geraeteprofil, ClientFehler):
         db.query(modell).filter(modell.user_id == ziel.id).delete(
             synchronize_session=False)
+    db.query(EmailTemplate).filter(
+        EmailTemplate.updated_by == ziel.id).update(
+            {"updated_by": None}, synchronize_session=False)
+    db.query(CalendarEvent).filter(
+        CalendarEvent.target_user_id == ziel.id).update(
+            {"target_user_id": None}, synchronize_session=False)
+    db.query(Buchung).filter(
+        Buchung.erfasser_id == ziel.id).update(
+            {"erfasser_id": None}, synchronize_session=False)
+    db.query(Dauerauftrag).filter(
+        Dauerauftrag.angelegt_von == ziel.id).update(
+            {"angelegt_von": None}, synchronize_session=False)
+    db.query(Inhalt).filter(
+        Inhalt.geaendert_von == ziel.id).update(
+            {"geaendert_von": None}, synchronize_session=False)
+    db.query(ContentAttachment).filter(
+        ContentAttachment.hochgeladen_von == ziel.id).update(
+            {"hochgeladen_von": None}, synchronize_session=False)
+    db.query(UserPermission).filter(
+        UserPermission.gesetzt_von == ziel.id).update(
+            {"gesetzt_von": None}, synchronize_session=False)
     db.query(DirectMessageRecipient).filter(
         DirectMessageRecipient.user_id == ziel.id).delete(synchronize_session=False)
+    eigene_nachrichten = [nachricht.id for nachricht in db.query(DirectMessage.id)
+                          .filter(DirectMessage.sender_id == ziel.id).all()]
+    if eigene_nachrichten:
+        db.query(DirectMessageRecipient).filter(
+            DirectMessageRecipient.message_id.in_(eigene_nachrichten)
+        ).delete(synchronize_session=False)
+        db.query(DirectMessage).filter(
+            DirectMessage.id.in_(eigene_nachrichten)
+        ).delete(synchronize_session=False)
     db.query(ApplicationReview).filter(
         ApplicationReview.user_id == ziel.id).delete(synchronize_session=False)
     db.query(TaskComment).filter(TaskComment.user_id == ziel.id).delete(
         synchronize_session=False)
     db.query(Attendance).filter(Attendance.user_id == ziel.id).delete(
         synchronize_session=False)
+    db.query(MeetingRueckmeldung).filter(
+        MeetingRueckmeldung.user_id == ziel.id).delete(synchronize_session=False)
+    db.query(MeetingPunkt).filter(
+        MeetingPunkt.user_id == ziel.id).update(
+            {"user_id": None}, synchronize_session=False)
     db.query(ProjectTeamMember).filter(
         ProjectTeamMember.user_id == ziel.id).delete(synchronize_session=False)
     db.query(CompetitionParticipant).filter(
@@ -258,5 +301,15 @@ def konto_daten_loesen(db, ziel: User) -> None:
         SuccessionCandidate.user_id == ziel.id).delete(synchronize_session=False)
     db.query(SupportMessage).filter(
         SupportMessage.sender_id == ziel.id).delete(synchronize_session=False)
+    eigene_tickets = [ticket.id for ticket in db.query(SupportTicket.id)
+                      .filter(SupportTicket.user_id == ziel.id).all()]
+    if eigene_tickets:
+        db.query(SupportMessage).filter(
+            SupportMessage.ticket_id.in_(eigene_tickets)
+        ).delete(synchronize_session=False)
+        db.query(SupportTicket).filter(
+            SupportTicket.id.in_(eigene_tickets)
+        ).delete(synchronize_session=False)
     db.query(SupportTicket).filter(
-        SupportTicket.user_id == ziel.id).delete(synchronize_session=False)
+        SupportTicket.replied_by == ziel.id).update(
+            {"replied_by": None}, synchronize_session=False)
