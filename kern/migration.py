@@ -11,6 +11,7 @@ import shutil
 from datetime import datetime
 
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import SQLAlchemyError
 
 from kern.datenbank import Base, SessionLocal, engine
 from kern.einstellungen import BACKUP_DIR, DATENBANK_DATEI
@@ -110,8 +111,18 @@ def _spalte_anhaengen(tabelle: str, name: str, typ: str, standard=None) -> bool:
             f'{_typ_fuer_datenbank(typ)}')
     if standard is not None:
         satz += f" DEFAULT {standard}"
-    with engine.begin() as verbindung:
-        verbindung.execute(text(satz))
+    try:
+        with engine.begin() as verbindung:
+            verbindung.execute(text(satz))
+    except SQLAlchemyError as problem:
+        # Website und Dashboard starten parallel. Beide koennen die Spalte
+        # beim ersten Inspect noch vermissen; gewinnt einer den ALTER-Befehl,
+        # ist der Duplicate-Column-Fehler des anderen bereits Erfolg.
+        ursache = getattr(problem, "orig", None)
+        if (getattr(ursache, "pgcode", None) == "42701"
+                or getattr(ursache, "sqlstate", None) == "42701"):
+            return False
+        raise
     return True
 
 
