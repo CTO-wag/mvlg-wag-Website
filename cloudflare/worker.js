@@ -44,7 +44,7 @@ import { SCHRIFTEN, STIL, WAPPEN, LOGO, FAVICON, ABTEILUNGEN, QUIZ_JS,
  * Die Nummer steht an drei Stellen: als Kopfzeile x-auffangnetz auf jeder
  * Antwort, die vom Worker selbst kommt, im Selbsttest und klein unten auf der
  * Fehlerseite. Bei jeder Aenderung hochzaehlen. */
-const FASSUNG = "2026-08-27-a";
+const FASSUNG = "2026-09-12-a";
 
 /* Diese Antworten kommen von Cloudflare selbst und heissen "die Anwendung war
    nicht erreichbar". Ein blankes 500 steht bewusst NICHT dabei: Das hat die
@@ -1153,7 +1153,9 @@ const ANGEBOT = liste("angebot", (b) =>
   + "</h3><p>" + maskiert(b.text || "") + "</p></div>");
 
 const PORTFOLIO = liste("portfolio", (b) =>
-  '<li class="portfolio-karte" style="--karte:'
+  '<article class="portfolio-karte" data-portfolio-slide'
+  + ' aria-roledescription="Folie"'
+  + ' style="--karte:'
   + maskiert(b.farbe || "#0E2647") + '">'
   + (b.zeitraum ? '<span class="portfolio-zeit">' + maskiert(b.zeitraum)
                   + "</span>" : "")
@@ -1161,7 +1163,7 @@ const PORTFOLIO = liste("portfolio", (b) =>
   + (b.text ? "<p>" + maskiert(b.text) + "</p>" : "")
   + (b.ergebnis ? '<p class="portfolio-ergebnis">' + maskiert(b.ergebnis)
                   + "</p>" : "")
-  + "</div></li>");
+  + "</div></article>");
 
 
 /* ------------------------------------------------------------------------- */
@@ -1502,9 +1504,20 @@ const PORTFOLIO_ABSCHNITT = PORTFOLIO ? `
   <h2>Was dabei herausgekommen ist</h2>
   <p class="meta" style="max-width:56ch;">Kein Prospekt, sondern das, was
     tats&auml;chlich passiert ist &ndash; mit Zeitraum und Ergebnis.</p>
-  <ol class="portfolio">
+  <div class="portfolio-slideshow" data-portfolio-slideshow
+       aria-roledescription="Slideshow" aria-label="Unsere Arbeit">
+    <div class="portfolio" data-portfolio-slides">
 ` + PORTFOLIO + `
-  </ol>
+    </div>
+    <div class="portfolio-steuerung">
+      <button type="button" class="portfolio-pfeil" data-portfolio-zurueck
+              aria-label="Vorherige Arbeit">&#8249;</button>
+      <div class="portfolio-punkte" data-portfolio-punkte role="tablist"
+           aria-label="Arbeiten auswählen"></div>
+      <button type="button" class="portfolio-pfeil" data-portfolio-weiter
+              aria-label="Nächste Arbeit">&#8250;</button>
+    </div>
+  </div>
 </section>` : "";
 
 
@@ -1732,6 +1745,45 @@ const SEITE = `<!doctype html>
     if (kopf && kopf.classList.contains("offen") && !kopf.contains(e.target)) {
       kopf.classList.remove("offen");
     }
+  });
+
+  /* --- Unsere Arbeit als Slideshow -------------------------------------- */
+  document.querySelectorAll("[data-portfolio-slideshow]").forEach(function (show) {
+    var folien = Array.prototype.slice.call(
+      show.querySelectorAll("[data-portfolio-slide]"));
+    var punkte = show.querySelector("[data-portfolio-punkte]");
+    if (folien.length < 2 || !punkte) { return; }
+    var aktuell = 0;
+    folien.forEach(function (_folie, index) {
+      var punkt = document.createElement("button");
+      punkt.type = "button";
+      punkt.className = "portfolio-punkt";
+      punkt.setAttribute("role", "tab");
+      punkt.setAttribute("aria-label", "Arbeit " + (index + 1) + " anzeigen");
+      punkt.addEventListener("click", function () { zeigen(index); });
+      punkte.appendChild(punkt);
+    });
+    function zeigen(index) {
+      aktuell = (index + folien.length) % folien.length;
+      folien.forEach(function (folie, folieIndex) {
+        folie.hidden = folieIndex !== aktuell;
+        folie.setAttribute("aria-hidden",
+          folieIndex === aktuell ? "false" : "true");
+      });
+      Array.prototype.forEach.call(punkte.children, function (punkt, punktIndex) {
+        punkt.setAttribute("aria-selected",
+          punktIndex === aktuell ? "true" : "false");
+      });
+    }
+    show.querySelector("[data-portfolio-zurueck]")
+      .addEventListener("click", function () { zeigen(aktuell - 1); });
+    show.querySelector("[data-portfolio-weiter]")
+      .addEventListener("click", function () { zeigen(aktuell + 1); });
+    show.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowLeft") { e.preventDefault(); zeigen(aktuell - 1); }
+      if (e.key === "ArrowRight") { e.preventDefault(); zeigen(aktuell + 1); }
+    });
+    zeigen(0);
   });
 
   /* --- Der Hinweis beim Anmelden ---------------------------------------- */

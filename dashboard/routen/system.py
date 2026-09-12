@@ -227,6 +227,7 @@ def _startseite_ansicht(a: Anmeldung, meldung=None):
                 bereiche=inhalte.BEREICHE,
                 bloecke=inhalte.alle_bloecke(a.db),
                 farben=inhalte.FARBVORSCHLAEGE,
+                farbnamen=inhalte.FARB_NAMEN,
                 mit_zeitraum=inhalte.MIT_ZEITRAUM,
                 mit_text=inhalte.MIT_TEXT,
                 mit_farbe=inhalte.MIT_FARBE,

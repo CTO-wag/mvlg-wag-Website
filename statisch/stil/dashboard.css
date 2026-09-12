@@ -564,6 +564,17 @@ html[data-theme="dark"] .dash-whatsapp:hover{ color:#3BE07B; }
 }
 .block-inhalt{ min-width:0; display:flex; flex-direction:column; gap:var(--r1); }
 .block-inaktiv{ opacity:.55; }
+.farbe-auswahl{ display:flex; align-items:center; gap:var(--r2); }
+.farbe-auswahl select{ min-width:15rem; }
+.farbe-vorschau{
+  display:inline-block; width:1.9rem; height:1.9rem; flex-shrink:0;
+  border:2px solid var(--flaeche); outline:1px solid var(--linie);
+  border-radius:50%; box-shadow:0 1px 3px rgba(8,15,26,.22);
+}
+@media (max-width:520px){
+  .farbe-auswahl{ align-items:flex-start; }
+  .farbe-auswahl select{ min-width:0; flex:1; }
+}
 
 /* --- Systemzustand ------------------------------------------------------- */
 .zustand-liste{ display:flex; flex-direction:column; gap:var(--r2); }

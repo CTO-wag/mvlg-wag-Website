@@ -324,35 +324,29 @@ html[data-theme="dark"] .quiz-option.falsch{
 }
 
 /* --- Portfolio: was die AG schon gemacht hat ----------------------------- */
-/* Eine Zeitleiste, keine Kachelwand. Bei Erfolgen zählt die Reihenfolge, und
-   eine Liste liest sich schneller als vier gleich große Kästen. */
-.portfolio{ list-style:none; margin:var(--r6) 0 0; padding:0; position:relative; }
-.portfolio::before{
-  content:""; position:absolute; left:7.5rem; top:.8rem; bottom:.8rem;
-  width:2px; background:var(--linie);
+/* Eine Karte zur Zeit: Die Erfolge bleiben vollständig sichtbar, ohne dass
+   die Startseite durch zehn Einträge unnötig lang wird. */
+.portfolio-slideshow{ margin-top:var(--r6); }
+.portfolio{
+  margin:0; padding:0; position:relative;
+  min-height:12rem;
 }
 .portfolio-karte{
   display:grid; grid-template-columns:7.5rem 1fr; gap:var(--r5);
-  align-items:start; padding:0 0 var(--r5);
-  position:relative;
+  align-items:start; padding:var(--r5);
+  position:relative; border:1px solid var(--linie);
+  border-left:4px solid var(--karte, var(--navy));
+  border-radius:var(--rund); background:var(--flaeche);
+  box-shadow:var(--schatten);
 }
-.portfolio-karte:last-child{ padding-bottom:0; }
+.portfolio-karte[hidden]{ display:none; }
 .portfolio-zeit{
   font-family:var(--schrift-mono); font-size:.76rem; letter-spacing:.04em;
   color:var(--gedaempft); text-align:right; padding-top:.35rem;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-/* Der Punkt auf der Linie. */
-.portfolio-karte::before{
-  content:""; position:absolute; left:calc(7.5rem - 4px); top:.75rem;
-  width:10px; height:10px; border-radius:50%;
-  background:var(--karte, var(--navy));
-  box-shadow:0 0 0 3px var(--bg);
-}
 .portfolio-inhalt{
   min-width:0; padding-left:var(--r2);
-  border-left:3px solid var(--karte, var(--navy));
-  padding-left:var(--r4);
 }
 .portfolio-galerie{ position:relative; margin-bottom:var(--r3); }
 .portfolio-bild{
@@ -403,12 +397,28 @@ html[data-theme="dark"] .quiz-option.falsch{
 html[data-theme="dark"] .portfolio-ergebnis{
   background:color-mix(in srgb, var(--karte, var(--navy)) 20%, var(--flaeche));
 }
+.portfolio-steuerung{
+  display:flex; align-items:center; justify-content:center;
+  gap:var(--r4); margin-top:var(--r4);
+}
+.portfolio-pfeil{
+  display:flex; align-items:center; justify-content:center;
+  width:2.5rem; height:2.5rem; padding:0; border:1px solid var(--linie);
+  border-radius:50%; background:var(--flaeche); color:var(--navy);
+  font-size:1.8rem; line-height:1; cursor:pointer;
+}
+.portfolio-pfeil:hover{ background:var(--navy-hauch); border-color:var(--navy); }
+.portfolio-punkte{ display:flex; align-items:center; gap:.45rem; }
+.portfolio-punkt{
+  width:.65rem; height:.65rem; padding:0; border:0; border-radius:50%;
+  background:var(--linie); cursor:pointer;
+}
+.portfolio-punkt[aria-selected="true"]{
+  background:var(--amber); transform:scale(1.25);
+}
 @media (max-width:720px){
-  .portfolio::before{ left:3px; }
-  .portfolio-karte{ grid-template-columns:1fr; gap:var(--r1); padding-left:var(--r5); }
-  .portfolio-karte::before{ left:-1px; top:.4rem; }
+  .portfolio-karte{ grid-template-columns:1fr; gap:var(--r1); padding:var(--r4); }
   .portfolio-zeit{ text-align:left; padding-top:0; }
-  .portfolio-inhalt{ border-left:none; padding-left:0; }
   .bild-dialog-pfeil{ width:2.4rem; height:2.4rem; }
   .bild-dialog-zurueck{ left:.5rem; }
   .bild-dialog-weiter{ right:.5rem; }

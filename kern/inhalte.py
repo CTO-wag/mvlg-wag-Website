@@ -44,6 +44,15 @@ MIT_BILD = ("portfolio", "angebot")
 
 FARBVORSCHLAEGE = ("#0E2647", "#B7791F", "#2F855A", "#B83280", "#2B6CB0",
                    "#805AD5", "#C53030")
+FARB_NAMEN = {
+    "#0E2647": "Marineblau",
+    "#B7791F": "Bernstein",
+    "#2F855A": "Grün",
+    "#B83280": "Pink",
+    "#2B6CB0": "Blau",
+    "#805AD5": "Violett",
+    "#C53030": "Rot",
+}
 
 # Die Seite wird oft aufgerufen und selten geaendert - deshalb kurz merken.
 _CACHE_SEKUNDEN = 20

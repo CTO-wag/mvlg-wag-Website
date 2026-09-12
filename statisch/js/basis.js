@@ -116,6 +116,68 @@
     if (e.target.closest('[data-bild-weiter]')) { bildDialogZeige(1); }
   });
 
+  /* --- Unsere Arbeit als Slideshow -------------------------------------- */
+  function portfolioshowsStarten() {
+    document.querySelectorAll('[data-portfolio-slideshow]').forEach(function (show) {
+      var folien = Array.prototype.slice.call(
+        show.querySelectorAll('[data-portfolio-slide]'));
+      var punkte = show.querySelector('[data-portfolio-punkte]');
+      if (folien.length < 2 || !punkte) { return; }
+      var aktuell = 0;
+      var timer = null;
+      var reduziert = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      folien.forEach(function (_folie, index) {
+        var punkt = document.createElement('button');
+        punkt.type = 'button';
+        punkt.className = 'portfolio-punkt';
+        punkt.setAttribute('role', 'tab');
+        punkt.setAttribute('aria-label', 'Arbeit ' + (index + 1) + ' anzeigen');
+        punkt.addEventListener('click', function () { zeigen(index); });
+        punkte.appendChild(punkt);
+      });
+
+      function zeigen(index) {
+        aktuell = (index + folien.length) % folien.length;
+        folien.forEach(function (folie, folieIndex) {
+          folie.hidden = folieIndex !== aktuell;
+          folie.setAttribute('aria-hidden', folieIndex === aktuell ? 'false' : 'true');
+        });
+        Array.prototype.forEach.call(punkte.children, function (punkt, punktIndex) {
+          punkt.setAttribute('aria-selected', punktIndex === aktuell ? 'true' : 'false');
+          punkt.tabIndex = punktIndex === aktuell ? 0 : -1;
+        });
+      }
+      function weiter() { zeigen(aktuell + 1); }
+      function timerStarten() {
+        if (!reduziert && !timer) { timer = window.setInterval(weiter, 7000); }
+      }
+      function timerStoppen() {
+        if (timer) { window.clearInterval(timer); timer = null; }
+      }
+
+      show.querySelector('[data-portfolio-zurueck]')
+        .addEventListener('click', function () { zeigen(aktuell - 1); });
+      show.querySelector('[data-portfolio-weiter]')
+        .addEventListener('click', weiter);
+      show.addEventListener('mouseenter', timerStoppen);
+      show.addEventListener('mouseleave', timerStarten);
+      show.addEventListener('focusin', timerStoppen);
+      show.addEventListener('focusout', function (e) {
+        if (!show.contains(e.relatedTarget)) { timerStarten(); }
+      });
+      show.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); zeigen(aktuell - 1); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); weiter(); }
+      });
+      zeigen(0);
+      timerStarten();
+    });
+  }
+  if (document.readyState !== 'loading') { portfolioshowsStarten(); }
+  else { document.addEventListener('DOMContentLoaded', portfolioshowsStarten); }
+
   /* --- Aus einer Fehlermeldung heraus den Support erreichen ---------------
      Gemeldet: Wer sich bewirbt und dabei gegen einen Fehler läuft, versucht
      es zweimal und gibt auf. Dass es einen Kontakt gibt, steht auf der

@@ -142,6 +142,15 @@
   document.addEventListener('input', function (e) {
     if (e.target.id === 'such-feld') { suchen(false); }
   });
+  function farbvorschauAktualisieren(wahl) {
+    var vorschau = wahl.closest('.farbe-auswahl') &&
+      wahl.closest('.farbe-auswahl').querySelector('[data-farbvorschau]');
+    if (vorschau) { vorschau.style.backgroundColor = wahl.value; }
+  }
+  document.addEventListener('change', function (e) {
+    if (e.target.matches('[data-farbwahl]')) { farbvorschauAktualisieren(e.target); }
+  });
+  document.querySelectorAll('[data-farbwahl]').forEach(farbvorschauAktualisieren);
   document.addEventListener('keydown', function (e) {
     if (e.target.id === 'such-feld') { suchTaste(e); return; }
     /* Strg+K springt ins Suchfeld - der Griff, den jedes Werkzeug hat. */

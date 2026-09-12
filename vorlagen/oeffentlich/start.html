@@ -128,9 +128,15 @@
   <p class="meta" style="max-width:56ch;">Kein Prospekt, sondern das, was
     tatsächlich passiert ist – mit Zeitraum und Ergebnis.</p>
 
-  <ol class="portfolio">
+  <div class="portfolio-slideshow" data-portfolio-slideshow
+       aria-roledescription="Slideshow" aria-label="Unsere Arbeit">
+    <div class="portfolio" data-portfolio-slides>
     {% for eintrag in portfolio %}
-    <li class="portfolio-karte" style="--karte:{{ eintrag.farbe or '#0E2647' }}">
+    <article class="portfolio-karte" data-portfolio-slide
+             aria-roledescription="Folie"
+             aria-label="{{ loop.index }} von {{ portfolio|length }}"
+             {% if not loop.first %}hidden{% endif %}
+             style="--karte:{{ eintrag.farbe or '#0E2647' }}">
       {% if eintrag.zeitraum %}
       <span class="portfolio-zeit">{{ eintrag.zeitraum }}</span>
       {% endif %}
@@ -155,9 +161,20 @@
         <p class="portfolio-ergebnis">{{ eintrag.ergebnis }}</p>
         {% endif %}
       </div>
-    </li>
+    </article>
     {% endfor %}
-  </ol>
+    </div>
+    {% if portfolio|length > 1 %}
+    <div class="portfolio-steuerung">
+      <button type="button" class="portfolio-pfeil" data-portfolio-zurueck
+              aria-label="Vorherige Arbeit">&#8249;</button>
+      <div class="portfolio-punkte" data-portfolio-punkte role="tablist"
+           aria-label="Arbeiten auswählen"></div>
+      <button type="button" class="portfolio-pfeil" data-portfolio-weiter
+              aria-label="Nächste Arbeit">&#8250;</button>
+    </div>
+    {% endif %}
+  </div>
 </section>
 {% endif %}
 

@@ -76,7 +76,23 @@
             {% endif %}
             {% if bereich in mit_farbe %}
             <label>Farbe
-              <input type="color" name="farbe" value="{{ b.farbe or '#0E2647' }}"></label>
+              <span class="farbe-auswahl">
+                <select name="farbe" data-farbwahl>
+                  {% set aktuelle_farbe = b.farbe or '#0E2647' %}
+                  {% if aktuelle_farbe not in farbnamen %}
+                  <option value="{{ aktuelle_farbe }}" selected>{{ aktuelle_farbe }}</option>
+                  {% endif %}
+                  {% for f in farben %}
+                  <option value="{{ f }}" {% if aktuelle_farbe == f %}selected{% endif %}>
+                    {{ farbnamen[f] }} ({{ f }})
+                  </option>
+                  {% endfor %}
+                </select>
+                <span class="farbe-vorschau" data-farbvorschau
+                      style="background:{{ aktuelle_farbe }};"
+                      aria-label="Vorschau der ausgewählten Farbe"></span>
+              </span>
+            </label>
             {% endif %}
             {% if bereich in mit_bild %}
             <label class="voll">Bilder <span class="meta">Mehrere PNG, JPG oder WebP möglich</span>
@@ -132,9 +148,16 @@
       {% endif %}
       {% if bereich in mit_farbe %}
       <label>Farbe
-        <select name="farbe">
-          {% for f in farben %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
-        </select>
+        <span class="farbe-auswahl">
+          <select name="farbe" data-farbwahl>
+            {% for f in farben %}
+            <option value="{{ f }}">{{ farbnamen[f] }} ({{ f }})</option>
+            {% endfor %}
+          </select>
+          <span class="farbe-vorschau" data-farbvorschau
+                style="background:{{ farben[0] }};"
+                aria-label="Vorschau der ausgewählten Farbe"></span>
+        </span>
       </label>
       {% endif %}
       {% if bereich in mit_bild %}
