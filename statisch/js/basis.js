@@ -128,6 +128,7 @@
       if (folien.length < 2 || !punkte) { return; }
       var aktuell = 0;
       var timer = null;
+      var autoAktiv = true;
       var reduziert = window.matchMedia &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -137,7 +138,9 @@
         punkt.className = 'portfolio-punkt';
         punkt.setAttribute('role', 'tab');
         punkt.setAttribute('aria-label', 'Arbeit ' + (index + 1) + ' anzeigen');
-        punkt.addEventListener('click', function () { zeigen(index); });
+        punkt.addEventListener('click', function () {
+          manuellSteuern(function () { zeigen(index); });
+        });
         punkte.appendChild(punkt);
       });
 
@@ -156,16 +159,25 @@
         if (!bildDialogIstOffen) { zeigen(aktuell + 1); }
       }
       function timerStarten() {
-        if (!reduziert && !timer) { timer = window.setInterval(weiter, 7000); }
+        if (autoAktiv && !reduziert && !timer) {
+          timer = window.setInterval(weiter, 7000);
+        }
       }
       function timerStoppen() {
         if (timer) { window.clearInterval(timer); timer = null; }
       }
+      function manuellSteuern(aktion) {
+        autoAktiv = false;
+        timerStoppen();
+        aktion();
+      }
 
       show.querySelector('[data-portfolio-zurueck]')
-        .addEventListener('click', function () { zeigen(aktuell - 1); });
+        .addEventListener('click', function () {
+          manuellSteuern(function () { zeigen(aktuell - 1); });
+        });
       show.querySelector('[data-portfolio-weiter]')
-        .addEventListener('click', weiter);
+        .addEventListener('click', function () { manuellSteuern(weiter); });
       show.addEventListener('mouseenter', timerStoppen);
       show.addEventListener('mouseleave', timerStarten);
       show.addEventListener('focusin', timerStoppen);
@@ -173,8 +185,14 @@
         if (!show.contains(e.relatedTarget)) { timerStarten(); }
       });
       show.addEventListener('keydown', function (e) {
-        if (e.key === 'ArrowLeft') { e.preventDefault(); zeigen(aktuell - 1); }
-        if (e.key === 'ArrowRight') { e.preventDefault(); weiter(); }
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          manuellSteuern(function () { zeigen(aktuell - 1); });
+        }
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          manuellSteuern(weiter);
+        }
       });
       zeigen(0);
       timerStarten();

@@ -1755,6 +1755,7 @@ const SEITE = `<!doctype html>
     var punkte = show.querySelector("[data-portfolio-punkte]");
     if (folien.length < 2 || !punkte) { return; }
     var aktuell = 0;
+    var autoAktiv = true;
     folien.forEach(function (_folie, index) {
       var punkt = document.createElement("button");
       punkt.type = "button";
@@ -1777,14 +1778,28 @@ const SEITE = `<!doctype html>
       });
     }
     show.querySelector("[data-portfolio-zurueck]")
-      .addEventListener("click", function () { zeigen(aktuell - 1); });
+      .addEventListener("click", function () {
+        autoAktiv = false;
+        zeigen(aktuell - 1);
+      });
     show.querySelector("[data-portfolio-weiter]")
       .addEventListener("click", function () {
-        if (!bildDialogIstOffen) { zeigen(aktuell + 1); }
+        if (!bildDialogIstOffen) {
+          autoAktiv = false;
+          zeigen(aktuell + 1);
+        }
       });
     show.addEventListener("keydown", function (e) {
-      if (e.key === "ArrowLeft") { e.preventDefault(); zeigen(aktuell - 1); }
-      if (e.key === "ArrowRight") { e.preventDefault(); zeigen(aktuell + 1); }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        autoAktiv = false;
+        zeigen(aktuell - 1);
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        autoAktiv = false;
+        zeigen(aktuell + 1);
+      }
     });
     zeigen(0);
   });

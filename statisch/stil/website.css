@@ -405,8 +405,15 @@ html[data-theme="dark"] .portfolio-ergebnis{
   display:flex; align-items:center; justify-content:center;
   width:2.5rem; height:2.5rem; padding:0; border:1px solid var(--linie);
   border-radius:50%; background:var(--flaeche); color:var(--navy);
-  font-size:1.8rem; line-height:1; cursor:pointer;
+  font-size:0; line-height:1; cursor:pointer;
 }
+.portfolio-pfeil::before{
+  font-family:Arial, sans-serif; font-size:1.8rem; font-weight:400;
+  line-height:1; transform:translateY(-.06em);
+}
+.portfolio-pfeil[data-portfolio-zurueck]::before{ content:"‹"; }
+.portfolio-pfeil[data-portfolio-weiter]::before{ content:"›"; }
+.portfolio-pfeil:active::before{ transform:translateY(-.06em); }
 .portfolio-pfeil:hover{ background:var(--navy-hauch); border-color:var(--navy); }
 .portfolio-punkte{ display:flex; align-items:center; gap:.45rem; }
 .portfolio-punkt{
