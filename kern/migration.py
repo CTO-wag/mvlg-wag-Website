@@ -242,6 +242,8 @@ def _neue_spalten() -> int:
         # seiten_inhalte: Portfolio-Angaben
         ("seiten_inhalte", "zeitraum", "VARCHAR(60)", None),
         ("seiten_inhalte", "ergebnis", "VARCHAR(120)", None),
+        ("seiten_inhalte", "bild_speichername", "VARCHAR(80)", None),
+        ("seiten_inhalte", "bild_alt", "VARCHAR(160)", None),
         # push_subscriptions: Website und Dashboard duerfen sich beide
         # anmelden. Woher die Anmeldung kam und welches Geraet dahintersteckt,
         # steht ab jetzt dabei - sonst bekaeme dasselbe Handy jede Meldung

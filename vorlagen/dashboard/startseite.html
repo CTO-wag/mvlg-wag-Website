@@ -58,6 +58,7 @@
             {% if b.text %}<br><span class="meta">{{ b.text|truncate(110) }}</span>{% endif %}
           </summary>
           <form hx-post="/dashboard/startseite/{{ b.id }}/aendern" hx-target="#tab-inhalt"
+                enctype="multipart/form-data"
                 class="formular" style="margin-top:var(--r3);">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <label class="voll">Titel
@@ -76,6 +77,21 @@
             {% if bereich in mit_farbe %}
             <label>Farbe
               <input type="color" name="farbe" value="{{ b.farbe or '#0E2647' }}"></label>
+            {% endif %}
+            {% if bereich in mit_bild %}
+            <label class="voll">Bild <span class="meta">PNG, JPG oder WebP, optional</span>
+              <input type="file" name="bild" accept="image/png,image/jpeg,image/webp">
+            </label>
+            <label class="voll">Bildbeschreibung <span class="meta">für Screenreader</span>
+              <input type="text" name="bild_alt" value="{{ b.bild_alt or '' }}" maxlength="160"
+                     placeholder="Kurze Beschreibung des Bildes">
+            </label>
+            {% if b.bild_speichername %}
+            <label class="haken voll">
+              <input type="checkbox" name="bild_loeschen" value="1">
+              <span>Vorhandenes Bild entfernen</span>
+            </label>
+            {% endif %}
             {% endif %}
             <label class="haken voll">
               <input type="checkbox" name="aktiv" value="1" {% if b.aktiv %}checked{% endif %}>
@@ -98,7 +114,7 @@
 
   <details style="margin-top:var(--r4);" {% if bereich == "portfolio" and not liste %}open{% endif %}>
     <summary class="meta" style="cursor:pointer;">Eintrag hinzufügen</summary>
-    <form hx-post="/dashboard/startseite" hx-target="#tab-inhalt" class="formular"
+    <form hx-post="/dashboard/startseite" hx-target="#tab-inhalt" enctype="multipart/form-data" class="formular"
           style="margin-top:var(--r3);">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="bereich" value="{{ bereich }}">
@@ -119,6 +135,14 @@
         <select name="farbe">
           {% for f in farben %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
         </select>
+      </label>
+      {% endif %}
+      {% if bereich in mit_bild %}
+      <label class="voll">Bild <span class="meta">PNG, JPG oder WebP, optional</span>
+        <input type="file" name="bild" accept="image/png,image/jpeg,image/webp">
+      </label>
+      <label class="voll">Bildbeschreibung <span class="meta">für Screenreader</span>
+        <input type="text" name="bild_alt" maxlength="160" placeholder="Kurze Beschreibung des Bildes">
       </label>
       {% endif %}
       <div class="formular-fuss"><button type="submit">Hinzufügen</button></div>

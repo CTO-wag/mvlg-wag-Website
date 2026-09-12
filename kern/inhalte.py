@@ -39,6 +39,7 @@ BEREICHE = {
 MIT_ZEITRAUM = ("portfolio",)
 MIT_TEXT = ("portfolio", "angebot", "stufen")
 MIT_FARBE = ("portfolio", "angebot")
+MIT_BILD = ("portfolio", "angebot")
 
 FARBVORSCHLAEGE = ("#0E2647", "#B7791F", "#2F855A", "#B83280", "#2B6CB0",
                    "#805AD5", "#C53030")
@@ -68,6 +69,8 @@ def bloecke(bereich: str, nur_aktive: bool = True) -> list:
         daten = [{"id": b.id, "titel": b.titel, "text": b.text or "",
                   "farbe": b.farbe or "", "zeitraum": b.zeitraum or "",
                   "ergebnis": b.ergebnis or "",
+                  "bild_speichername": b.bild_speichername or "",
+                  "bild_alt": b.bild_alt or "",
                   "reihenfolge": b.reihenfolge, "aktiv": bool(b.aktiv)}
                  for b in abfrage.order_by(Inhalt.reihenfolge, Inhalt.id).all()]
     with _sperre:

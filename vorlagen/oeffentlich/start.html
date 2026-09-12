@@ -104,6 +104,10 @@
   <div class="raster-2" style="margin-top:var(--r6);">
     {% for karte in angebot %}
     <div class="panel arbeit-karte" style="--karte:{{ karte.farbe or '#0E2647' }}">
+      {% if karte.bild_speichername %}
+      <img src="/bilder/startseite/{{ karte.bild_speichername }}" alt="{{ karte.bild_alt or karte.titel }}"
+           loading="lazy" decoding="async">
+      {% endif %}
       <h3>{{ karte.titel }}</h3>
       <p>{{ karte.text }}</p>
     </div>
@@ -127,6 +131,10 @@
   <ol class="portfolio">
     {% for eintrag in portfolio %}
     <li class="portfolio-karte" style="--karte:{{ eintrag.farbe or '#0E2647' }}">
+      {% if eintrag.bild_speichername %}
+      <img src="/bilder/startseite/{{ eintrag.bild_speichername }}" alt="{{ eintrag.bild_alt or eintrag.titel }}"
+           loading="lazy" decoding="async">
+      {% endif %}
       {% if eintrag.zeitraum %}
       <span class="portfolio-zeit">{{ eintrag.zeitraum }}</span>
       {% endif %}

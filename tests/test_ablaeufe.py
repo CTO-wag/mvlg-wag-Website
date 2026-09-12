@@ -148,6 +148,29 @@ class TestAblaeufe(unittest.TestCase):
         self.senden(f"/dashboard/startseite/{block_id}/loeschen")
         self.assertIsNone(self.erstes(Inhalt, titel="Probeeintrag"))
 
+    def test_startseitenbild(self):
+        bild = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+                b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00"
+                b"\x1f\x15\xc4\x89\x00\x00\x00\x0cIDAT\x08\xd7c\xf8\xcf"
+                b"\xc0\xf0\x1f\x00\x05\x00\x01\xff\x89\x99=\x1d\x00\x00"
+                b"\x00\x00IEND\xaeB`\x82")
+        antwort = self.dash.post(
+            "/dashboard/startseite",
+            data={"csrf": self.csrf, "bereich": "portfolio",
+                  "titel": "Bildbeitrag", "bild_alt": "Testbild"},
+            files={"bild": ("test.png", bild, "image/png")})
+        self.assertEqual(antwort.status_code, 200)
+        block_id = self.erstes(Inhalt, titel="Bildbeitrag")
+        self.assertIsNotNone(block_id)
+        db = SessionLocal()
+        block = db.get(Inhalt, block_id)
+        speichername = block.bild_speichername
+        db.close()
+        self.assertTrue(speichername)
+        self.assertIn(f"/bilder/startseite/{speichername}", self.web.get("/").text)
+        self.assertEqual(self.web.get(f"/bilder/startseite/{speichername}").status_code, 200)
+        self.senden(f"/dashboard/startseite/{block_id}/loeschen")
+
     # --- Kassenbuch --------------------------------------------------------
     def test_kassenbuch(self):
         self.senden("/dashboard/kassenbuch", zweck="Probebuchung", betrag="12,50",

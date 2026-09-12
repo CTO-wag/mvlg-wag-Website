@@ -856,6 +856,8 @@ class Inhalt(Base):
     bereich = Column(String(30), nullable=False, index=True, default="portfolio")
     titel = Column(String(160), nullable=False)
     text = Column(Text, nullable=True)
+    bild_speichername = Column(String(80), nullable=True)
+    bild_alt = Column(String(160), nullable=True)
     # Bleibt als Spalte bestehen, wird aber nicht mehr benutzt: die Startseite
     # kommt ohne Bildzeichen aus. Eine Spalte zu loeschen waere mehr Risiko
     # als Nutzen - sie stoert niemanden.

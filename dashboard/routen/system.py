@@ -1,8 +1,9 @@
 """Rollen, Abteilungen, Startseite, Kassenbuch, Datenbank, Papierkorb, Sicherheit."""
 
 from datetime import date, timedelta
+import secrets
 
-from fastapi import APIRouter, Depends, Form
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import func, inspect
 
@@ -10,7 +11,7 @@ from dashboard.hilfen import (
     als_csv, Anmeldung, datum, fehler, gut, info, papierkorb_hinweis, teil, zahl,
     warnung,
 )
-from kern import inhalte, kasse, papierkorb, protokoll, sicherung, zustand
+from kern import inhalte, kasse, papierkorb, protokoll, sicherung, speicher, zustand
 from kern import einstellungen as cfg
 from kern.datenbank import Base, engine
 from kern.modelle import (
@@ -228,6 +229,7 @@ def _startseite_ansicht(a: Anmeldung, meldung=None):
                 mit_zeitraum=inhalte.MIT_ZEITRAUM,
                 mit_text=inhalte.MIT_TEXT,
                 mit_farbe=inhalte.MIT_FARBE,
+                mit_bild=inhalte.MIT_BILD,
                 meldung=meldung)
 
 
@@ -237,10 +239,28 @@ def startseite(a: Anmeldung = Depends(Anmeldung.pflicht)):
     return _startseite_ansicht(a)
 
 
+async def _bild_hochladen(datei: UploadFile):
+    if not datei or not datei.filename:
+        return None
+    inhalt = await datei.read()
+    if len(inhalt) > cfg.MAX_REDAKTION_BYTES:
+        raise ValueError(
+            f"Das Bild ist zu groß (höchstens "
+            f"{cfg.MAX_REDAKTION_BYTES // 1024 // 1024} MB).")
+    endung = cfg.ERLAUBTE_BILDTYPEN.get(datei.content_type or "")
+    if not endung:
+        raise ValueError("Erlaubt sind PNG, JPG und WebP.")
+    speichername = secrets.token_hex(16) + endung
+    await speicher.ablegen_aus_route(speicher.REDAKTION, speichername,
+                                     inhalt, datei.content_type)
+    return speichername
+
+
 @router.post("/startseite")
-def block_anlegen(bereich: str = Form(""), titel: str = Form(""),
+async def block_anlegen(bereich: str = Form(""), titel: str = Form(""),
                   text: str = Form(""), farbe: str = Form(""),
                   zeitraum: str = Form(""), ergebnis: str = Form(""),
+                  bild_alt: str = Form(""), bild: UploadFile = File(None),
                   csrf: str = Form(""),
                   a: Anmeldung = Depends(Anmeldung.pflicht)):
     a.verlange("seiteninhalte")
@@ -250,9 +270,15 @@ def block_anlegen(bereich: str = Form(""), titel: str = Form(""),
     titel_ = sauber(titel)[:160]
     if not titel_:
         return _startseite_ansicht(a, fehler("Ohne Titel geht es nicht."))
-    inhalte.anlegen(a.db, bereich, titel_, sauber(text)[:2000],
-                    _farbe_pruefen(farbe, ""), sauber(zeitraum)[:60],
-                    sauber(ergebnis)[:120], a.user.id)
+    try:
+        bildname = await _bild_hochladen(bild)
+    except (ValueError, speicher.SpeicherFehler) as problem:
+        return _startseite_ansicht(a, fehler(str(problem)))
+    block = inhalte.anlegen(a.db, bereich, titel_, sauber(text)[:2000],
+                            _farbe_pruefen(farbe, ""), sauber(zeitraum)[:60],
+                            sauber(ergebnis)[:120], a.user.id)
+    block.bild_speichername = bildname
+    block.bild_alt = sauber(bild_alt)[:160] or titel_ if bildname else None
     a.db.commit()
     inhalte.verwerfen()
     hinweis = ("Eintrag hinzugefügt – er steht ab sofort auf der Startseite."
@@ -263,9 +289,11 @@ def block_anlegen(bereich: str = Form(""), titel: str = Form(""),
 
 
 @router.post("/startseite/{block_id}/aendern")
-def block_aendern(block_id: int, titel: str = Form(""), text: str = Form(""),
+async def block_aendern(block_id: int, titel: str = Form(""), text: str = Form(""),
                   farbe: str = Form(""), zeitraum: str = Form(""),
                   ergebnis: str = Form(""), aktiv: str = Form(""),
+                  bild_alt: str = Form(""), bild_loeschen: str = Form(""),
+                  bild: UploadFile = File(None),
                   csrf: str = Form(""),
                   a: Anmeldung = Depends(Anmeldung.pflicht)):
     a.verlange("seiteninhalte")
@@ -273,16 +301,31 @@ def block_aendern(block_id: int, titel: str = Form(""), text: str = Form(""),
     block = a.db.get(Inhalt, block_id)
     if not block:
         return _startseite_ansicht(a, fehler("Diesen Block gibt es nicht mehr."))
+    alte_bilddatei = block.bild_speichername
+    try:
+        neue_bilddatei = await _bild_hochladen(bild)
+    except (ValueError, speicher.SpeicherFehler) as problem:
+        return _startseite_ansicht(a, fehler(str(problem)))
     if sauber(titel):
         block.titel = sauber(titel)[:160]
     block.text = sauber(text)[:2000] or None
     block.farbe = _farbe_pruefen(farbe, "") or None
     block.zeitraum = sauber(zeitraum)[:60] or None
     block.ergebnis = sauber(ergebnis)[:120] or None
+    if neue_bilddatei:
+        block.bild_speichername = neue_bilddatei
+        block.bild_alt = sauber(bild_alt)[:160] or block.titel
+    elif bild_loeschen and alte_bilddatei:
+        block.bild_speichername = None
+        block.bild_alt = None
+    elif block.bild_speichername:
+        block.bild_alt = sauber(bild_alt)[:160] or block.bild_alt or block.titel
     block.aktiv = 1 if aktiv else 0
     block.geaendert_von = a.user.id
     block.updated_at = utcnow()
     a.db.commit()
+    if (neue_bilddatei or bild_loeschen) and alte_bilddatei:
+        speicher.entfernen(speicher.REDAKTION, alte_bilddatei)
     inhalte.verwerfen()
     return _startseite_ansicht(a, gut("Gespeichert."))
 

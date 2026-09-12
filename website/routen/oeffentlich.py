@@ -7,15 +7,23 @@ from fastapi.responses import (
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from kern import benachrichtigung, inhalte
+from kern import benachrichtigung, inhalte, speicher
 from kern import einstellungen as cfg
 from kern.datenbank import hole_db
-from kern.modelle import ContactMessage
+from kern.modelle import ContactMessage, Inhalt
 from kern.sitzung import angemeldete_person, csrf_gueltig, csrf_token
 from kern.text import email_gueltig, email_normal, kuerzen, sauber
 from kern.vorlagen import zeige
 
 router = APIRouter()
+
+
+@router.get("/bilder/startseite/{speichername}")
+def startseitenbild(speichername: str, db: Session = Depends(hole_db)):
+    if not db.query(Inhalt.id).filter(Inhalt.bild_speichername == speichername,
+                                      Inhalt.aktiv == 1).first():
+        return Response("Nicht gefunden", status_code=404, media_type="text/plain")
+    return speicher.antwort(speicher.REDAKTION, speichername)
 
 #  Quiz
 #  Die Fragen stehen hier und nicht in der Datenbank: sie sind Teil der
