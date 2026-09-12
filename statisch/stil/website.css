@@ -410,11 +410,15 @@ html[data-theme="dark"] .portfolio-ergebnis{
 .portfolio-pfeil:hover{ background:var(--navy-hauch); border-color:var(--navy); }
 .portfolio-punkte{ display:flex; align-items:center; gap:.45rem; }
 .portfolio-punkt{
-  width:.65rem; height:.65rem; padding:0; border:0; border-radius:50%;
-  background:var(--linie); cursor:pointer;
+  width:.55rem; min-width:.55rem; height:.55rem; min-height:.55rem;
+  padding:0; border:0; border-radius:50%;
+  background:var(--gedaempft-2); cursor:pointer; opacity:.55;
+  transition:width var(--tempo) ease, border-radius var(--tempo) ease,
+             opacity var(--tempo) ease, background var(--tempo) ease;
 }
 .portfolio-punkt[aria-selected="true"]{
-  background:var(--amber); transform:scale(1.25);
+  width:1.8rem; background:var(--amber); border-radius:var(--rund-voll);
+  opacity:1;
 }
 @media (max-width:720px){
   .portfolio-karte{ grid-template-columns:1fr; gap:var(--r1); padding:var(--r4); }

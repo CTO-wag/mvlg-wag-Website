@@ -1748,6 +1748,7 @@ const SEITE = `<!doctype html>
   });
 
   /* --- Unsere Arbeit als Slideshow -------------------------------------- */
+  var bildDialogIstOffen = false;
   document.querySelectorAll("[data-portfolio-slideshow]").forEach(function (show) {
     var folien = Array.prototype.slice.call(
       show.querySelectorAll("[data-portfolio-slide]"));
@@ -1778,7 +1779,9 @@ const SEITE = `<!doctype html>
     show.querySelector("[data-portfolio-zurueck]")
       .addEventListener("click", function () { zeigen(aktuell - 1); });
     show.querySelector("[data-portfolio-weiter]")
-      .addEventListener("click", function () { zeigen(aktuell + 1); });
+      .addEventListener("click", function () {
+        if (!bildDialogIstOffen) { zeigen(aktuell + 1); }
+      });
     show.addEventListener("keydown", function (e) {
       if (e.key === "ArrowLeft") { e.preventDefault(); zeigen(aktuell - 1); }
       if (e.key === "ArrowRight") { e.preventDefault(); zeigen(aktuell + 1); }

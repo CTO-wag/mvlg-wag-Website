@@ -64,6 +64,7 @@
   /* --- Startseiten-Bilder als Slideshow --------------------------------- */
   var bildDialogBilder = [];
   var bildDialogIndex = 0;
+  var bildDialogIstOffen = false;
   function bildDialogAktualisieren() {
     var dialog = document.querySelector('[data-bild-dialog]');
     var bild = dialog && dialog.querySelector('[data-bild-dialog-bild]');
@@ -81,6 +82,7 @@
     var dialog = document.querySelector('[data-bild-dialog]');
     if (!dialog) { return; }
     dialog.hidden = false;
+    bildDialogIstOffen = true;
     bildDialogAktualisieren();
     document.body.style.overflow = 'hidden';
     dialog.querySelector('[data-bild-schliessen]').focus();
@@ -89,6 +91,7 @@
     var dialog = document.querySelector('[data-bild-dialog]');
     if (!dialog) { return; }
     dialog.hidden = true;
+    bildDialogIstOffen = false;
     document.body.style.overflow = '';
     bildDialogBilder = [];
   }
@@ -149,7 +152,9 @@
           punkt.tabIndex = punktIndex === aktuell ? 0 : -1;
         });
       }
-      function weiter() { zeigen(aktuell + 1); }
+      function weiter() {
+        if (!bildDialogIstOffen) { zeigen(aktuell + 1); }
+      }
       function timerStarten() {
         if (!reduziert && !timer) { timer = window.setInterval(weiter, 7000); }
       }
