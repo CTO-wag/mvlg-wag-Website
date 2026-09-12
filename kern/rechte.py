@@ -282,6 +282,10 @@ def rollen(nur_cache: bool = False) -> dict:
                                        protected=False, beschreibung="")
             with _sperre:
                 _rollen_cache = daten
+            # The cache may be invalidated by another thread immediately
+            # after assignment. Return the local snapshot instead of reading
+            # the mutable cache again and accidentally returning None.
+            return daten
         except Exception:
             # Vor der ersten Migration gibt es die Tabelle noch nicht.
             return {k: dict(v, label=LABELS.get(k, k), rang=ROLE_RANG.get(k, 10),
