@@ -11,6 +11,7 @@ unveraendert uebernommen - die Seite sah nach dem Umstieg also genauso aus
 wie vorher.
 """
 
+import json
 import threading
 import time
 
@@ -71,11 +72,29 @@ def bloecke(bereich: str, nur_aktive: bool = True) -> list:
                   "ergebnis": b.ergebnis or "",
                   "bild_speichername": b.bild_speichername or "",
                   "bild_alt": b.bild_alt or "",
+                  "bilder": _bilder(b),
                   "reihenfolge": b.reihenfolge, "aktiv": bool(b.aktiv)}
                  for b in abfrage.order_by(Inhalt.reihenfolge, Inhalt.id).all()]
     with _sperre:
         _cache[schluessel] = (daten, time.monotonic())
     return daten
+
+
+def _bilder(block: Inhalt) -> list:
+    """Alle Bilder eines Blocks, inklusive des alten Einzelbild-Feldes."""
+    try:
+        bilder = json.loads(block.bilder or "[]")
+    except (TypeError, ValueError):
+        bilder = []
+    if not isinstance(bilder, list):
+        bilder = []
+    bilder = [bild for bild in bilder if isinstance(bild, dict)
+              and bild.get("name")]
+    if block.bild_speichername and not any(
+            bild["name"] == block.bild_speichername for bild in bilder):
+        bilder.insert(0, {"name": block.bild_speichername,
+                          "alt": block.bild_alt or block.titel})
+    return bilder
 
 
 def alle_bloecke(db) -> dict:

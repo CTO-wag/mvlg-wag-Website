@@ -79,12 +79,12 @@
               <input type="color" name="farbe" value="{{ b.farbe or '#0E2647' }}"></label>
             {% endif %}
             {% if bereich in mit_bild %}
-            <label class="voll">Bild <span class="meta">PNG, JPG oder WebP, optional</span>
-              <input type="file" name="bild" accept="image/png,image/jpeg,image/webp">
+            <label class="voll">Bilder <span class="meta">Mehrere PNG, JPG oder WebP möglich</span>
+              <input type="file" name="bilder" accept="image/png,image/jpeg,image/webp" multiple>
             </label>
-            <label class="voll">Bildbeschreibung <span class="meta">für Screenreader</span>
-              <input type="text" name="bild_alt" value="{{ b.bild_alt or '' }}" maxlength="160"
-                     placeholder="Kurze Beschreibung des Bildes">
+            <label class="voll">Bildbeschreibungen <span class="meta">eine pro Zeile, in derselben Reihenfolge</span>
+              <textarea name="bilder_alt" maxlength="1600" rows="2"
+                        placeholder="Kurze Beschreibung je Bild">{{ b.bild_alt or '' }}</textarea>
             </label>
             {% if b.bild_speichername %}
             <label class="haken voll">
@@ -139,10 +139,11 @@
       {% endif %}
       {% if bereich in mit_bild %}
       <label class="voll">Bild <span class="meta">PNG, JPG oder WebP, optional</span>
-        <input type="file" name="bild" accept="image/png,image/jpeg,image/webp">
+        <input type="file" name="bilder" accept="image/png,image/jpeg,image/webp" multiple>
       </label>
-      <label class="voll">Bildbeschreibung <span class="meta">für Screenreader</span>
-        <input type="text" name="bild_alt" maxlength="160" placeholder="Kurze Beschreibung des Bildes">
+      <label class="voll">Bildbeschreibungen <span class="meta">eine pro Zeile, in derselben Reihenfolge</span>
+        <textarea name="bilder_alt" maxlength="1600" rows="2"
+                  placeholder="Kurze Beschreibung je Bild"></textarea>
       </label>
       {% endif %}
       <div class="formular-fuss"><button type="submit">Hinzufügen</button></div>

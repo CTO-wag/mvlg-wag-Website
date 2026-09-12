@@ -354,6 +354,42 @@ html[data-theme="dark"] .quiz-option.falsch{
   border-left:3px solid var(--karte, var(--navy));
   padding-left:var(--r4);
 }
+.portfolio-galerie{ position:relative; margin-bottom:var(--r3); }
+.portfolio-bild{
+  display:none; width:100%; padding:0; border:0; background:none;
+  cursor:zoom-in; text-align:left;
+}
+.portfolio-bild:first-child{ display:block; }
+.portfolio-bild img{
+  display:block; width:100%; max-height:20rem; object-fit:cover;
+  border-radius:var(--r2); margin:0;
+}
+.portfolio-bild-anzahl{
+  position:absolute; right:.65rem; bottom:.65rem; pointer-events:none;
+  padding:.2rem .55rem; border-radius:var(--rund-voll);
+  background:rgba(8,26,51,.82); color:#fff; font-size:.78rem;
+}
+.bild-dialog{
+  position:fixed; inset:0; z-index:100;
+  display:flex; align-items:center; justify-content:center;
+  padding:clamp(1rem, 4vw, 4rem);
+  background:rgba(8,15,26,.9);
+}
+.bild-dialog[hidden]{ display:none; }
+.bild-dialog-bild{
+  max-width:min(92vw, 1100px); max-height:88vh; object-fit:contain;
+  border-radius:var(--rund-klein); box-shadow:0 16px 50px rgba(0,0,0,.45);
+}
+.bild-dialog-schliessen,.bild-dialog-pfeil{
+  position:absolute; display:flex; align-items:center; justify-content:center;
+  width:2.8rem; height:2.8rem; padding:0; border:1px solid rgba(255,255,255,.3);
+  border-radius:50%; background:rgba(8,26,51,.8); color:#fff; cursor:pointer;
+}
+.bild-dialog-schliessen{ top:1.2rem; right:1.2rem; font-size:1.8rem; }
+.bild-dialog-pfeil{ top:50%; transform:translateY(-50%); font-size:2rem; }
+.bild-dialog-zurueck{ left:1.2rem; }
+.bild-dialog-weiter{ right:1.2rem; }
+.bild-dialog-pfeil[hidden]{ display:none; }
 .portfolio-inhalt h3{ margin:0 0 var(--r2); font-size:1.08rem; }
 .portfolio-inhalt p{ margin:0 0 var(--r2); color:var(--gedaempft); font-size:.94rem; }
 .portfolio-inhalt p:last-child{ margin-bottom:0; }
@@ -373,6 +409,9 @@ html[data-theme="dark"] .portfolio-ergebnis{
   .portfolio-karte::before{ left:-1px; top:.4rem; }
   .portfolio-zeit{ text-align:left; padding-top:0; }
   .portfolio-inhalt{ border-left:none; padding-left:0; }
+  .bild-dialog-pfeil{ width:2.4rem; height:2.4rem; }
+  .bild-dialog-zurueck{ left:.5rem; }
+  .bild-dialog-weiter{ right:.5rem; }
 }
 
 /* Die Notluke am zweiten Faktor - unauffaellig, aber auffindbar. */

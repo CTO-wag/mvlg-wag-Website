@@ -135,9 +135,19 @@
       <span class="portfolio-zeit">{{ eintrag.zeitraum }}</span>
       {% endif %}
       <div class="portfolio-inhalt">
-        {% if eintrag.bild_speichername %}
-        <img src="/bilder/startseite/{{ eintrag.bild_speichername }}" alt="{{ eintrag.bild_alt or eintrag.titel }}"
-             loading="lazy" decoding="async">
+        {% if eintrag.bilder %}
+        <div class="portfolio-galerie" aria-label="Bilder zu {{ eintrag.titel }}">
+          {% for bild in eintrag.bilder %}
+          <button type="button" class="portfolio-bild" data-galerie-bild
+                  aria-label="Bild {{ loop.index }} von {{ eintrag.bilder|length }} vergrößern">
+            <img src="/bilder/startseite/{{ bild.name }}" alt="{{ bild.alt or eintrag.titel }}"
+                 loading="lazy" decoding="async">
+          </button>
+          {% endfor %}
+          {% if eintrag.bilder|length > 1 %}
+          <span class="portfolio-bild-anzahl">{{ eintrag.bilder|length }} Bilder</span>
+          {% endif %}
+        </div>
         {% endif %}
         <h3>{{ eintrag.titel }}</h3>
         {% if eintrag.text %}<p>{{ eintrag.text }}</p>{% endif %}
@@ -150,6 +160,17 @@
   </ol>
 </section>
 {% endif %}
+
+<div class="bild-dialog" data-bild-dialog hidden role="dialog" aria-modal="true"
+     aria-label="Bildansicht">
+  <button type="button" class="bild-dialog-schliessen" data-bild-schliessen
+          aria-label="Bildansicht schließen">&times;</button>
+  <button type="button" class="bild-dialog-pfeil bild-dialog-zurueck"
+          data-bild-zurueck aria-label="Vorheriges Bild">&#8249;</button>
+  <img class="bild-dialog-bild" data-bild-dialog-bild alt="">
+  <button type="button" class="bild-dialog-pfeil bild-dialog-weiter"
+          data-bild-weiter aria-label="Nächstes Bild">&#8250;</button>
+</div>
 
 <section id="weg" class="abschnitt">
   <span class="hut">Dein Weg</span>

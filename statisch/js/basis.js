@@ -47,11 +47,73 @@
   });
 
   document.addEventListener('keydown', function (e) {
+    var dialog = document.querySelector('[data-bild-dialog]:not([hidden])');
+    if (dialog && (e.key === 'Escape' || e.key === 'ArrowLeft'
+                   || e.key === 'ArrowRight')) {
+      if (e.key === 'Escape') { bildDialogSchliessen(); }
+      else { bildDialogZeige(e.key === 'ArrowRight' ? 1 : -1); }
+      return;
+    }
     if (e.key !== 'Escape') { return; }
     var kopf = document.getElementById('kopfzeile');
     if (kopf && kopf.classList.contains('offen')) {
       menueUmschalten(kopf, kopf.querySelector('[data-burger]'), false);
     }
+  });
+
+  /* --- Startseiten-Bilder als Slideshow --------------------------------- */
+  var bildDialogBilder = [];
+  var bildDialogIndex = 0;
+  function bildDialogAktualisieren() {
+    var dialog = document.querySelector('[data-bild-dialog]');
+    var bild = dialog && dialog.querySelector('[data-bild-dialog-bild]');
+    if (!bild || !bildDialogBilder.length) { return; }
+    var eintrag = bildDialogBilder[bildDialogIndex];
+    bild.src = eintrag.src;
+    bild.alt = eintrag.alt;
+    var mehrere = bildDialogBilder.length > 1;
+    dialog.querySelector('[data-bild-zurueck]').hidden = !mehrere;
+    dialog.querySelector('[data-bild-weiter]').hidden = !mehrere;
+  }
+  function bildDialogOeffnen(bilder, index) {
+    bildDialogBilder = bilder;
+    bildDialogIndex = index;
+    var dialog = document.querySelector('[data-bild-dialog]');
+    if (!dialog) { return; }
+    dialog.hidden = false;
+    bildDialogAktualisieren();
+    document.body.style.overflow = 'hidden';
+    dialog.querySelector('[data-bild-schliessen]').focus();
+  }
+  function bildDialogSchliessen() {
+    var dialog = document.querySelector('[data-bild-dialog]');
+    if (!dialog) { return; }
+    dialog.hidden = true;
+    document.body.style.overflow = '';
+    bildDialogBilder = [];
+  }
+  function bildDialogZeige(richtung) {
+    if (!bildDialogBilder.length) { return; }
+    bildDialogIndex = (bildDialogIndex + richtung + bildDialogBilder.length)
+      % bildDialogBilder.length;
+    bildDialogAktualisieren();
+  }
+  document.addEventListener('click', function (e) {
+    var knopf = e.target.closest('[data-galerie-bild]');
+    var dialog = e.target.closest('[data-bild-dialog]');
+    if (knopf) {
+      var galerie = knopf.closest('.portfolio-galerie');
+      var bilder = Array.prototype.map.call(
+        galerie.querySelectorAll('[data-galerie-bild] img'),
+        function (img) { return {src: img.src, alt: img.alt}; });
+      bildDialogOeffnen(bilder, Array.prototype.indexOf.call(
+        galerie.querySelectorAll('[data-galerie-bild]'), knopf));
+      return;
+    }
+    if (dialog && e.target === dialog) { bildDialogSchliessen(); return; }
+    if (e.target.closest('[data-bild-schliessen]')) { bildDialogSchliessen(); return; }
+    if (e.target.closest('[data-bild-zurueck]')) { bildDialogZeige(-1); return; }
+    if (e.target.closest('[data-bild-weiter]')) { bildDialogZeige(1); }
   });
 
   /* --- Aus einer Fehlermeldung heraus den Support erreichen ---------------

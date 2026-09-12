@@ -1,6 +1,7 @@
 """Rollen, Abteilungen, Startseite, Kassenbuch, Datenbank, Papierkorb, Sicherheit."""
 
 from datetime import date, timedelta
+import json
 import secrets
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
@@ -256,11 +257,22 @@ async def _bild_hochladen(datei: UploadFile):
     return speichername
 
 
+async def _bilder_hochladen(dateien: list[UploadFile]) -> list[str]:
+    namen = []
+    for datei in dateien:
+        name = await _bild_hochladen(datei)
+        if name:
+            namen.append(name)
+    return namen
+
+
 @router.post("/startseite")
 async def block_anlegen(bereich: str = Form(""), titel: str = Form(""),
                   text: str = Form(""), farbe: str = Form(""),
                   zeitraum: str = Form(""), ergebnis: str = Form(""),
-                  bild_alt: str = Form(""), bild: UploadFile = File(None),
+                  bild_alt: str = Form(""), bilder_alt: str = Form(""),
+                  bild: UploadFile = File(None),
+                  bilder: list[UploadFile] = File(default=[]),
                   csrf: str = Form(""),
                   a: Anmeldung = Depends(Anmeldung.pflicht)):
     a.verlange("seiteninhalte")
@@ -271,14 +283,22 @@ async def block_anlegen(bereich: str = Form(""), titel: str = Form(""),
     if not titel_:
         return _startseite_ansicht(a, fehler("Ohne Titel geht es nicht."))
     try:
-        bildname = await _bild_hochladen(bild)
+        bildnamen = await _bilder_hochladen(
+            ([bild] if bild and bild.filename else []) + bilder)
     except (ValueError, speicher.SpeicherFehler) as problem:
         return _startseite_ansicht(a, fehler(str(problem)))
     block = inhalte.anlegen(a.db, bereich, titel_, sauber(text)[:2000],
                             _farbe_pruefen(farbe, ""), sauber(zeitraum)[:60],
                             sauber(ergebnis)[:120], a.user.id)
-    block.bild_speichername = bildname
-    block.bild_alt = sauber(bild_alt)[:160] or titel_ if bildname else None
+    block.bild_speichername = bildnamen[0] if bildnamen else None
+    block.bild_alt = sauber(bild_alt)[:160] or titel_ if bildnamen else None
+    alttexte = [sauber(wert)[:160] or titel_ for wert in
+                bilder_alt.splitlines()]
+    block.bilder = json.dumps(
+        [{"name": name, "alt": alttexte[index] if index < len(alttexte)
+          else block.bild_alt or titel_}
+         for index, name in enumerate(bildnamen)],
+        ensure_ascii=False) if bildnamen else None
     a.db.commit()
     inhalte.verwerfen()
     hinweis = ("Eintrag hinzugefügt – er steht ab sofort auf der Startseite."
@@ -293,7 +313,8 @@ async def block_aendern(block_id: int, titel: str = Form(""), text: str = Form("
                   farbe: str = Form(""), zeitraum: str = Form(""),
                   ergebnis: str = Form(""), aktiv: str = Form(""),
                   bild_alt: str = Form(""), bild_loeschen: str = Form(""),
-                  bild: UploadFile = File(None),
+                  bilder_alt: str = Form(""), bild: UploadFile = File(None),
+                  bilder: list[UploadFile] = File(default=[]),
                   csrf: str = Form(""),
                   a: Anmeldung = Depends(Anmeldung.pflicht)):
     a.verlange("seiteninhalte")
@@ -301,9 +322,10 @@ async def block_aendern(block_id: int, titel: str = Form(""), text: str = Form("
     block = a.db.get(Inhalt, block_id)
     if not block:
         return _startseite_ansicht(a, fehler("Diesen Block gibt es nicht mehr."))
-    alte_bilddatei = block.bild_speichername
+    alte_bilder = inhalte._bilder(block)
     try:
-        neue_bilddatei = await _bild_hochladen(bild)
+        neue_bilddateien = await _bilder_hochladen(
+            ([bild] if bild and bild.filename else []) + bilder)
     except (ValueError, speicher.SpeicherFehler) as problem:
         return _startseite_ansicht(a, fehler(str(problem)))
     if sauber(titel):
@@ -312,20 +334,33 @@ async def block_aendern(block_id: int, titel: str = Form(""), text: str = Form("
     block.farbe = _farbe_pruefen(farbe, "") or None
     block.zeitraum = sauber(zeitraum)[:60] or None
     block.ergebnis = sauber(ergebnis)[:120] or None
-    if neue_bilddatei:
-        block.bild_speichername = neue_bilddatei
-        block.bild_alt = sauber(bild_alt)[:160] or block.titel
-    elif bild_loeschen and alte_bilddatei:
+    if neue_bilddateien:
+        alttexte = [sauber(wert)[:160] or block.titel for wert in
+                    bilder_alt.splitlines()]
+        neue_bilder = [
+            {"name": name, "alt": alttexte[index] if index < len(alttexte)
+             else sauber(bild_alt)[:160] or block.titel}
+            for index, name in enumerate(neue_bilddateien)
+        ]
+        block.bilder = json.dumps(
+            alte_bilder + neue_bilder,
+            ensure_ascii=False)
+        if not alte_bilder:
+            block.bild_speichername = neue_bilddateien[0]
+            block.bild_alt = sauber(bild_alt)[:160] or block.titel
+    elif bild_loeschen and alte_bilder:
         block.bild_speichername = None
         block.bild_alt = None
+        block.bilder = None
     elif block.bild_speichername:
         block.bild_alt = sauber(bild_alt)[:160] or block.bild_alt or block.titel
     block.aktiv = 1 if aktiv else 0
     block.geaendert_von = a.user.id
     block.updated_at = utcnow()
     a.db.commit()
-    if (neue_bilddatei or bild_loeschen) and alte_bilddatei:
-        speicher.entfernen(speicher.REDAKTION, alte_bilddatei)
+    if bild_loeschen:
+        for bild in alte_bilder:
+            speicher.entfernen(speicher.REDAKTION, bild["name"])
     inhalte.verwerfen()
     return _startseite_ansicht(a, gut("Gespeichert."))
 

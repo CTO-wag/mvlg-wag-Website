@@ -1,5 +1,7 @@
 """Startseite, Quiz, Rechtstexte, Kontaktformular."""
 
+import json
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import (
     PlainTextResponse, RedirectResponse, Response,
@@ -18,10 +20,25 @@ from kern.vorlagen import zeige
 router = APIRouter()
 
 
+def _galerienamen(wert: str) -> set[str]:
+    try:
+        bilder = json.loads(wert or "[]")
+    except (TypeError, ValueError):
+        return set()
+    return {bild.get("name") for bild in bilder
+            if isinstance(bild, dict) and bild.get("name")}
+
+
 @router.get("/bilder/startseite/{speichername}")
 def startseitenbild(speichername: str, db: Session = Depends(hole_db)):
-    if not db.query(Inhalt.id).filter(Inhalt.bild_speichername == speichername,
-                                      Inhalt.aktiv == 1).first():
+    einzelbild = db.query(Inhalt.id).filter(
+        Inhalt.bild_speichername == speichername, Inhalt.aktiv == 1).first()
+    galerie = db.query(Inhalt.bilder).filter(Inhalt.aktiv == 1).all()
+    in_galerie = any(
+        speichername in _galerienamen(bilder)
+        for bilder, in galerie
+    )
+    if not einzelbild and not in_galerie:
         return Response("Nicht gefunden", status_code=404, media_type="text/plain")
     return speicher.antwort(speicher.REDAKTION, speichername)
 
