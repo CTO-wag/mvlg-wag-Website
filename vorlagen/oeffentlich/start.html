@@ -131,14 +131,14 @@
   <ol class="portfolio">
     {% for eintrag in portfolio %}
     <li class="portfolio-karte" style="--karte:{{ eintrag.farbe or '#0E2647' }}">
-      {% if eintrag.bild_speichername %}
-      <img src="/bilder/startseite/{{ eintrag.bild_speichername }}" alt="{{ eintrag.bild_alt or eintrag.titel }}"
-           loading="lazy" decoding="async">
-      {% endif %}
       {% if eintrag.zeitraum %}
       <span class="portfolio-zeit">{{ eintrag.zeitraum }}</span>
       {% endif %}
       <div class="portfolio-inhalt">
+        {% if eintrag.bild_speichername %}
+        <img src="/bilder/startseite/{{ eintrag.bild_speichername }}" alt="{{ eintrag.bild_alt or eintrag.titel }}"
+             loading="lazy" decoding="async">
+        {% endif %}
         <h3>{{ eintrag.titel }}</h3>
         {% if eintrag.text %}<p>{{ eintrag.text }}</p>{% endif %}
         {% if eintrag.ergebnis %}
