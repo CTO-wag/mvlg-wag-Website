@@ -1372,7 +1372,7 @@ const LANDING = `
 
 <ul class="fakten" aria-label="Das Wichtigste in K&uuml;rze">
   <li><strong>Klasse 9&ndash;13</strong><span>Egal, welcher Schnitt</span></li>
-  <li><strong>Alle zwei Wochen</strong><span>Ein Nachmittag, dazwischen das Dashboard</span></li>
+  <li><strong>Jede Woche</strong><span>Mittwochs 7.Stunde</span></li>
   <li><strong>Ohne Vorwissen</strong><span>Interesse reicht als Voraussetzung</span></li>
   <li><strong>Echte Wettbewerbe</strong><span>Planspiel B&ouml;rse, Jugend Gr&uuml;ndet</span></li>
 </ul>
