@@ -137,7 +137,7 @@ class TestWorkerDateien(unittest.TestCase):
         """Ohne Stylesheet und Schriften sähe die Notfassung aus wie ein
         Textdokument - und genau daran erkennt man sie sonst sofort."""
         for name in ("SCHRIFTEN", "STIL", "WAPPEN", "LOGO", "FAVICON",
-                     "INHALTE"):
+                     "INHALTE", "NETLIFY_SITE"):
             self.assertIn(f"export const {name} = ", self.eingebettet, name)
         self.assertIn("data:font/woff2;base64,", self.eingebettet)
         # Ein Stück aus statisch/stil/basis.css - kommt es nicht mit, ist die

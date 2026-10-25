@@ -24,6 +24,7 @@ Was hier eingesammelt wird
 * Die Schriften als data:-Adressen. Nur "latin", nicht "latin-ext": Deutsche
   Umlaute stehen in latin, und latin-ext waere noch einmal so viel.
 * Wappen, Logo und Favicon.
+* Die Netlify-Veröffentlichung aus wag-koblenz/dist, einschliesslich Bilder.
 * Das Quiz - Fragen und Auswertung. Es rechnet ohnehin im Browser; ohne
   Server fehlt ihm also nichts, und die Notfassung kommt ohne Luecke aus.
 * Die vier pflegbaren Bloecke der Startseite (Vorteile, Stufen, Aktivitaeten,
@@ -37,6 +38,7 @@ liefert nur die Zutaten - so bleibt lesbar, was das Auffangnetz tut.
 
 import base64
 import json
+import mimetypes
 import os
 import re
 import sys
@@ -55,6 +57,7 @@ KONFIG_QUELLE = _konfig_einlesen()
 
 STATISCH = os.path.join(PROGRAMM, "statisch")
 ZIEL = os.path.join(PROGRAMM, "cloudflare", "eingebettet.js")
+NETLIFY_DIST = os.path.join(PROGRAMM, "wag-koblenz", "dist")
 
 # Nur die Schnitte, die basis.css und website.css wirklich benutzen. Jeder
 # weitere waere ein Anhang von rund 60 KB fuer Zeichen, die nie erscheinen.
@@ -121,6 +124,33 @@ def _lesen(pfad: str) -> bytes:
 
 def _als_daten(pfad: str, typ: str) -> str:
     return f"data:{typ};base64," + base64.b64encode(_lesen(pfad)).decode("ascii")
+
+
+def netlify_dateien() -> dict:
+    """Die veröffentlichte Netlify-Seite samt lokal referenzierten Dateien."""
+    dateien = {}
+    for ordner, _, namen in os.walk(NETLIFY_DIST):
+        for name in namen:
+            pfad = os.path.join(ordner, name)
+            rel = os.path.relpath(pfad, NETLIFY_DIST).replace(os.sep, "/")
+            typ, _ = mimetypes.guess_type(rel)
+            typ = typ or "application/octet-stream"
+            daten = _lesen(pfad)
+            if typ.startswith("text/") or typ in (
+                    "application/javascript", "application/json"):
+                dateien["/" + rel] = {
+                    "type": typ + ("; charset=utf-8"
+                                   if typ.startswith("text/") else ""),
+                    "body": daten.decode("utf-8"),
+                    "base64": False,
+                }
+            else:
+                dateien["/" + rel] = {
+                    "type": typ,
+                    "body": base64.b64encode(daten).decode("ascii"),
+                    "base64": True,
+                }
+    return dateien
 
 
 def schriften_css() -> str:
@@ -241,6 +271,7 @@ def bauen() -> None:
     quiz_js = _lesen(os.path.join(STATISCH, "js", "quiz.js")).decode("utf-8")
     bilder = {name: _als_daten(os.path.join(STATISCH, pfad), typ)
               for name, (pfad, typ) in BILDER.items()}
+    netlify = netlify_dateien()
 
     kopf = (
         "/* ERZEUGT - nicht von Hand aendern.\n"
@@ -251,10 +282,9 @@ def bauen() -> None:
         " *\n"
         " *     python werkzeuge/auffangnetz_bauen.py\n"
         " *\n"
-        " * Enthalten sind das Stylesheet der oeffentlichen Seite, die Schriften,\n"
-        " * Wappen, Logo, Favicon und die im Dashboard gepflegten Bloecke der\n"
-        " * Startseite. Alles als Text, weil ein Worker keine zweite Datei\n"
-        " * nachladen kann - der Server, von dem sie kaeme, ist der ausgefallene.\n"
+        " * Enthalten sind die Schriften, Bilder und Bloecke der Notfassung.\n"
+        " * Die Netlify-Seite liegt samt Assets ebenfalls hier, damit der Worker\n"
+        " * sie ohne erreichbaren Ursprung ausliefern kann.\n"
         " */\n\n")
 
     zeilen = [kopf]
@@ -270,6 +300,9 @@ def bauen() -> None:
                   + json.dumps(fragen, ensure_ascii=False, indent=2) + ";\n\n")
     zeilen.append("export const INHALTE = "
                   + json.dumps(inhalte, ensure_ascii=False, indent=2) + ";\n")
+    zeilen.append("export const NETLIFY_SITE = "
+                  + json.dumps(netlify, ensure_ascii=False, separators=(",", ":"))
+                  + ";\n")
 
     text = "".join(zeilen)
     with open(ZIEL, "w", encoding="utf-8", newline="\n") as datei:
@@ -283,6 +316,7 @@ def bauen() -> None:
         print(f"  {name:<11}: {len(bilder[name]):>9,} Zeichen")
     print(f"  Quiz       : {len(fragen)} Fragen, "
           f"{len(quiz_js):,} Zeichen Auswertung")
+    print(f"  Netlify    : {len(netlify)} Dateien")
     print("  Abteilungen: " + ", ".join(a["label"] for a in faecher))
     print(f"  Inhalte    : " + ", ".join(
         f"{len(v)}× {k}" for k, v in inhalte.items()))

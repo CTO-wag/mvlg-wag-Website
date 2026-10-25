@@ -1,8 +1,10 @@
 """Aufbau der oeffentlichen Anwendung."""
 
 from contextlib import asynccontextmanager
+import os
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from kern import einstellungen as cfg
 from kern import mail, planer
@@ -48,3 +50,9 @@ app.include_router(oeffentlich.router)
 app.include_router(anmeldung.router)
 app.include_router(bewerbung.router)
 app.include_router(pwa.router)
+
+# Die Netlify-Landingpage wird hier ebenfalls ausgeliefert, damit der
+# öffentliche Ursprung und der Cloudflare-Fallback dieselben Dateien nutzen.
+_NETLIFY_DIST = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "wag-koblenz", "dist")
+app.mount("/", StaticFiles(directory=_NETLIFY_DIST), name="netlify-site")

@@ -16,6 +16,9 @@ const netz = (await import(process.argv[2])).default;
 
 let ursprungStatus = 200;         // was der "Tunnel" antwortet
 let ntfyRufe = [];
+let brevoRufe = [];
+let brevoStatus = 201;
+let ursprungRufe = 0;
 const lager = new Map();
 
 const LAGER = {
@@ -35,12 +38,21 @@ globalThis.fetch = async (ziel, optionen) => {
     ntfyRufe.push(JSON.parse(optionen.body));
     return new Response("ok", { status: 200 });
   }
+  if (adresse.includes("api.brevo.com")) {
+    brevoRufe.push(JSON.parse(optionen.body));
+    return new Response("", { status: brevoStatus });
+  }
+  ursprungRufe += 1;
   if (ursprungStatus === 0) { throw new TypeError("kein Netz"); }
   return new Response("echte Seite", { status: ursprungStatus });
 };
 
 const umgebung = { LAGER, ABHOL_SCHLUESSEL: "geheim-".padEnd(45, "x"),
-                   NTFY_THEMA: "wag-ausfall-test" };
+                   NTFY_THEMA: "wag-ausfall-test",
+                   BREVO_API_KEY: "nur-ein-testschluessel",
+                   BEWERBUNG_EMAILS: "ceo@example.org,coo@example.org,cro@example.org,cto@example.org",
+                   PRUEFUNG_AKTIV: "0" };
+const warteKurz = () => new Promise(r => setTimeout(r, 30));
 let fehler = 0;
 function pruefe(name, bedingung, zusatz = "") {
   console.log((bedingung ? "  ok   " : "  FEHL ") + name + (bedingung ? "" : "   " + zusatz));
@@ -54,6 +66,11 @@ ursprungStatus = 200;
 let a = await hole("/dashboard/aufgaben");
 pruefe("Normalbetrieb wird unveraendert durchgeleitet",
        a.status === 200 && (await a.text()) === "echte Seite", a.status);
+const rufeVorStartseite = ursprungRufe;
+a = await hole("/");
+pruefe("Startseite wird immer vom Worker und nicht vom Backend geliefert",
+       a.status === 200 && (await a.text()).includes("WIRTSCHAFT.")
+       && ursprungRufe <= rufeVorStartseite + 1);
 
 /* Ein 500 der Anwendung darf NICHT ueberdeckt werden */
 ursprungStatus = 500;
@@ -72,44 +89,38 @@ for (const s of [502, 530, 521]) {
 ursprungStatus = 0;
 a = await hole("/");
 let html = await a.text();
-pruefe("Gar keine Antwort liefert die eigene Seite",
-       a.status === 503 && html.includes("keine Verbindung"));
-pruefe("Seite traegt noindex und Retry-After",
-       a.headers.get("x-robots-tag") === "noindex"
-       && a.headers.get("retry-after") === "120");
-/* Nachgeladen werden darf nichts - der Server, von dem es kaeme, ist der
-   ausgefallene. Ein blosser Textverweis (die Schule im Fuss) ist etwas
-   anderes als eine Datei, die der Browser holen muss. */
-pruefe("Seite laedt nichts nach",
-       !/src="https?:/.test(html) && !/@import/.test(html)
-       && !/url\(\s*['"]?https?:/.test(html)
-       && !/<link[^>]+href="https?:/.test(html)
-       && !/fonts\.(googleapis|gstatic)/.test(html));
-pruefe("Sie bringt das echte Stylesheet mit",
-       html.includes("--seitenrand") && html.includes(".marke-logo")
-       && html.includes("data:font/woff2;base64,"));
-pruefe("Und kein Platzhalter ist stehengeblieben", !/%%[A-Z_]+%%/.test(html));
-
-/* Ohne den eingebetteten Stil geprueft: dort steht ein Haken als
-   CSS-Inhalt, und der faellt sonst in dieselbe Falle. */
-const nurMarkup = (t) => t.replace(/<style>[\s\S]*?<\/style>/g, "")
-                          .replace(/<script>[\s\S]*?<\/script>/g, "");
-pruefe("Keine Emojis auf der Seite",
-       !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(nurMarkup(html)));
-
-/* --- 2b. Der normale Besucher merkt nichts ------------------------------
-   Das ist der ganze Sinn der Uebung: Wer zum ersten Mal auf die Seite kommt,
-   soll die Startseite sehen und nicht eine Stoerungsmeldung. Die Nachricht
-   liegt zwar in der Seite - sie geht aber erst auf, wenn jemand auf Login
-   tippt. */
-pruefe("Die Stoerungsmeldung steht zugeklappt in der Seite",
-       /id="ausfall"[^>]*\shidden/.test(html));
-pruefe("Der Besucher bekommt die Startseite, nicht eine Fehlerseite",
-       html.indexOf("Deine erste Aktie")
-         < html.indexOf("Das System ist gerade nicht erreichbar")
-       && !nurMarkup(html).includes("Notfassung"));
-pruefe("Und der Hinweis steht beim ersten Aufruf zu",
-       /var OFFEN = "" === "1"/.test(html));
+pruefe("Die Worker-Startseite bleibt bei fehlendem Ursprung erreichbar",
+       a.status === 200 && html.includes("WIRTSCHAFT.")
+       && html.includes("Wirtschaft verstehen. Zukunft gestalten.")
+       && a.headers.get("x-content-type-options") === "nosniff");
+pruefe("Die neue Seite verweist auf lokale Assets",
+       html.includes('href="styles.css"')
+       && html.includes('src="assets/wag-logo.webp"'));
+a = await hole("/styles.css");
+const styles = await a.text();
+pruefe("Stylesheet wird aus dem Worker-Bundle ohne veralteten Browsercache ausgeliefert",
+       a.status === 200 && styles.includes(".site-header")
+       && styles.includes("object-fit:contain")
+       && styles.includes("display:none!important")
+       && a.headers.get("cache-control") === "no-store");
+a = await hole("/");
+pruefe("Startseite fordert eine frische Version an",
+       a.headers.get("cache-control") === "no-store"
+       && a.headers.get("x-auffangnetz") === "2026-10-25-bilder-voll");
+a = await hole("/script.js");
+pruefe("Skript wird aus dem Worker-Bundle ausgeliefert",
+       a.status === 200 && (await a.text()).includes("/__ausfall/bewerben"));
+a = await hole("/assets/wag-logo.webp");
+pruefe("Logo wird binär aus dem Worker-Bundle ausgeliefert",
+       a.status === 200 && a.headers.get("content-type") === "image/webp"
+       && (await a.arrayBuffer()).byteLength > 1000);
+for (const bild of ["wag-aktuelles-01.webp", "wag-aktuelles-02.webp",
+                    "wag-aktuelles-03.webp"]) {
+  a = await hole("/assets/" + bild);
+  pruefe(bild + " wird aus dem Worker-Bundle ausgeliefert",
+         a.status === 200 && a.headers.get("content-type") === "image/webp"
+         && (await a.arrayBuffer()).byteLength > 10000);
+}
 
 /* Wer sich anmelden will, erfaehrt es sofort - fuer ihn ist es seine Sache. */
 a = await hole("/login");
@@ -120,8 +131,8 @@ pruefe("Auf /login geht der Hinweis von selbst auf",
 /* Ohne Lager: die Formulare sagen es, statt ins Leere zu schicken */
 a = await netz.fetch(new Request("https://mvlg-wag.de/"), { ABHOL_SCHLUESSEL: "x" });
 html = await a.text();
-pruefe("Ohne Lager wissen die Formulare Bescheid",
-       /var LAGER = "" === "1"/.test(html));
+pruefe("Die öffentliche Seite bleibt ohne Worker-Lager verfügbar",
+       a.status === 200 && html.includes("WIRTSCHAFT."));
 
 /* --- 3. Lebt-Nachfrage -------------------------------------------------- */
 ursprungStatus = 0;
@@ -196,28 +207,21 @@ const gespeichert = [...lager.keys()].filter(k => k.startsWith("meldung:")).leng
 pruefe("Der Deckel je Stunde greift", gespeichert <= 30, gespeichert);
 
 
-/* --- 7. Alibi-Inhalt fuer Besucher ------------------------------------- */
+/* --- 7. Die Netlify-Seite bleibt fuer Besucher verfuegbar ---------------- */
 ursprungStatus = 0;
 a = await hole("/");
 html = await a.text();
-pruefe("Oeffentliche Seite bringt die ganze Startseite",
-       html.includes("Max-von-Laue-Gymnasium")
-       && html.includes("Zwei Halbjahre") && html.includes("Dein Weg")
-       && html.includes("Von Sch"));
-pruefe("Mit Kontaktformular, das auch etwas tut",
-       html.includes('id="kontakt-formular"')
-       && html.includes("/__ausfall/nachricht"));
+pruefe("Oeffentliche Seite bringt die Netlify-Startseite",
+       html.includes("WIRTSCHAFT.") && html.includes("Klasse 9–13"));
 
-/* /bewerbung liegt vollstaendig im Worker. Ein Interessent, der zufaellig in
-   einen Ausfall geraet, ist der teuerste Verlust dieser Anlage. */
+a = await hole("/unbekannte-seite");
+pruefe("Unbekannte öffentliche Wege zeigen kein altes Backend",
+       a.status === 404);
+
 a = await hole("/bewerbung");
 const bewHtml = await a.text();
-pruefe("Und ein vollstaendiges Bewerbungsformular unter /bewerbung",
-       bewHtml.includes('id="bewerbung-formular"')
-       && bewHtml.includes("b-motivation") && bewHtml.includes("b-telefon")
-       && bewHtml.includes("b-vorwissen")
-       && bewHtml.includes('value="recruitment"'));
-pruefe("Mit Honigtopf gegen Skripte", bewHtml.includes("b-webseite"));
+pruefe("Der Bewerbungsweg zeigt die neue statische Bewerbungsseite",
+       bewHtml.includes("Komm ins") && bewHtml.includes("Bewerbung abschicken"));
 
 a = await netz.fetch(new Request("https://app.mvlg-wag.de/dashboard"), umgebung);
 const dashHtml = await a.text();
@@ -300,10 +304,12 @@ html = await r.text();
 pruefe("Selbsttest antwortet", r.status === 200 && html.includes("Selbsttest"));
 pruefe("Selbsttest nennt die vier Bausteine",
        html.includes("Zwischenspeicher") && html.includes("Abholschluessel")
-       && html.includes("ntfy-Thema") && html.includes("Meldungen"));
+       && html.includes("ntfy-Thema") && html.includes("Meldungen")
+       && html.includes("Bewerbungs-E-Mail"));
 pruefe("Selbsttest verraet keine Geheimnisse",
        !html.includes(umgebung.ABHOL_SCHLUESSEL)
-       && !html.includes(umgebung.NTFY_THEMA));
+       && !html.includes(umgebung.NTFY_THEMA)
+       && !html.includes(umgebung.BREVO_API_KEY));
 
 r = await netz.fetch(new Request("https://mvlg-wag.de/__ausfall/selbsttest"),
                      { ABHOL_SCHLUESSEL: "x" });
@@ -315,7 +321,8 @@ pruefe("Fehlendes KV wird als offener Punkt gezeigt",
 //  Der wichtigste Teil: Eine Bewerbung darf unter keinen Umstaenden verloren
 //  gehen, auch nicht, wenn die Plattform mitten im Tippen zurueckkommt.
 const bewerbung = (zusatz) => hole("/__ausfall/bewerben", {
-  method: "POST", headers: { "content-type": "application/json" },
+  method: "POST", headers: { "content-type": "application/json",
+                            "origin": "https://mvlg-wag.de" },
   body: JSON.stringify(Object.assign({
     vorname: "Mara", nachname: "Winkler", klasse: "11",
     abteilung: "tech", email: "mara@example.org",
@@ -326,18 +333,49 @@ const bewerbung = (zusatz) => hole("/__ausfall/bewerben", {
   }, zusatz || {})) });
 
 [...lager.keys()].filter(k => k.startsWith("bzaehler:")).forEach(k => lager.delete(k));
+const vorflug = await netz.fetch(new Request(
+  "https://app.mvlg-wag.de/__ausfall/bewerben", {
+    method: "OPTIONS",
+    headers: { origin: "https://mvlg-wag.de",
+               "access-control-request-method": "POST",
+               "access-control-request-headers": "content-type" },
+  }), umgebung);
+pruefe("Bewerbungsroute beantwortet CORS-Vorflug",
+       vorflug.status === 204
+       && vorflug.headers.get("access-control-allow-origin")
+          === "https://mvlg-wag.de"
+       && vorflug.headers.get("access-control-allow-methods").includes("POST"));
+const fremderVorflug = await netz.fetch(new Request(
+  "https://app.mvlg-wag.de/__ausfall/bewerben", {
+    method: "OPTIONS", headers: { origin: "https://example.org" },
+  }), umgebung);
+pruefe("CORS-Vorflug von unbekannter Website wird abgelehnt",
+       fremderVorflug.status === 403);
 ursprungStatus = 0;
 r = await bewerbung();
-pruefe("Bewerbung wird angenommen", r.status === 200 && (await r.json()).ok === true);
+pruefe("Bewerbung wird angenommen",
+       r.status === 200 && (await r.json()).ok === true
+       && r.headers.get("access-control-allow-origin") === "https://mvlg-wag.de");
+await warteKurz();
 pruefe("Und liegt im Lager",
        [...lager.keys()].filter(k => k.startsWith("bewerbung:")).length === 1);
+pruefe("Bewerbung schickt eine E-Mail-Benachrichtigung",
+       brevoRufe.length === 1
+       && brevoRufe[0].to.map(z => z.email).join(",")
+          === umgebung.BEWERBUNG_EMAILS
+       && brevoRufe[0].textContent.includes("Mara Winkler")
+       && brevoRufe[0].textContent.includes("Wunschabteilung: tech")
+       && !brevoRufe[0].textContent.includes("mara@example.org"));
 
 ursprungStatus = 200;                       // Plattform kommt zurueck
 r = await bewerbung({ email: "zweite@example.org" });
 pruefe("Auch wenn die Plattform wieder laeuft, wird sie angenommen",
        r.status === 200 && (await r.json()).ok === true);
+await warteKurz();
 pruefe("Eine Bewerbung geht also nie verloren",
        [...lager.keys()].filter(k => k.startsWith("bewerbung:")).length === 2);
+pruefe("Auch bei erreichbarem Backend wird per E-Mail benachrichtigt",
+       brevoRufe.length === 2);
 ursprungStatus = 0;
 
 r = await bewerbung({ email: "keine-mail" });
@@ -371,6 +409,71 @@ pruefe("Und lassen sich bestaetigen",
        (await r.json()).entfernt === 2
        && [...lager.keys()].filter(k => k.startsWith("bewerbung:")).length === 0);
 
+brevoStatus = 429;
+r = await bewerbung({ email: "retry@example.org" });
+await warteKurz();
+const alarmWartend = [...lager.keys()].filter(
+  k => k.startsWith("bewerbungsalarm:"));
+pruefe("Bei einem E-Mail-Fehler bleibt der Hinweis in KV",
+       r.status === 200 && alarmWartend.length === 1
+       && Boolean(await LAGER.get("bewerbungsalarm_fehler")));
+brevoStatus = 201;
+await netz.scheduled({}, umgebung);
+pruefe("Der Zeitplan wiederholt den E-Mail-Versand",
+       (await LAGER.get(alarmWartend[0])) === null
+       && (await LAGER.get("bewerbungsalarm_fehler")) === null);
+let retryKennung = "";
+for (const eintrag of (await LAGER.list({ prefix: "bewerbung:", limit: 100 })).keys) {
+  const roh = await LAGER.get(eintrag.name);
+  if (roh && JSON.parse(roh).email === "retry@example.org") {
+    retryKennung = eintrag.name;
+    break;
+  }
+}
+if (retryKennung) { await LAGER.delete(retryKennung); }
+
+const emailProbe = (schluessel) => netz.fetch(new Request(
+  "https://mvlg-wag.de/__ausfall/probe-bewerbungs-email", {
+    method: "POST", headers: { "x-ausfall-schluessel": schluessel },
+  }), umgebung);
+r = await emailProbe("falsch");
+pruefe("Bewerbungs-E-Mail-Test verlangt den Abholschluessel", r.status === 403);
+r = await emailProbe(umgebung.ABHOL_SCHLUESSEL);
+d = await r.json();
+pruefe("Sicherer E-Mail-Test adressiert alle vier Vorstandsrollen",
+       r.status === 200 && d.ok === true && d.empfaenger === 4
+       && brevoRufe[brevoRufe.length - 1].to.map(z => z.email).join(",")
+          === umgebung.BEWERBUNG_EMAILS
+       && brevoRufe[brevoRufe.length - 1].subject.startsWith("TEST:")
+       && brevoRufe[brevoRufe.length - 1].textContent.includes(
+         "keine echte Bewerbung"));
+r = await emailProbe(umgebung.ABHOL_SCHLUESSEL);
+pruefe("Bewerbungs-E-Mail-Test ist gegen Wiederholung gedrosselt",
+       r.status === 429);
+await LAGER.delete("probe_bewerbungs_email");
+
+const brevoSchluessel = umgebung.BREVO_API_KEY;
+delete umgebung.BREVO_API_KEY;
+r = await bewerbung({ email: "ohne-api-key@example.org" });
+await warteKurz();
+const ohneSchluesselHinweis = (await LAGER.list({
+  prefix: "bewerbungsalarm:", limit: 100,
+})).keys[0];
+pruefe("Ohne API-Schluessel bleibt die Benachrichtigung ausstehend",
+       r.status === 200 && Boolean(ohneSchluesselHinweis));
+umgebung.BREVO_API_KEY = brevoSchluessel;
+await netz.scheduled({}, umgebung);
+pruefe("Nach dem Einrichten wird die ausstehende E-Mail nachgeholt",
+       !ohneSchluesselHinweis
+       || (await LAGER.get(ohneSchluesselHinweis.name)) === null);
+for (const eintrag of (await LAGER.list({ prefix: "bewerbung:", limit: 100 })).keys) {
+  const roh = await LAGER.get(eintrag.name);
+  if (roh && JSON.parse(roh).email === "ohne-api-key@example.org") {
+    await LAGER.delete(eintrag.name);
+    break;
+  }
+}
+
 /* --- 8c. Alarm beim Ausfall --------------------------------------------- */
 //  Der Alarm laeuft absichtlich NEBEN der Antwort - der Besucher soll seine
 //  Seite sofort bekommen. Im Betrieb erledigt das Cloudflare mit waitUntil;
@@ -383,7 +486,7 @@ ntfyRufe = [];
 const alarme = (was) => ntfyRufe.filter(r => r.title.includes(was)).length;
 
 ursprungStatus = 0;
-await hole("/"); await ruhe();
+await hole("/login"); await ruhe();
 pruefe("Der erste Ausfall meldet sich von selbst",
        alarme("NICHT erreichbar") === 1, JSON.stringify(ntfyRufe));
 
@@ -399,13 +502,13 @@ pruefe("Die Rueckkehr gibt Entwarnung",
 
 ursprungStatus = 0;
 lager.delete("alarm_ausfall");        // Ruhefrist beiseite, neuer Ausfall
-await hole("/"); await ruhe();
+await hole("/login"); await ruhe();
 pruefe("Ein zweiter Ausfall meldet sich wieder",
        alarme("NICHT erreichbar") === 2, alarme("NICHT erreichbar"));
 
 // Die Ruhefrist faengt ab, was der Zustandsmerker nicht schafft.
 lager.delete("zustand");
-await hole("/"); await ruhe();
+await hole("/login"); await ruhe();
 pruefe("Die Ruhefrist verhindert eine Salve",
        alarme("NICHT erreichbar") === 2, alarme("NICHT erreichbar"));
 
@@ -417,7 +520,7 @@ pruefe("Ohne Lager wird kein Alarm geraten", ntfyRufe.length === 0);
 lager.clear();
 ntfyRufe = [];
 ursprungStatus = 200;
-await hole("/"); await ruhe();
+await hole("/login"); await ruhe();
 pruefe("Die erste Beobachtung im Normalbetrieb klingelt nicht",
        ntfyRufe.length === 0, JSON.stringify(ntfyRufe));
 
@@ -429,7 +532,7 @@ lager.clear();
 ntfyRufe = [];
 ursprungStatus = 0;
 // Erst ein Fehlschlag ohne Thema, dann ein Erfolg mit.
-await netz.fetch(new Request("https://mvlg-wag.de/"), { LAGER }); await ruhe();
+await netz.fetch(new Request("https://app.mvlg-wag.de/"), { LAGER }); await ruhe();
 pruefe("Ein Fehlschlag wird vermerkt",
        Boolean(await LAGER.get("klingel_fehler")));
 r = await hole("/__ausfall/selbsttest");
@@ -440,7 +543,7 @@ pruefe("Er steht im Selbsttest, zaehlt aber nicht als offener Punkt",
 
 lager.delete("zustand");
 lager.delete("alarm_ausfall");
-await hole("/"); await ruhe();          // jetzt mit Thema
+await hole("/login"); await ruhe();     // jetzt mit Thema
 pruefe("Ein geglueckter Ruf raeumt ihn weg",
        (await LAGER.get("klingel_fehler")) === null,
        String(await LAGER.get("klingel_fehler")));
@@ -453,10 +556,11 @@ a = await hole("/");
 html = await a.text();
 const fassung = a.headers.get("x-auffangnetz");
 pruefe("Fehlerseite traegt die Fassung als Kopfzeile", Boolean(fassung), fassung);
-/* Nicht mehr im Fusstext: Dort stuende sie fuer jeden Besucher, und "diese
-   Seite ist eine Notfassung" ist genau die Auskunft, die er nicht bekommen
-   soll. Als Kommentar bleibt sie fuer den nachlesbar, der sie sucht. */
-pruefe("Und als Kommentar in der Seite",
+/* Die Startseite bleibt die Netlify-Veröffentlichung; die Fassung ist nur
+   über den Header nachweisbar. Die App-Fehlerseite behält ihren Kommentar. */
+a = await netz.fetch(new Request("https://app.mvlg-wag.de/dashboard"), umgebung);
+html = await a.text();
+pruefe("App-Fehlerseite nennt dieselbe Fassung im Kommentar",
        html.includes("<!-- Auffangnetz " + fassung));
 r = await hole("/__ausfall/selbsttest");
 html = await r.text();

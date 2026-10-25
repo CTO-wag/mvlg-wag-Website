@@ -1,5 +1,6 @@
 """Beide Server: erreichbar, geschützt, und die Sichtbarkeitsregel stimmt."""
 
+import re
 import unittest
 
 from tests import hilfe                                      # noqa: F401
@@ -24,22 +25,40 @@ class TestWebsite(unittest.TestCase):
     def test_startseite(self):
         a = self.c.get("/")
         self.assertEqual(a.status_code, 200)
-        self.assertIn("Deine erste Aktie", a.text)
+        self.assertIn("WIRTSCHAFT.", a.text)
+        self.assertIn("Wirtschaft verstehen. Zukunft gestalten.", a.text)
+        self.assertIn('src="assets/wag-logo.webp"', a.text)
+        self.assertIn('href="styles.css"', a.text)
+        self.assertEqual(self.c.get("/styles.css").status_code, 200)
+        self.assertEqual(self.c.get("/script.js").status_code, 200)
+        self.assertEqual(self.c.get("/wissenstest.html").status_code, 200)
+        self.assertEqual(self.c.get("/assets/wag-logo.webp").status_code, 200)
+        self.assertEqual(self.c.get("/assets/wag-aktuelles-01.webp").status_code, 200)
+        self.assertEqual(self.c.get("/assets/wag-aktuelles-02.webp").status_code, 200)
+        self.assertEqual(self.c.get("/assets/wag-aktuelles-03.webp").status_code, 200)
+        for bild in ("wag-aktuelles-01.webp", "wag-aktuelles-02.webp",
+                     "wag-aktuelles-03.webp"):
+            self.assertIn(f'assets/{bild}', a.text)
+        folien = re.findall(
+            r'<article class="news-slide".*?</article>', a.text, re.DOTALL)
+        self.assertEqual(len(folien), 3)
+        for folienkarte, bild in zip(
+                folien, ("wag-aktuelles-01.webp", "wag-aktuelles-02.webp",
+                         "wag-aktuelles-03.webp")):
+            self.assertIn(f'assets/{bild}', folienkarte)
+        self.assertNotIn('class="news-gallery"', a.text)
+        stil = self.c.get("/styles.css").text
+        self.assertIn(".photo-visual img", stil)
+        self.assertIn("object-fit:contain", stil)
+        self.assertIn(".news-slide.is-before:before", stil)
+        self.assertIn("display:none!important", stil)
+        self.assertNotIn("data-stack-label=", a.text)
 
-    def test_startseitentext_ist_erhalten(self):
-        """Der Text der Startseite wurde aus V1 übernommen und bleibt."""
+    def test_teamrollen_zeigen_die_zustaendigen(self):
         text = self.c.get("/").text
-        for satz in ("An alle, die größer denken.",
-                     "Von Schülern geleitet. Sonst niemandem.",
-                     "Zwei Halbjahre, zwei Welten",
-                     "Was wir konkret machen",
-                     "Du fängst an, wo du stehst"):
-            self.assertIn(satz, text, satz)
-
-    def test_fusszeile_ohne_klarnamen(self):
-        """Nach außen tritt die AG auf, nicht eine einzelne Person."""
-        text = self.c.get("/").text
-        self.assertNotIn("Janis Hahn", text)
+        for name in ("Minh Nguyen", "Musashi Noack", "Ivan Vakuliuk",
+                     "Janis Hahn", "Arman Hassan"):
+            self.assertIn(name, text)
         self.assertIn("© 2026", text)
         self.assertIn("Wirtschafts- &amp; Investment-AG", text)
 
@@ -48,46 +67,6 @@ class TestWebsite(unittest.TestCase):
         text = self.c.get("/").text
         self.assertNotIn("aufmacher-zahl", text)
         self.assertNotIn("Mitglieder</span>", text)
-
-    def test_angebot_kommt_aus_der_datenbank(self):
-        from kern.datenbank import SessionLocal
-        from kern.modelle import Inhalt
-        from kern import inhalte
-
-        db = SessionLocal()
-        db.add(Inhalt(bereich="angebot", titel="Testbaustein",
-                      text="Aus der Datenbank.", reihenfolge=999))
-        db.commit()
-        db.close()
-        inhalte.verwerfen()
-        self.assertIn("Testbaustein", self.c.get("/").text)
-
-    def test_portfolio_erscheint_erst_mit_eintraegen(self):
-        """Eine leere Erfolgsliste wirbt gegen die AG - dann lieber weg."""
-        from kern.datenbank import SessionLocal
-        from kern.modelle import Inhalt
-        from kern import inhalte
-
-        db = SessionLocal()
-        db.query(Inhalt).filter(Inhalt.bereich == "portfolio").delete()
-        db.commit()
-        db.close()
-        inhalte.verwerfen()
-        self.assertNotIn("Was dabei herausgekommen ist", self.c.get("/").text)
-
-        db = SessionLocal()
-        db.add(Inhalt(bereich="portfolio", titel="Planspiel Börse 2025",
-                      text="Mit zwei Teams angetreten.",
-                      zeitraum="Herbst 2025",
-                      ergebnis="2. Platz im Landesfinale", reihenfolge=10))
-        db.commit()
-        db.close()
-        inhalte.verwerfen()
-        seite = self.c.get("/").text
-        self.assertIn("Was dabei herausgekommen ist", seite)
-        self.assertIn("Planspiel Börse 2025", seite)
-        self.assertIn("Herbst 2025", seite)
-        self.assertIn("2. Platz im Landesfinale", seite)
 
     def test_weitere_seiten(self):
         for pfad, wort in (("/bewerbung", "Warum willst du mitmachen"),
@@ -130,7 +109,7 @@ class TestWebsite(unittest.TestCase):
     def test_honigtopf_faengt_automaten(self):
         from kern.datenbank import SessionLocal
         from kern.modelle import ContactMessage
-        token = hilfe.csrf_aus(self.c.get("/").text)
+        token = hilfe.csrf_aus(self.c.get("/bewerbung").text)
         self.c.post("/kontakt", data={
             "name": "Bot", "email": "bot@spam.de", "nachricht": "Werbung hier",
             "webseite": "http://spam.example", "csrf": token})

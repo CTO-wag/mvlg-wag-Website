@@ -47,20 +47,18 @@ id = "6507974c41344a2c94e117d19e49b66f"
 PRUEF_ADRESSE = "https://mvlg-wag.de/"
 # Ein eigener ntfy-Server, falls ihr je einen aufsetzt. Leer lassen = ntfy.sh.
 NTFY_BASIS = "https://ntfy.sh"
+# Bewerbungshinweise gehen unabhaengig vom Backend an den Vorstand.
+BEWERBUNG_EMAILS = "ceo@exekutive.mvlg-wag.de,coo@exekutive.mvlg-wag.de,cro@recruitment.mvlg-wag.de,cto@tech.mvlg-wag.de"
+MAIL_ABSENDER = "mail@mvlg-wag.de"
+MAIL_ABSENDER_NAME = "Wirtschafts- & Investment-AG"
+# Die Backend-Pruefung bleibt aus; der Zeitplan dient den E-Mail-Wiederholungen.
+PRUEFUNG_AKTIV = "0"
 
 # ---------------------------------------------------------------------------
 #  Regelmaessig nachsehen, auch wenn niemand die Seite oeffnet
 # ---------------------------------------------------------------------------
-#  Standardmaessig AUS. Ohne Zeitplan erfaehrt der CTO von einem Ausfall erst,
-#  wenn ihn jemand meldet - faellt die Plattform Freitagabend aus, also
-#  moeglicherweise gar nicht. Mit Zeitplan schaut Cloudflare alle fuenf Minuten
-#  nach und meldet den Wechsel: einmal beim Ausfall, einmal bei der Rueckkehr.
-#
-#  Bedenke dabei: Der Rechner in der Schule laeuft nicht rund um die Uhr. Wenn
-#  er abends planmaessig ausgeht, klingelt es abends planmaessig - und eine
-#  Meldung, die jeden Abend kommt, liest nach einer Woche niemand mehr. Schalte
-#  das nur ein, wenn der Rechner eigentlich immer laufen soll.
-#
-#  Zum Einschalten die naechsten zwei Zeilen entkommentieren:
-# [triggers]
-# crons = ["*/5 * * * *"]
+#  Alle fuenf Minuten werden unzustellbare Bewerbungs-E-Mails erneut versucht.
+#  Backend-Ausfallalarme werden nur bei PRUEFUNG_AKTIV = "1" regelmaessig
+#  geprueft und gemeldet.
+[triggers]
+crons = ["*/5 * * * *"]

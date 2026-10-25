@@ -32,7 +32,7 @@
  * Sie muessen mit in die Datei: Der Server, von dem sie sonst kaemen, ist
  * genau der ausgefallene. */
 import { SCHRIFTEN, STIL, WAPPEN, LOGO, FAVICON, ABTEILUNGEN, QUIZ_JS,
-         QUIZ_FRAGEN, INHALTE } from "./eingebettet.js";
+         QUIZ_FRAGEN, INHALTE, NETLIFY_SITE } from "./eingebettet.js";
 
 /* Welche Fassung gerade laeuft.
  *
@@ -44,7 +44,7 @@ import { SCHRIFTEN, STIL, WAPPEN, LOGO, FAVICON, ABTEILUNGEN, QUIZ_JS,
  * Die Nummer steht an drei Stellen: als Kopfzeile x-auffangnetz auf jeder
  * Antwort, die vom Worker selbst kommt, im Selbsttest und klein unten auf der
  * Fehlerseite. Bei jeder Aenderung hochzaehlen. */
-const FASSUNG = "2026-09-12-a";
+const FASSUNG = "2026-10-25-bilder-voll";
 
 /* Diese Antworten kommen von Cloudflare selbst und heissen "die Anwendung war
    nicht erreichbar". Ein blankes 500 steht bewusst NICHT dabei: Das hat die
@@ -99,8 +99,12 @@ export default {
       return meldungAufnehmen(anfrage, umgebung, adresse);
     }
     if (adresse.pathname === "/__ausfall/bewerben"
+        && anfrage.method === "OPTIONS") {
+      return bewerbungVorflug(anfrage);
+    }
+    if (adresse.pathname === "/__ausfall/bewerben"
         && anfrage.method === "POST") {
-      return bewerbungAufnehmen(anfrage, umgebung);
+      return bewerbungAufnehmen(anfrage, umgebung, ablauf);
     }
     if (adresse.pathname === "/__ausfall/nachricht"
         && anfrage.method === "POST") {
@@ -118,6 +122,10 @@ export default {
     }
     if (adresse.pathname === "/__ausfall/probe" && anfrage.method === "POST") {
       return probeKlingeln(umgebung);
+    }
+    if (adresse.pathname === "/__ausfall/probe-bewerbungs-email"
+        && anfrage.method === "POST") {
+      return probeBewerbungsEmail(anfrage, umgebung);
     }
     if (adresse.pathname === "/__ausfall/lebt") {
       /* Von der Fehlerseite aus gefragt: Geht es wieder? Absichtlich ein
@@ -140,6 +148,27 @@ export default {
       return fetch(anfrage);
     }
 
+    /* Die Hauptdomain gehoert der statischen Landingpage. Sie kommt immer
+       direkt aus dem Worker-Bundle; ein erreichbarer alter Website-Server
+       darf sie nicht wieder durch seine alte Startseite ersetzen. Login und
+       API-Aufrufe bleiben beim zustandsbehafteten Backend. */
+    const weg = adresse.pathname.toLowerCase();
+    const backendPfad = weg === "/api" || weg.startsWith("/api/")
+      || weg === "/login" || weg.startsWith("/login/")
+      || weg === "/logout" || weg.startsWith("/dashboard")
+      || weg.startsWith("/passwort") || weg === "/email-bestaetigen"
+      || weg.startsWith("/kalender/") || weg.startsWith("/__ausfall/");
+    if (adresse.hostname === "mvlg-wag.de" && !backendPfad
+        && (anfrage.method === "GET" || anfrage.method === "HEAD")) {
+      if (weg === "/" && Date.now() - letzteZustandspflege > 60000) {
+        letzteZustandspflege = Date.now();
+        nebenbei(ablauf, erreichbar(anfrage).then((lebt) =>
+          zustandPflegen(umgebung, lebt,
+                         lebt ? "" : "keine Verbindung", false)));
+      }
+      return netlifyFallback(anfrage, adresse);
+    }
+
     try {
       /* Eine zuvor ausgelieferte Notfallseite darf weder aus dem Browser-
          noch aus einem vorgeschalteten Cache wiederkommen. Der Reload-
@@ -160,12 +189,13 @@ export default {
       }
       const grund = String(antwort.status);
       nebenbei(ablauf, zustandPflegen(umgebung, false, grund, false));
-      return ausfallseite(adresse, umgebung, grund);
+      return netlifyFallback(anfrage, adresse) || ausfallseite(adresse, umgebung, grund);
     } catch (fehler) {
       /* Kam gar keine Antwort zustande. Fuer den Nutzer dasselbe Bild. */
       nebenbei(ablauf, zustandPflegen(umgebung, false, "keine Verbindung",
                                       false));
-      return ausfallseite(adresse, umgebung, "keine Verbindung");
+      return netlifyFallback(anfrage, adresse)
+        || ausfallseite(adresse, umgebung, "keine Verbindung");
     }
   },
 
@@ -179,6 +209,8 @@ export default {
    */
   async scheduled(_ereignis, umgebung) {
     if (!umgebung.LAGER) { return; }
+    await bewerbungsalarmeWiederholen(umgebung);
+    if (umgebung.PRUEFUNG_AKTIV !== "1") { return; }
     let lebt = false;
     let grund = "keine Verbindung";
     try {
@@ -196,6 +228,49 @@ export default {
     await zustandPflegen(umgebung, lebt, grund, false);
   },
 };
+
+function netlifyFallback(anfrage, adresse) {
+  if (adresse.hostname !== "mvlg-wag.de") { return null; }
+  const weg = adresse.pathname.toLowerCase();
+  if (weg.startsWith("/api") || weg.startsWith("/__ausfall/")
+      || weg === "/login" || weg.startsWith("/dashboard")) {
+    return null;
+  }
+  const alias = {
+    "/": "/index.html",
+    "/bewerbung": "/bewerben.html",
+    "/bewerben": "/bewerben.html",
+    "/quiz": "/wissenstest.html",
+    "/kontakt": "/kontakt.html",
+    "/impressum": "/impressum.html",
+    "/datenschutz": "/datenschutz.html",
+  };
+  const datei = NETLIFY_SITE[alias[weg] || adresse.pathname];
+  if (!datei) {
+    return new Response("Nicht gefunden.", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8",
+                 "cache-control": "no-store",
+                 "x-content-type-options": "nosniff" },
+    });
+  }
+  const koerper = datei.base64
+    ? Uint8Array.from(atob(datei.body), zeichen => zeichen.charCodeAt(0))
+    : datei.body;
+  return new Response(anfrage.method === "HEAD" ? null : koerper, {
+    status: 200,
+    headers: {
+      "content-type": datei.type,
+      "cache-control": /text\/html|text\/css|javascript/.test(datei.type)
+        ? "no-store"
+        : "public, max-age=3600",
+      "x-content-type-options": "nosniff",
+      "referrer-policy": "strict-origin-when-cross-origin",
+      "permissions-policy": "camera=(), microphone=(), geolocation=()",
+      "x-auffangnetz": FASSUNG,
+    },
+  });
+}
 
 
 /* ------------------------------------------------------------------------- */
@@ -485,9 +560,11 @@ async function nachrichtAufnehmen(anfrage, umgebung) {
  * Einlesen noch einmal - hier draussen ist niemandem zu trauen, auch nicht
  * dem eigenen Formular.
  */
-async function bewerbungAufnehmen(anfrage, umgebung) {
-  const kopf = { "content-type": "application/json; charset=utf-8",
-                 "cache-control": "no-store" };
+async function bewerbungAufnehmen(anfrage, umgebung, ablauf) {
+  const kopf = Object.assign(
+    { "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store", "vary": "Origin" },
+    bewerbungCors(anfrage));
   const nein = (grund, status) => new Response(
     JSON.stringify({ ok: false, grund }), { status: status || 400, headers: kopf });
 
@@ -559,6 +636,10 @@ async function bewerbungAufnehmen(anfrage, umgebung) {
                 + crypto.randomUUID().slice(0, 8);
   await umgebung.LAGER.put(kennung, JSON.stringify(b),
                            { expirationTtl: AUFBEWAHRUNG_SEKUNDEN });
+  const alarm = "bewerbungsalarm:" + kennung;
+  await umgebung.LAGER.put(alarm, kennung,
+                           { expirationTtl: AUFBEWAHRUNG_SEKUNDEN });
+  nebenbei(ablauf, bewerbungsEmailSenden(umgebung, kennung, b));
 
   /* Hier klingelt es OHNE Ruhefrist. Eine Bewerbung ist selten und wichtig -
      wer sich waehrend eines Ausfalls bewirbt, soll nicht deshalb zwei Tage
@@ -574,6 +655,165 @@ async function bewerbungAufnehmen(anfrage, umgebung) {
   } catch (fehler) { /* die Bewerbung liegt trotzdem sicher */ }
 
   return new Response(JSON.stringify({ ok: true }), { headers: kopf });
+}
+
+async function bewerbungsEmailSenden(umgebung, kennung, bewerbung) {
+  const empfaenger = String(umgebung.BEWERBUNG_EMAILS || "")
+    .split(",").map((adresse) => adresse.trim()).filter(Boolean);
+  if (!umgebung.BREVO_API_KEY || !empfaenger.length) { return false; }
+
+  let grund = "Brevo ist nicht erreichbar";
+  try {
+    const antwort = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": umgebung.BREVO_API_KEY,
+                 "content-type": "application/json" },
+      body: JSON.stringify({
+        sender: {
+          name: umgebung.MAIL_ABSENDER_NAME || "Wirtschafts- & Investment-AG",
+          email: umgebung.MAIL_ABSENDER || "mail@mvlg-wag.de",
+        },
+        to: empfaenger.map((email) => ({ email })),
+        subject: "Neue Bewerbung bei der Wirtschafts- & Investment-AG",
+        textContent: [
+          "Eine neue Bewerbung ist eingegangen und sicher im Worker gespeichert.",
+          "",
+          "Name: " + bewerbung.vorname + " " + bewerbung.nachname,
+          "Klasse/Jahrgangsstufe: " + bewerbung.klasse,
+          "Wunschabteilung: " + bewerbung.abteilung,
+          "Eingegangen: " + bewerbung.zeitpunkt,
+          "",
+          "Die vollstaendige Bewerbung wird in die Plattform uebernommen, sobald "
+            + "der Backend-Server wieder laeuft.",
+        ].join("\n"),
+      }),
+    });
+    if (!antwort.ok) {
+      grund = "Brevo antwortet " + antwort.status;
+      throw new Error(grund);
+    }
+    await umgebung.LAGER.delete("bewerbungsalarm:" + kennung);
+    await umgebung.LAGER.delete("bewerbungsalarm_fehler");
+    return true;
+  } catch (fehler) {
+    await umgebung.LAGER.put(
+      "bewerbungsalarm_fehler",
+      new Date().toISOString() + " - " + grund,
+      { expirationTtl: AUFBEWAHRUNG_SEKUNDEN });
+    return false;
+  }
+}
+
+async function probeBewerbungsEmail(anfrage, umgebung) {
+  const kopf = { "content-type": "application/json; charset=utf-8",
+                 "cache-control": "no-store" };
+  if (!schluesselStimmt(anfrage, umgebung)) {
+    return new Response(JSON.stringify({ ok: false, grund: "Nein." }),
+                        { status: 403, headers: kopf });
+  }
+  const empfaenger = String(umgebung.BEWERBUNG_EMAILS || "")
+    .split(",").map((adresse) => adresse.trim()).filter(Boolean);
+  if (!umgebung.BREVO_API_KEY || !empfaenger.length) {
+    return new Response(JSON.stringify({
+      ok: false, grund: "E-Mail-Versand ist nicht eingerichtet.",
+    }), { status: 503, headers: kopf });
+  }
+  if (!umgebung.LAGER) {
+    return new Response(JSON.stringify({ ok: false, grund: "Kein KV." }),
+                        { status: 503, headers: kopf });
+  }
+  const zuletzt = parseInt(
+    await umgebung.LAGER.get("probe_bewerbungs_email") || "0", 10);
+  const jetzt = Math.floor(Date.now() / 1000);
+  if (jetzt - zuletzt < 60) {
+    return new Response(JSON.stringify({
+      ok: false, grund: "Gerade eben schon getestet. Eine Minute warten.",
+    }), { status: 429, headers: kopf });
+  }
+  await umgebung.LAGER.put("probe_bewerbungs_email", String(jetzt),
+                           { expirationTtl: 3600 });
+  try {
+    const antwort = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": umgebung.BREVO_API_KEY,
+                 "content-type": "application/json" },
+      body: JSON.stringify({
+        sender: {
+          name: umgebung.MAIL_ABSENDER_NAME || "Wirtschafts- & Investment-AG",
+          email: umgebung.MAIL_ABSENDER || "mail@mvlg-wag.de",
+        },
+        to: empfaenger.map((email) => ({ email })),
+        subject: "TEST: Bewerbungsbenachrichtigung",
+        textContent: "Dies ist eine Testnachricht des Bewerbungs-Auffangnetzes. "
+          + "Es wurde keine echte Bewerbung eingereicht. Wenn du diese E-Mail "
+          + "erhaeltst, funktioniert der Versand an das Vorstandsteam.",
+      }),
+    });
+    if (!antwort.ok) {
+      const fehler = "Brevo antwortet " + antwort.status;
+      await umgebung.LAGER.put(
+        "bewerbungsalarm_fehler",
+        new Date().toISOString() + " - " + fehler,
+        { expirationTtl: AUFBEWAHRUNG_SEKUNDEN });
+      return new Response(JSON.stringify({ ok: false, grund: fehler }),
+                          { status: 502, headers: kopf });
+    }
+    await umgebung.LAGER.delete("bewerbungsalarm_fehler");
+    return new Response(JSON.stringify({
+      ok: true, empfaenger: empfaenger.length,
+    }), { headers: kopf });
+  } catch (fehler) {
+    return new Response(JSON.stringify({
+      ok: false, grund: "Brevo ist nicht erreichbar.",
+    }), { status: 502, headers: kopf });
+  }
+}
+
+async function bewerbungsalarmeWiederholen(umgebung) {
+  if (!umgebung.BREVO_API_KEY || !umgebung.BEWERBUNG_EMAILS) { return; }
+  const warteschlange = await umgebung.LAGER.list({
+    prefix: "bewerbungsalarm:", limit: 20,
+  });
+  for (const eintrag of warteschlange.keys) {
+    const kennung = await umgebung.LAGER.get(eintrag.name);
+    if (!kennung || !kennung.startsWith("bewerbung:")) { continue; }
+    const roh = await umgebung.LAGER.get(kennung);
+    if (!roh) {
+      await umgebung.LAGER.delete(eintrag.name);
+      continue;
+    }
+    let bewerbung;
+    try {
+      bewerbung = JSON.parse(roh);
+    } catch (fehler) {
+      continue;
+    }
+    if (!await bewerbungsEmailSenden(umgebung, kennung, bewerbung)) { break; }
+  }
+}
+
+function bewerbungCors(anfrage) {
+  const herkunft = anfrage.headers.get("origin") || "";
+  const erlaubt = herkunft === "https://mvlg-wag.de"
+    || herkunft === "https://www.mvlg-wag.de"
+    || /^https:\/\/[a-z0-9-]+\.netlify\.app$/i.test(herkunft);
+  return erlaubt ? { "access-control-allow-origin": herkunft } : {};
+}
+
+function bewerbungVorflug(anfrage) {
+  const cors = bewerbungCors(anfrage);
+  if (!cors["access-control-allow-origin"]) {
+    return new Response(null, { status: 403 });
+  }
+  return new Response(null, {
+    status: 204,
+    headers: Object.assign(cors, {
+      "access-control-allow-methods": "POST, OPTIONS",
+      "access-control-allow-headers": "Content-Type",
+      "access-control-max-age": "600",
+      "vary": "Origin",
+    }),
+  });
 }
 
 /** Die gelagerten Meldungen an die Plattform uebergeben. */
@@ -749,6 +989,10 @@ async function klingelnMitRuhe(umgebung, meldung) {
 async function selbsttest(anfrage, umgebung) {
   const adresse = new URL(anfrage.url);
   const lager = Boolean(umgebung.LAGER);
+  const bewerbungsempfaenger = String(umgebung.BEWERBUNG_EMAILS || "")
+    .split(",").map((adresse) => adresse.trim()).filter(Boolean);
+  const bewerbungsEmailEingerichtet = Boolean(
+    umgebung.BREVO_API_KEY && bewerbungsempfaenger.length);
   const zeilen = [];
   let offen = 0;
 
@@ -783,18 +1027,37 @@ async function selbsttest(anfrage, umgebung) {
         + "fuer dich - du denkst dir einen unerratbaren Namen aus und traegst "
         + "ihn an ZWEI Stellen zeichengenau ein: hier als Secret NTFY_THEMA "
         + "(Settings, Variables and Secrets) und in der ntfy-App als Abo.");
+  zeile("Bewerbungs-E-Mail eingerichtet", bewerbungsEmailEingerichtet,
+        bewerbungsEmailEingerichtet ? "bereit" : "fehlt",
+        "E-Mail-Benachrichtigungen brauchen das Secret BREVO_API_KEY und die "
+        + "Variable BEWERBUNG_EMAILS. Nicht zugestellte Hinweise bleiben in KV "
+        + "und werden alle fuenf Minuten erneut versucht.");
 
   let wartend = 0;
+  let bewerbungsalarmeWartend = 0;
   let letzterFehler = "";
+  let letzterBewerbungsFehler = "";
   if (lager) {
     try {
       const liste = await umgebung.LAGER.list({ prefix: "meldung:", limit: 100 });
       wartend = liste.keys.length;
       letzterFehler = await umgebung.LAGER.get("klingel_fehler") || "";
+      letzterBewerbungsFehler =
+        await umgebung.LAGER.get("bewerbungsalarm_fehler") || "";
+      const bewerbungsalarme = await umgebung.LAGER.list({
+        prefix: "bewerbungsalarm:", limit: 100,
+      });
+      bewerbungsalarmeWartend = bewerbungsalarme.keys.length;
     } catch (fehler) {
       letzterFehler = "KV nicht lesbar: " + fehler.name;
     }
   }
+  zeile("Bewerbungs-E-Mail-Hinweise ausstehend", true,
+        String(bewerbungsalarmeWartend),
+        bewerbungsalarmeWartend
+          ? "Sie werden erneut verschickt, sobald Brevo eingerichtet und "
+            + "erreichbar ist."
+          : "Keine offenen E-Mail-Hinweise.", false);
   zeile("Meldungen, die auf Abholung warten", true, String(wartend),
         wartend
           ? "Sie werden zu Tickets, sobald die Plattform laeuft und die "
@@ -806,6 +1069,12 @@ async function selbsttest(anfrage, umgebung) {
           "Ein Eintrag aus der Vergangenheit, kein offener Punkt - deshalb "
           + "zaehlt er oben nicht mit. Er verschwindet, sobald wieder etwas "
           + "durchgekommen ist. Zum Ausprobieren der Knopf unten.", false);
+  }
+  if (letzterBewerbungsFehler) {
+    zeile("Letzter Fehler bei Bewerbungs-E-Mail", false,
+          letzterBewerbungsFehler,
+          "Der Versand wird automatisch wiederholt, sobald Brevo erreichbar "
+          + "und der API-Schluessel gueltig ist.", false);
   }
 
   const gemerkt = lager ? await umgebung.LAGER.get("zustand") : null;

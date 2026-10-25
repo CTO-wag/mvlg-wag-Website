@@ -1,10 +1,9 @@
 # Auffangnetz einrichten
 
-Was du danach hast: Ist die Plattform nicht erreichbar, bekommt ein Besucher
-trotzdem die Startseite. Nicht die englische Cloudflare-Seite, und auch keine
-Fehlermeldung – **dieselbe Seite wie immer**: dasselbe Stylesheet, dieselben
-Schriften, derselbe Aufbau. Bewerbung und Kontaktformular funktionieren
-weiter; der Worker nimmt beides selbst entgegen.
+Was du danach hast: Die öffentliche Startseite kommt direkt aus
+`wag-koblenz/dist` im Cloudflare Worker. Sie hängt nicht von Netlify oder dem
+Anwendungsserver ab. Das Dashboard bleibt davon getrennt: Wer sich dort
+anmelden will, bekommt bei einem Ausfall den Hinweis und kann ihn melden.
 
 Der Ausfall steht an genau einer Stelle: **Wer auf „Login" tippt, erfährt es.**
 Dann geht ein Hinweis auf – das System ist gerade nicht erreichbar, wir sehen
@@ -17,45 +16,38 @@ erste Zeile dagegen kostet ihn. Wer sich anmelden will, gehört dagegen zur AG,
 und für ihn ist „das System ist gerade aus" die richtige, vollständige
 Antwort.
 
-Was fehlt, fehlt mit Absicht: das Quiz und alles, was sonst live aus der
-Datenbank käme. Die Datenbank ist ja gerade der Teil, der nicht antwortet. Die
-vier im Dashboard pflegbaren Blöcke (Vorteile, Stufen, Aktivitäten,
-Portfolio) sind eingebacken – sie stammen von dem Tag, an dem die Notfassung
-zuletzt gebaut wurde.
+Die öffentliche Seite und das Quiz sind statisch und bleiben beim Ausfall
+verfügbar. Sie entsprechen dem Stand des letzten Worker-Baus. Anmelden und
+Dashboard-Inhalte live laden geht ohne den Anwendungsserver nicht.
 
-Was während eines Ausfalls hereinkommt – Bewerbung, Kontaktanfrage,
-Störungsmeldung – wird bei Cloudflare hinterlegt und automatisch eingetragen,
-sobald die Plattform wieder läuft. Mit dem richtigen Zeitpunkt, samt
-Bestätigungsmail und Benachrichtigung an die Zuständigen. Hinterher sieht es
-aus wie ganz normal hereingekommen.
+Bewerbungen werden vom Worker zwischengespeichert und automatisch eingetragen,
+sobald die Plattform wieder läuft. Das Kontaktformular öffnet wie auf Netlify
+einen E-Mail-Entwurf.
 
 Dauer: etwa 20 Minuten.
 
 ---
 
-## Schritt 0: Die Notfassung bauen
+## Schritt 0: Den Worker mit der Website bauen
 
 Der Worker steht am Rand des Netzes und kann sich **nichts** nachladen – der
-Server, von dem Stylesheet, Schriften und Wappen kämen, ist genau der
-ausgefallene. Alles muss mit in die Worker-Datei. Das erledigt ein Skript:
+Server, von dem die Website-Dateien kämen, ist genau der ausgefallene. Die
+Netlify-Veröffentlichung muss deshalb mit in die Worker-Datei. Das erledigt
+ein Skript:
 
 ```
 python werkzeuge/auffangnetz_bauen.py
 ```
 
-Es liest `statisch/stil/basis.css`, `statisch/stil/website.css`, die
-Schriftschnitte und die Bilder ein und schreibt sie nach
-`cloudflare/eingebettet.js`. Steht eine Datenbank zur Verfügung, holt es
-zusätzlich die vier pflegbaren Startseiten-Blöcke; sonst bleibt der bisherige
-Stand stehen.
+Es liest `wag-koblenz/dist` samt Assets sowie die übrigen nötigen Dateien ein
+und schreibt sie nach `cloudflare/eingebettet.js`.
 
-**Wann ausführen:** immer, wenn sich das Aussehen der Website ändert oder wenn
-im Dashboard Startseiten-Blöcke gepflegt wurden. Sonst sieht die Notfassung
-aus wie die Seite von vorletztem Jahr – und zwar ausgerechnet dann, wenn man
-es am wenigsten gebrauchen kann.
+**Wann ausführen:** nach jeder Änderung an der Website und vor jedem
+Worker-Deployment.
 
 `cloudflare/eingebettet.js` gehört mit ins Repository und mit ins Deployment.
-Von Hand ändern lohnt nicht: Der nächste Lauf überschreibt es.
+Von Hand ändern lohnt nicht: Der nächste Lauf überschreibt es. Das Netlify-
+Logo liegt als WebP vor, damit die Worker-Fassung klein bleibt.
 
 ---
 
@@ -104,7 +96,7 @@ in der Arbeit ist, fällt auf einer Unterseite hinein.
 Beide Adressen, weil ein Ausfall beide trifft.
 
 **Jetzt einmal prüfen, ob die Seite noch normal läuft.** Öffne
-`https://mvlg-wag.de` – es muss alles aussehen wie vorher. Wenn nicht: in
+`https://mvlg-wag.de` – es muss wie die Veröffentlichung aus `dist` aussehen. Wenn nicht: in
 **Domains & Routes** die Routen wieder entfernen, dann ist der Zustand von
 vorher zurück.
 
@@ -168,10 +160,47 @@ Zwei Dinge, die dazugehören:
 - Der Alarm braucht **beides** – den Zwischenspeicher aus Schritt 3 und dieses
   Thema. Der Selbsttest zeigt in der Zeile „Alarm beim Ausfall", ob er scharf
   ist.
-- Er hängt daran, dass **jemand die Seite aufruft**. Fällt die Plattform nachts
-  aus und niemand schaut hin, merkt es auch der Worker nicht. Wenn du das
-  willst, schalte zusätzlich den Zeitplan ein (siehe unten) – dann sieht
-  Cloudflare alle fünf Minuten von selbst nach.
+- Der Alarm beim Ausfall wird nur regelmaessig geprueft, wenn
+  `PRUEFUNG_AKTIV` in `wrangler.toml` auf `"1"` steht. Die E-Mail-Wiederholungen
+  laufen unabhaengig davon alle fuenf Minuten.
+
+### 4c. Bewerbungen auch ohne Backend per E-Mail melden
+
+Jede Bewerbung wird zuerst sicher in Cloudflare KV gespeichert. Zusaetzlich
+schickt der Worker eine kurze Benachrichtigung an die Funktionsadressen von
+CEO (`ceo@exekutive.mvlg-wag.de`), COO (`coo@exekutive.mvlg-wag.de`), CRO
+(`cro@recruitment.mvlg-wag.de`) und CTO (`cto@tech.mvlg-wag.de`) – unabhaengig
+davon, ob der Backend-Server laeuft. Die E-Mail enthaelt Name,
+Klasse/Jahrgangsstufe, Wunschabteilung und Eingangszeit; die vollstaendige
+Bewerbung bleibt im KV und wird vom Backend uebernommen, sobald es wieder
+gestartet wird. Schlaegt der Versand fehl, versucht der Worker es alle fuenf
+Minuten erneut.
+
+Der Versand nutzt Brevo, das auch fuer die vorhandenen System-E-Mails genutzt
+wird. Dafuer braucht der Worker einen **Brevo-API-Schluessel**. Der SMTP-
+Schluessel aus `config.cmd` ist dafuer nicht geeignet.
+
+1. Im Brevo-Konto einen API-Schluessel erstellen.
+2. Im Projektordner `cloudflare` diesen Befehl ausfuehren und den Schluessel
+   auf Nachfrage eingeben:
+
+   ```
+   npx wrangler secret put BREVO_API_KEY
+   ```
+
+3. Der Worker wird von Wrangler mit dem Secret aktualisiert. Im Selbsttest
+   muss „Bewerbungs-E-Mail eingerichtet" **bereit** anzeigen.
+
+Zum gefahrlosen Versandtest ohne fingierte Bewerbung kann einmal pro Minute
+`POST https://mvlg-wag.de/__ausfall/probe-bewerbungs-email` mit dem Header
+`x-ausfall-schluessel` (dem Abholschluessel) aufgerufen werden. HTTP 200
+bedeutet, dass Brevo die ausdrücklich als **TEST** markierte Nachricht an alle
+vier Empfänger angenommen hat. Den Schlüssel nie in einen öffentlichen
+Chat, Screenshot oder Link schreiben.
+
+Ohne diesen API-Schluessel werden Bewerbungen weiterhin in KV gespeichert,
+aber es kann keine E-Mail zugestellt werden. Offene Hinweise bleiben sichtbar
+im Selbsttest und werden nach dem Einrichten erneut versandt.
 
 ---
 
@@ -207,8 +236,8 @@ https://mvlg-wag.de/__ausfall/selbsttest
 ```
 
 Die Seite sagt dir in einer Tabelle, was eingerichtet ist und was fehlt –
-Zwischenspeicher, Abholschlüssel, ntfy-Thema, wartende Meldungen. Steht oben
-„Alles eingerichtet", stimmt die Kette.
+Zwischenspeicher, Abholschlüssel, ntfy-Thema, Bewerbungs-E-Mail und wartende
+Meldungen. Steht oben „Alles eingerichtet", stimmt die Kette.
 
 Ist ein ntfy-Thema hinterlegt, gibt es dort auch einen Knopf
 **Probemeldung aufs Telefon**. Das ist der schnellste Weg herauszufinden, ob es
@@ -227,12 +256,12 @@ Der ehrliche Test ist der, bei dem du es kaputt machst.
 1. Auf dem Laptop das Fenster der Plattform schließen (**nicht** den Tunnel –
    dann bekommst du 502 statt 1033, beide werden abgefangen, aber so ist es
    schneller wieder da).
-2. Vom Telefon `https://mvlg-wag.de` öffnen. Du musst die **ganz normale
-   Startseite** sehen. Genau das ist der Test: Sieht sie anders aus als sonst
-   – andere Schrift, kein Wappen, verrutschte Kästen –, dann fehlt
-   `eingebettet.js` oder ist veraltet (Schritt 0).
-3. Oben rechts auf **Login** tippen. Erst jetzt darf stehen: „Das System ist
-   gerade nicht erreichbar."
+2. Vom Telefon `https://mvlg-wag.de` öffnen. Du musst die **Startseite aus
+   `wag-koblenz/dist`** samt Stylesheet, Skript und Logo sehen. Genau das ist
+   der Test: Sieht sie anders aus als `dist`, dann fehlt `eingebettet.js` oder ist
+   veraltet (Schritt 0).
+3. Oben rechts auf **Anmelden** tippen. Auf `app.mvlg-wag.de` muss jetzt
+   stehen: „Das System ist gerade nicht erreichbar."
 4. Warte 15 Sekunden – der Zähler im Hinweis muss herunterlaufen.
 5. **Dem CTO melden** aufklappen, etwas hineinschreiben, abschicken.
    Es muss stehen: „Angekommen."
@@ -247,25 +276,15 @@ Wenn Punkt 2, 3 und 8 klappen, ist alles richtig verbunden.
 **Und einmal dasselbe mit einer Bewerbung** – das ist der Weg, der wirklich
 zählt:
 
-1. Plattform wieder abschalten, `https://mvlg-wag.de/bewerbung` öffnen.
+1. Plattform wieder abschalten, `https://mvlg-wag.de/bewerben.html` öffnen.
 2. Das Bewerbungsformular ausfüllen und abschicken. Es muss stehen:
    „Danke, … Deine Bewerbung liegt bei uns."
 3. Plattform starten, ein paar Minuten warten.
 4. Im Dashboard unter **Bewerbungen** steht sie – mit dem Zeitpunkt, zu dem
    sie wirklich abgeschickt wurde, nicht dem des Neustarts.
 
-**Und mit einer Frage über das Kontaktformular:**
-
-1. Plattform abschalten, `https://mvlg-wag.de` öffnen, ganz nach unten zu
-   „Fragen? Schreib einfach." scrollen und etwas abschicken.
-2. Plattform starten, ein paar Minuten warten.
-3. Im Dashboard unter **Nachrichten** steht sie bei „Anfragen über die
-   Website" – und lässt sich von dort per E-Mail beantworten.
-
-Anders als bei den Störungsmeldungen nimmt der Worker Bewerbungen und
-Anfragen **immer** an, auch wenn die Plattform währenddessen zurückkommt.
-Lieber eine doppelte als eine verlorene: Eine doppelte sieht man und löscht
-sie, eine fehlende sieht niemand.
+Das Kontaktformular öffnet einen E-Mail-Entwurf. Es speichert keine Anfrage
+im Dashboard.
 
 ---
 
@@ -332,6 +351,17 @@ nicht zeichengenau überein. Steht in der Tabelle eine Zeile
 „Letzter Fehler beim Klingeln", hat ntfy die Nachricht abgelehnt – dort steht,
 warum.
 
+Bei „daily message quota reached" hat ntfy.sh sein Tageslimit erreicht. Die
+Bewerbung bleibt trotzdem in KV; fuer eine unabhaengige E-Mail-Benachrichtigung
+den Brevo-API-Schluessel nach Schritt 4c einrichten.
+
+**Bewerbungs-E-Mail kommt nicht**
+Im Selbsttest muessen „Bewerbungs-E-Mail eingerichtet" auf **bereit** und
+„Bewerbungs-E-Mail-Hinweise ausstehend" moeglichst auf **0** stehen. Ein
+ausstehender Hinweis wird alle fuenf Minuten erneut versucht. Pruefe bei einem
+Fehler, ob das Secret `BREVO_API_KEY` gueltig ist und die Absenderadresse
+`mail@mvlg-wag.de` in Brevo freigeschaltet ist.
+
 **Auf der Fehlerseite stand „Gespeichert" statt „aufs Telefon bekommen"**
 Das ist keine Panne, sondern die ehrliche Auskunft: Die Meldung liegt sicher,
 aber es war kein ntfy-Thema hinterlegt. Schritt 4b nachholen.
@@ -340,19 +370,18 @@ aber es war kein ntfy-Thema hinterlegt. Schritt 4b nachholen.
 
 ## Was das Netz nicht kann
 
-- **Aktuelle Inhalte zeigen.** Aktivitäten, Portfolio, Vorteilsliste und
-  Stufen sind der Stand vom letzten `python werkzeuge/auffangnetz_bauen.py`.
-  Wer im Dashboard etwas ändert, sieht es auf der Notfassung erst nach dem
-  nächsten Bauen. Das Quiz fehlt ganz – es braucht den Server.
+- **Dashboard-Inhalte live zeigen.** Die öffentliche Seite und das Quiz
+  bleiben verfügbar, aber dynamische Inhalte und Anmelden brauchen den Server.
+  Nach Änderungen an `wag-koblenz/dist` muss der Worker neu gebaut und
+  deployed werden.
 - **Anmelden.** Dafür braucht es die Datenbank. Genau das steht im Hinweis,
   der beim Klick auf „Login" aufgeht; auf `app.mvlg-wag.de` und auf
   `/dashboard/…` steht er gleich offen, denn wer dorthin wollte, wollte sich
   anmelden.
 - **Eine laufende Eingabe retten.** Wer gerade ein Formular abgeschickt hat und
-  dabei in den Ausfall läuft, verliert das Getippte. Das ließe sich nur auf dem
-  Gerät selbst abfangen, nicht am Rand des Netzes. Was auf der Notfassung
-  selbst getippt wird, bleibt dagegen stehen – sie lädt sich nicht von allein
-  neu.
+  dabei in den Ausfall läuft, muss es erneut absenden. Eine Bewerbung, die auf
+  der öffentlichen Seite ausgefüllt wurde, wird dagegen direkt beim Worker
+  zwischengespeichert.
 - **Einen Ausfall von Cloudflare oder der Domain überbrücken.** Zeigt die
   Domain nicht mehr auf Cloudflare, ist auch der Worker nicht erreichbar.
 

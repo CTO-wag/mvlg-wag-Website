@@ -1,10 +1,11 @@
 """Startseite, Quiz, Rechtstexte, Kontaktformular."""
 
 import json
+import os
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import (
-    PlainTextResponse, RedirectResponse, Response,
+    FileResponse, PlainTextResponse, RedirectResponse, Response,
 )
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -18,6 +19,9 @@ from kern.text import email_gueltig, email_normal, kuerzen, sauber
 from kern.vorlagen import zeige
 
 router = APIRouter()
+NETLIFY_DIST = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "wag-koblenz", "dist")
 
 
 def _galerienamen(wert: str) -> set[str]:
@@ -113,16 +117,8 @@ def _kontext(request: Request, db: Session, **rest) -> dict:
 
 
 @router.get("/")
-def startseite(request: Request, db: Session = Depends(hole_db)):
-    return zeige("oeffentlich/start.html", request=request,
-                 **_kontext(request, db,
-                            angebot=inhalte.bloecke("angebot"),
-                            portfolio=inhalte.bloecke("portfolio"),
-                            vorteile=inhalte.bloecke("vorteile"),
-                            stufen=inhalte.bloecke("stufen"),
-                            quiz_anzahl=len(QUIZ_FRAGEN),
-                            kontakt_erfolg=False, kontakt_fehler=None,
-                            pfad="/"))
+def startseite():
+    return FileResponse(os.path.join(NETLIFY_DIST, "index.html"))
 
 
 @router.get("/kontakt", include_in_schema=False)
